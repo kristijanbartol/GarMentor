@@ -1,0 +1,62 @@
+FROM pytorch/pytorch:1.6.0-cuda10.1-cudnn7-devel
+
+ENV PATH=$PATH:/opt/conda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/cuda/bin/
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/
+
+ENV CUDA_HOME=/usr/local/cuda/
+ENV CUDA_TOOLKIT_ROOT_DIR=$CUDA_HOME
+ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0+PTX"
+ENV TORCH_NVCC_FLAGS="-Xfatbin -compress-all"
+ENV CMAKE_PREFIX_PATH="$(dirname $(which conda))/../"
+
+ENV C_INCLUDE_PATH=$C_INCLUDE_PATH:$CUDA_HOME/targets/
+ENV CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH:$CUDA_HOME/targets/
+ENV C_INCLUDE_PATH=$C_INCLUDE_PATH:$CUDA_HOME/targets/x86_64-linux/include/
+ENV CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH:$CUDA_HOME/targets/x86_64-linux/include/
+
+ENV FORCE_CUDA="1"
+
+COPY . /meshurer/
+
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
+
+RUN apt-get update && apt-get install -y git \
+	ninja-build \
+	libglib2.0-0 \
+	libsm6 \
+	libxrender-dev \
+	libxext6 \
+	libgl1-mesa-glx \
+	python3-pip \
+	vim \
+	curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3.7 -m pip install \
+	torch==1.6.0 \
+	torchvision==0.7.0 \
+	opencv-python \
+	tqdm \
+	matplotlib \
+	dataclasses \
+	pyyaml \
+	yacs \
+	fvcore==0.1.2.post20201213 \
+	scikit-image==0.17.2 \
+	scipy==1.5.4 \
+	smplx==0.1.26 \
+	trimesh \
+	scikit-learn \
+	tensorboard
+
+WORKDIR /
+
+RUN curl -LO https://github.com/NVIDIA/cub/archive/1.10.0.tar.gz && \
+	tar xzf 1.10.0.tar.gz 
+
+ENV CUB_HOME=/cub-1.10.0
+
+RUN python3.7 -m pip install "git+https://github.com/facebookresearch/pytorch3d.git@v0.3.0"
+
+WORKDIR /meshurer
