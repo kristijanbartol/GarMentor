@@ -1,0 +1,22 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                //"--image_dir", "./demo/", "--save_dir", "./output/", "--visualise_samples", "--visualise_uncropped"     // predict
+                //"-D", "ssp3d", "-V", "-M"     // evaluate
+                //"--lsun_dir", "../lsun/", "--train_files_dir", "train_files/"     // copy LSUN
+                "-E", "experiments/zero_male_t_norm", "-G", "male", "--use_verts3d_t_norm", "--from_scratch"             // train
+            ]
+        }
+    ]
+}
