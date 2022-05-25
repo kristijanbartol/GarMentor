@@ -1,3 +1,3 @@
-#!/bin/sh
+#!/bin/bash
 
-docker build -t $USER-garmentor docker/
+docker build -t $USER-garmentor .

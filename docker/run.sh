@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if [[ "$USER" == "kristijan" ]]; then
 	REPO_DIR=/media/kristijan/kristijan-hdd-ex/garmentor/
@@ -6,6 +6,9 @@ if [[ "$USER" == "kristijan" ]]; then
 elif [[ "$USER" == "dbojanic" ]]; then
 	REPO_DIR=/home/dbojanic/garmentor/
 	BASE_DATA_DIR=/home/dbojanic/data/
+elif [[ "$USER" == "julien" ]]; then
+	REPO_DIR=/home/julien/git/garmentor/
+	BASE_DATA_DIR=/home/julien/data/
 else
 	REPO_DIR=/home/$USER/garmentor/
 	BASE_DATA_DIR=/home/$USER/data/
