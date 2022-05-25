@@ -16,7 +16,7 @@ ENV CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH:$CUDA_HOME/targets/x86_64-linux/inclu
 
 ENV FORCE_CUDA="1"
 
-COPY . /meshurer/
+COPY . /garmentor/
 
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
 
@@ -59,4 +59,4 @@ ENV CUB_HOME=/cub-1.10.0
 
 RUN python3.7 -m pip install "git+https://github.com/facebookresearch/pytorch3d.git@v0.3.0"
 
-WORKDIR /meshurer
+WORKDIR /garmentor
