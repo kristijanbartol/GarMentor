@@ -1,0 +1,3 @@
+[submodule "tailornet-for-garmentor"]
+	path = tailornet-for-garmentor
+	url = https://github.com/kristijanbartol/tailornet-for-garmentor.git
