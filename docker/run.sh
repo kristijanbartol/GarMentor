@@ -1,15 +1,20 @@
-#!/bin/sh
+#!/bin/bash
 
-if [[ "$(whoami)" == "kristijan" ]]; then
-	REPO_DIR=/media/kristijan/kristijan-hdd-ex/meshurer/
+if [[ "$USER" == "kristijan" ]]; then
+	REPO_DIR=/media/kristijan/kristijan-hdd-ex/garmentor/
 	BASE_DATA_DIR=/media/kristijan/kristijan-hdd-ex/data/
-		else
-	REPO_DIR=/home/dbojanic/meshurer/
+elif [[ "$USER" == "dbojanic" ]]; then
+	REPO_DIR=/home/dbojanic/garmentor/
 	BASE_DATA_DIR=/home/dbojanic/data/
+elif [[ "$USER" == "julien" ]]; then
+	REPO_DIR=/home/julien/git/garmentor/
+	BASE_DATA_DIR=/home/julien/data/
+else
+	REPO_DIR=/home/$USER/garmentor/
+	BASE_DATA_DIR=/home/$USER/data/
 fi
 
-docker run --rm --gpus all --shm-size=8gb --name kbartol-meshurer -it \
-	-v ${REPO_DIR}:/meshurer \
+docker run --rm --gpus all --shm-size=8gb --name $USER-garmentor -it \
+	-v ${REPO_DIR}:/garmentor \
 	-v ${BASE_DATA_DIR}/3dpw/:/data/3dpw/ \
-	-v ${BASE_DATA_DIR}:/SSP-3D/ kbartol-meshurer
-
+	-v ${BASE_DATA_DIR}:/SSP-3D/ $USER-garmentor
