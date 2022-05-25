@@ -21,7 +21,8 @@ from train.train_poseMF_shapeGaussian_net import train_poseMF_shapeGaussian_net
 def run_train(device,
               experiment_dir,
               pose_shape_cfg_opts=None,
-              resume_from_epoch=None):
+              resume_from_epoch=None,
+              is_garmentor=False):
 
     pose_shape_cfg = get_poseMF_shapeGaussian_cfg_defaults()
 
@@ -126,6 +127,8 @@ if __name__ == '__main__':
                         help='Command line options to modify experiment config e.g. ''-O TRAIN.NUM_EPOCHS 120'' will change number of training epochs to 120 in the config.')
     parser.add_argument('--resume_from_epoch', '-R', type=int, default=None,
                         help='Epoch to resume experiment from. If resuming, experiment_dir must already exist, with saved model checkpoints and config yaml file.')
+    parser.add_argument('--garmentor', dest='garmentor', action='store_true',
+                        help='Whether to train Garmentor using TailorNet as synthetic data.')
     parser.add_argument('--gpu', type=int, default=0)
     args = parser.parse_args()
 
@@ -137,4 +140,5 @@ if __name__ == '__main__':
     run_train(device=device,
               experiment_dir=args.experiment_dir,
               pose_shape_cfg_opts=args.pose_shape_cfg_opts,
-              resume_from_epoch=args.resume_from_epoch)
+              resume_from_epoch=args.resume_from_epoch,
+              is_garmentor=args.garmentor)
