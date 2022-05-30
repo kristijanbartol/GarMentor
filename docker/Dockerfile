@@ -32,7 +32,8 @@ RUN pip install \
 	scikit-learn \
 	tensorboard \
 	chumpy \
-	tensorboardX
+	tensorboardX \
+	"protobuf<4.21.0"
 
 # pytorch3d prebuilt wheel
 RUN pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py38_cu113_pyt1110/download.html
