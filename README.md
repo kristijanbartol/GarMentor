@@ -8,19 +8,18 @@ Work-in-progress
 - Linux or macOS
 - Python ≥ 3.6
 
-### Installation
+### Setup
 
-Install GPU-enabled docker. Then build docker image:
-
-```
-docker build -t <yourname>-garmentor docker
-```
-
-Then run the container:
-
-```
-bash docker/run.sh
-```
+1) Install Docker and the NVIDIA Container Toolkit (see e.g. [here](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker))
+2) Build our docker image (from within the `garmentor/` directory) with:
+    ```
+    docker build -t <yourname>-garmentor docker
+    ```
+    or execute the `build.sh` script **from within** the `garmentor/docker/` directory.
+3) To run the container, use
+    ```
+    docker/run.sh
+    ```
 
 ### Model files
 You will need to download the SMPL model. The [neutral model](http://smplify.is.tue.mpg.de) is required for training and running the demo code. If you want to evaluate the model on datasets with gendered SMPL labels (such as 3DPW and SSP-3D), the male and female models are available [here](http://smpl.is.tue.mpg.de). You will need to convert the SMPL model files to be compatible with python3 by removing any chumpy objects. To do so, please follow the instructions [here](https://github.com/vchoutas/smplx/tree/master/tools).
