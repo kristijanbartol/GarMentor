@@ -16,7 +16,10 @@ Work-in-progress
     docker build -t <yourname>-garmentor docker
     ```
     or execute the `build.sh` script **from within** the `garmentor/docker/` directory.
-3) To run the container, use
+3) Setup data required by TailorNet and HierProb3D:
+    * TailorNet: Please refer to [this document](documentation/tailornet_preparation)
+    * HierProb3D: Please refer to [this document](documentation/hierprob3d_preparation)
+4) To run the container, use
     ```
     docker/run.sh
     ```
@@ -67,7 +70,7 @@ python run_evaluate.py -D ssp3d
 
 Download 3DPW from [here](https://virtualhumans.mpi-inf.mpg.de/3DPW/). You will need to preprocess the dataset first, to extract centred+cropped images and SMPL labels (adapted from [SPIN](https://github.com/nkolot/SPIN/tree/master/datasets/preprocess)):
 ```
-python data/pw3d_preprocess.py --dataset_path $3DPW_DIR_PATH
+python -m data.pw3d_preprocess --dataset_path $3DPW_DIR_PATH
 ```
 This should create a subdirectory with preprocessed files, such that the 3DPW directory has the following structure:
 ```
