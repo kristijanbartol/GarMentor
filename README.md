@@ -13,12 +13,12 @@ Work-in-progress
 1) Install Docker and the NVIDIA Container Toolkit (see e.g. [here](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker))
 2) Build our docker image (from within the `garmentor/` directory) with:
     ```
-    docker build -t <yourname>-garmentor docker
+    docker build -t <username>-garmentor docker
     ```
     or execute the `build.sh` script **from within** the `garmentor/docker/` directory.
 3) Setup data required by TailorNet and HierProb3D:
-    * TailorNet: Please refer to [this document](documentation/tailornet_preparation)
-    * HierProb3D: Please refer to [this document](documentation/hierprob3d_preparation)
+    * TailorNet: Please refer to [this document](documentation/tailornet_preparation.md)
+    * HierProb3D: Please refer to [this document](documentation/hierprob3d_preparation.md)
 4) To run the container, use
     ```
     docker/run.sh
