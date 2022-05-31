@@ -14,7 +14,11 @@ else
 	BASE_DATA_DIR=/home/$USER/data/
 fi
 
-docker run -it --rm --runtime=nvidia --gpus all --shm-size=8gb \
+docker run -it \
+	--rm \
+	--runtime=nvidia --gpus all \
+	--shm-size=8gb \
+	--name $USER-garmentor \
 	-v ${REPO_DIR}:/garmentor \
 	-v ${BASE_DATA_DIR}/3dpw/:/data/3dpw/ \
 	-v ${BASE_DATA_DIR}:/SSP-3D/ \
