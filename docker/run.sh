@@ -26,7 +26,11 @@ else
 	HIERPROB3D_DATA_DIR=/path/to/hierprob3d/data
 fi
 
-docker run --rm --gpus all --shm-size=8gb --name $USER-garmentor -it \
+docker run -it \
+	--rm \
+	--runtime=nvidia --gpus all \
+	--shm-size=8gb \
+	--name $USER-garmentor \
 	-v ${REPO_DIR}:/garmentor \
 	-v ${PW3D_DIR}:/data/3DPW/ \
 	-v ${SSP3D_DIR}:/data/SSP-3D/ \
