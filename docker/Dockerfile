@@ -41,6 +41,9 @@ RUN pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfile
 # psbody.mesh installation
 RUN mkdir /psbody && cd /psbody && git clone https://github.com/MPI-IS/mesh && cd mesh && make all
 
+# clone SMPL-X code
+RUN mkdir /home/git && cd /home/git && git clone https://github.com/vchoutas/smplx
+
 RUN mkdir -p /garmentor
 
 WORKDIR /garmentor
