@@ -33,7 +33,7 @@
 Your `<tailornet_data_root>` should now look similar to this (depending on the different garment types that you downloaded):
 
 ```
-.
+<tailornet_data_root>/
 ├── apose.npy
 ├── apose.pkl
 ├── garment_class_info.pkl

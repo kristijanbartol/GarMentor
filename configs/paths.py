@@ -8,7 +8,7 @@ H36M_REGRESSOR = '/data/hierprob3d/J_regressor_h36m.npy'
 DP_UV_PROCESSED_FILE = '/data/hierprob3d/UV_Processed.mat'
 
 # ------------------------- Eval Datasets -------------------------
-PW3D_PATH = '/data/3DPW'
+PW3D_PATH = '/data/3DPW/test'
 SSP3D_PATH = '/data/SSP-3D'
 
 # ------------------------- Train Datasets -------------------------

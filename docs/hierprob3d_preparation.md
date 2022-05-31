@@ -11,7 +11,7 @@
 
 Your `<hierprob3d_data_root>` should now look like this:
 ```
-.
+<hierprob3d_data_root>/
 ├── cocoplus_regressor.npy
 ├── J_regressor_extra.npy
 ├── J_regressor_h36m.npy
@@ -20,4 +20,5 @@ Your `<hierprob3d_data_root>` should now look like this:
 │   ├── SMPL_MALE.pkl
 │   └── SMPL_NEUTRAL.pkl
 └── UV_Processed.mat
+
 ```
