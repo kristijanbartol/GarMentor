@@ -42,7 +42,9 @@ RUN pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfile
 RUN mkdir /git && cd /git && git clone https://github.com/MPI-IS/mesh && cd mesh && make all
 
 # clone SMPL-X code and make tools/clean_ch.py usable with Python 3
-RUN cd /git && git clone https://github.com/vchoutas/smplx && cd smplx/tools && sed -i "/body_data = / s/pickle.load(body_file)/pickle.load(body_file, encoding='latin1')/" clean_ch.py
+RUN cd /git && git clone https://github.com/vchoutas/smplx && cd smplx/tools && \
+	sed -i "/body_data = / s/pickle.load(body_file)/pickle.load(body_file, encoding='latin1')/" clean_ch.py && \
+	sed -i "s/iteritems/items/g" clean_ch.py
 
 RUN mkdir -p /garmentor
 
