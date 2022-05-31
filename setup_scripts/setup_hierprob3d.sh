@@ -10,7 +10,7 @@ else
         --runtime=nvidia \
         -v $1:/hierprob3d_data \
         -w /home/git/smplx/tools \
-        $USER-garmentor /bin/bash '
+        $USER-garmentor /bin/bash -c '
         for file in /hierprob3d_data/*.pkl
         do
             python clean_ch.py --input-models $file --output-folder /hierprob3d_data/smpl
