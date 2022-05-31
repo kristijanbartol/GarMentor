@@ -17,8 +17,8 @@ Work-in-progress
     ```
     or execute the `build.sh` script **from within** the `garmentor/docker/` directory.
 3) Setup data required by TailorNet and HierProb3D:
-    * TailorNet: Please refer to [this document](documentation/tailornet_preparation.md)
-    * HierProb3D: Please refer to [this document](documentation/hierprob3d_preparation.md)
+    * TailorNet: Please refer to [this document](docs/tailornet_preparation.md)
+    * HierProb3D: Please refer to [this document](docs/hierprob3d_preparation.md)
 4) To run the container, use
     ```
     docker/run.sh
