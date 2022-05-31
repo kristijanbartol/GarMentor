@@ -2,7 +2,7 @@
 1) Download the SMPL models (Female, Male and Neutral) from [this](https://smpl.is.tue.mpg.de/) link (requires registration)
 2) Unzip the file and put the three `*.pkl` files from `SMPL_python_v.1.1.0/smpl/models/` in a directory `<tailornet_data_root>/smpl`
     * `<tailornet_data_root>` can be choosen arbitrarily
-3) In `garmentor/tailornet_dataset-for-garmentor/global_var.py` , make sure that the filenames for `SMPL_PATH_MALE` and `SMPL_PATH_FEMALE` are the same as the filenames of the `*.pkl` files that you unzipped in step 2
+3) In `garmentor/tailornet_dataset_for_garmentor/global_var.py` , make sure that the filenames for `SMPL_PATH_MALE` and `SMPL_PATH_FEMALE` are the same as the filenames of the `*.pkl` files that you unzipped in step 2
     * The filenames are the last arguments in the `os.path.join()` calls
     * It's ok that no neutral model is listed
     * TODO: Downloaded male and female models are v.1.1.0, but every script references them as v.1.0.0, why? Do we have to rename these files, or can we safely change all references to v.1.1.0?
