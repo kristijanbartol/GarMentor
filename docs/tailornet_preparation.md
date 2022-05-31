@@ -8,7 +8,7 @@
     * TODO: Downloaded male and female models are v.1.1.0, but every script references them as v.1.0.0, why? Do we have to rename these files, or can we safely change all references to v.1.1.0?
 4) Run
     ```bash
-    garmentor/setup_scripts/setup_tailornet.sh <absolute/path/to/garmentor> <tailornet_data_root>
+    garmentor/setup_scripts/setup_tailornet.sh /path/to/garmentor/directory <tailornet_data_root>
     ```
     * This converts the SMPL models for use in TailorNet
 5) Download TailorNet dataset from [here](https://nextcloud.mpi-klsb.mpg.de/index.php/s/W7a57iXRG9Yms6P)

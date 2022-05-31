@@ -19,7 +19,10 @@ Work-in-progress
 3) Setup data required by TailorNet and HierProb3D:
     * TailorNet: Please refer to [this document](docs/tailornet_preparation.md)
     * HierProb3D: Please refer to [this document](docs/hierprob3d_preparation.md)
-4) To run the container, use
+4) Setup 3DPW and SSP-3D datasets:
+    * 3DPW: Please refer to [this document](docs/3dpw_preparation.md)
+    * SSP-3D: Please refer to [this document](docs/ssp-3d_preparation.md)
+5) To run the container, use
     ```
     docker/run.sh
     ```
