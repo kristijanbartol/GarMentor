@@ -22,7 +22,13 @@ Work-in-progress
 4) Setup 3DPW and SSP-3D datasets:
     * 3DPW: Please refer to [this document](docs/3dpw_preparation.md)
     * SSP-3D: Please refer to [this document](docs/ssp-3d_preparation.md)
-5) To run the container, use
+5) Adapt the `docker/run.sh` script to mount the root directories that you previously created into the docker container
+    * `REPO_DIR` should point to the garmentor repository
+    * `PW3D_DIR` should point to `<3dpw_root>`
+    * `SSP3D_DIR` should point to `<ssp-3d_root>`
+    * `TAILORNET_DATA_DIR` should point to `<tailornet_data_root>`
+    * `HIERPROB3D_DATA_DIR` should point to `<hierprob3d_data_root>`
+6) To run the container with all data mounted in the correct places, you can now use
     ```
     docker/run.sh
     ```
