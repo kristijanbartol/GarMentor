@@ -9,7 +9,7 @@ else
         --rm \
         --runtime=nvidia \
         -v $1:/hierprob3d_data \
-        -w /home/git/smplx/tools \
+        -w /git/smplx/tools \
         $USER-garmentor /bin/bash -c '
         for file in /hierprob3d_data/*.pkl
         do
