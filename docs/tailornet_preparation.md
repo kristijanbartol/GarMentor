@@ -5,7 +5,7 @@
 3) In `garmentor/tailornet_dataset_for_garmentor/global_var.py` , make sure that the filenames for `SMPL_PATH_MALE` and `SMPL_PATH_FEMALE` are the same as the filenames of the `*.pkl` files that you unzipped in step 2
     * The filenames are the last arguments in the `os.path.join()` calls
     * It's ok that no neutral model is listed here
-4) In `garmentor/tailornet-for-garmentor/global_var.py` , make sure that the **filenames** for `SMPL_PATH_[FEMALE, MALE, NEUTRAL]` correspond to the filenames of the `*.pkl` files that you unzipped in step 2
+4) In `garmentor/tailornet_for_garmentor/global_var.py` , make sure that the **filenames** for `SMPL_PATH_[FEMALE, MALE, NEUTRAL]` correspond to the filenames of the `*.pkl` files that you unzipped in step 2
     * Only modify the filenames but keep the paths as they are
 5) Run
     ```bash
@@ -67,8 +67,3 @@ Your `<tailornet_data_root>` should now look similar to this (depending on the d
 └── weights
     └── t-shirt_male_weights
 ```
-<!---
-SMPL_PATH_NEUTRAL = '/data/tailornet/smpl/basicmodel_neutral_lbs_10_207_0_v1.1.0.pkl'
-SMPL_PATH_MALE = '/data/tailornet/smpl/basicmodel_m_lbs_10_207_0_v1.0.0.pkl'
-SMPL_PATH_FEMALE = '/data/tailornet/smpl/basicModel_f_lbs_10_207_0_v1.0.0.pkl' 
---->

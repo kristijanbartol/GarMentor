@@ -1,6 +1,6 @@
-[submodule "tailornet-for-garmentor"]
-	path = tailornet-for-garmentor
-	url = https://github.com/kristijanbartol/tailornet-for-garmentor.git
+[submodule "tailornet_for_garmentor"]
+	path = tailornet_for_garmentor
+	url = https://github.com/kristijanbartol/tailornet_for_garmentor.git
 [submodule "tailornet_dataset_for_garmentor"]
 	path = tailornet_dataset_for_garmentor
 	url = https://github.com/kristijanbartol/tailornet_dataset_for_garmentor
