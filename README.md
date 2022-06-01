@@ -12,7 +12,7 @@ Work-in-progress
 
 1) Install Docker and the NVIDIA Container Toolkit (see e.g. [here](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker))
 2) Build our docker image (from within the `garmentor/` directory) with:
-    ```
+    ```bash
     docker build -t <username>-garmentor docker
     ```
     or execute the `build.sh` script **from within** the `garmentor/docker/` directory.
@@ -29,9 +29,10 @@ Work-in-progress
     * `TAILORNET_DATA_DIR` should point to `<tailornet_data_root>`
     * `HIERPROB3D_DATA_DIR` should point to `<hierprob3d_data_root>`
 6) To run the container with all data mounted in the correct places, you can now use
-    ```
+    ```bash
     docker/run.sh
     ```
+The following sections give an overview on how to use HierProb3D for inference and training. While they also contain instructions on how to setup the code and data, if you have followed the above six steps, you are already ready to go and can ignore these instructions.
 
 ### Model files
 You will need to download the SMPL model. The [neutral model](http://smplify.is.tue.mpg.de) is required for training and running the demo code. If you want to evaluate the model on datasets with gendered SMPL labels (such as 3DPW and SSP-3D), the male and female models are available [here](http://smpl.is.tue.mpg.de). You will need to convert the SMPL model files to be compatible with python3 by removing any chumpy objects. To do so, please follow the instructions [here](https://github.com/vchoutas/smplx/tree/master/tools).

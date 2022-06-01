@@ -16,8 +16,8 @@ elif [[ "$USER" == "julien" ]]; then
 	REPO_DIR=/home/julien/git/garmentor
 	PW3D_DIR=/home/julien/data/3DPW
 	SSP3D_DIR=/home/julien/data/SSP-3D
-	TAILORNET_DATA_DIR=/home/julien/body_models
-	HIERPROB3D_DATA_DIR=/home/julien/git/HierarchicalProbabilistic3DHuman/model_files
+	TAILORNET_DATA_DIR=/home/julien/data/TailorNet
+	HIERPROB3D_DATA_DIR=/home/julien/data/HierProb3D
 else
 	REPO_DIR=/path/to/garmentor/repository
 	PW3D_DIR=/path/to/3DPW/dataset

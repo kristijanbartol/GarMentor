@@ -4,14 +4,15 @@
     * `<tailornet_data_root>` can be choosen arbitrarily
 3) In `garmentor/tailornet_dataset_for_garmentor/global_var.py` , make sure that the filenames for `SMPL_PATH_MALE` and `SMPL_PATH_FEMALE` are the same as the filenames of the `*.pkl` files that you unzipped in step 2
     * The filenames are the last arguments in the `os.path.join()` calls
-    * It's ok that no neutral model is listed
-    * TODO: Downloaded male and female models are v.1.1.0, but every script references them as v.1.0.0, why? Do we have to rename these files, or can we safely change all references to v.1.1.0?
-4) Run
+    * It's ok that no neutral model is listed here
+4) In `garmentor/tailornet-for-garmentor/global_var.py` , make sure that the **filenames** for `SMPL_PATH_[FEMALE, MALE, NEUTRAL]` correspond to the filenames of the `*.pkl` files that you unzipped in step 2
+    * Only modify the filenames but keep the paths as they are
+5) Run
     ```bash
     garmentor/setup_scripts/setup_tailornet.sh /path/to/garmentor/directory <tailornet_data_root>
     ```
     * This converts the SMPL models for use in TailorNet
-5) Download TailorNet dataset from [here](https://nextcloud.mpi-klsb.mpg.de/index.php/s/W7a57iXRG9Yms6P)
+6) Download TailorNet dataset from [here](https://nextcloud.mpi-klsb.mpg.de/index.php/s/W7a57iXRG9Yms6P)
     * Download `dataset_meta.zip` (dataset meta data)
     * Download one or more sub-datasets (each represents a different garment type):
         * t-shirt_female(6.9 GB)
@@ -25,10 +26,9 @@
         * short-pant_female(1.9 GB)
         * short-pant_male(2 GB)
         * skirt_female(5 GB)
-6) Unzip the downloaded files to `<tailornet_data_root>`
-7) For the garment types you downloaded, download the pre-trained weights from [here](https://nextcloud.mpi-klsb.mpg.de/index.php/s/LTWJPcRt7gsgoss)
-8) Unzip the downloaded weights to `<tailornet_data_root>/weights`
-    * TODO: change SMPL model version in filename to 1.1.0? Or do we keep it? In `TailorNet/global_var.py`
+7) Unzip the downloaded files to `<tailornet_data_root>`
+8) For the garment types you downloaded, download the pre-trained weights from [here](https://nextcloud.mpi-klsb.mpg.de/index.php/s/LTWJPcRt7gsgoss)
+9) Unzip the downloaded weights to `<tailornet_data_root>/weights`
 
 Your `<tailornet_data_root>` should now look similar to this (depending on the different garment types that you downloaded):
 
