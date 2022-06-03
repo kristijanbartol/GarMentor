@@ -4,3 +4,6 @@
 [submodule "tailornet_dataset_for_garmentor"]
 	path = tailornet_dataset_for_garmentor
 	url = https://github.com/kristijanbartol/tailornet_dataset_for_garmentor
+[submodule "lsun_for_garmentor"]
+	path = lsun_for_garmentor
+	url = https://github.com/jufi2112/lsun_for_garmentor

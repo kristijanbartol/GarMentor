@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# arg 1 - path to <hierprob3d_data_root>
+# arg 1 - path to garmentor
+# arg 2 - path to <hierprob3d_data_root>
 
 if [ "$#" -ne 2 ]; then
     echo "1st argument: Path to garmentor directory"

@@ -27,19 +27,43 @@ Your `<hierprob3d_data_root>` should now look like this:
 └── UV_Processed.mat
 ```
 ## Setup Data for Training
-Please note: You will need to download roughly 157 GB of data
+Please note: You will need to download roughly 168 GB of data.
 1) Create the directory `<hierprob3d_data_root>/training`
 2) Download train and validation body poses and textures from [here](https://drive.google.com/drive/folders/1lvxwKcqi4HaxTLQlEicPhN5Q3L-aWjYN) and move them to `<hierprob3d_data_root>/training`
-3) Download the [LSUN](https://www.yf.io/p/lsun) dataset to a directory `<lsun_original_data>`
-    * Clone [this](https://github.com/fyu/lsun) repository
-    * From within this repository, run
-        ```bash
-        python3 download.py -o <lsun_original_data>
-        ```
-        * The download can take a while, depending on your internet connection (~157 GB)
-4) Run
+3) In the following, these data locations will be referenced:
+    * `<lsun_zipped>`: Directory where the zipped LSUN scenes are located
+    * `<lsun_unzipped>`: Directory where the unzipped LSUN databases are located
+    * `<lsun_images>`: Directory where the extracted LSUN images are located
+4) Download the [LSUN](https://www.yf.io/p/lsun) datasets to `<lsun_zipped>`
+    * Option 1:
+        * Create a new (or use an existing) python environment and install (e.g. with `pip`) the following packages:
+            * `numpy`
+            * `opencv-python`
+            * `lmdb`
+            * `tqdm`
+        * Clone [this](https://github.com/jufi2112/lsun_for_garmentor) repository 
+        * From within this repository, run
+            ```bash
+            python3 download.py -o <lsun_zipped>
+            ```
+    * Option 2:
+        * Manually download the dataset from [this](http://dl.yf.io/lsun/scenes/) website to `<lsun_zipped>`
+5) Extract the downloaded `*.zip` files to `<lsun_unzipped>`
+    * It's not a problem if you're unable to unzip the files that contain the test images 
+6) To extract the images from the unzipped databases, you can
+    * Option 1:
+        * Use the previously created Python environment and run, from within the cloned `lsun_for_garmentor` repository,
+            ```
+            python data.py export <list all extracted folders from inside <lsun_unzipped> > --out_dir <lsun_images>
+            ```
+    * Option 2:
+        * Run
+            ```bash
+            garmentor/setup_scripts/setup_hierprob3d_data.sh /path/to/garmentor/directory <lsun_unzipped> <lsun_images>
+            ```
+5) Run
     ```bash
-    garmentor/setup_scripts/setup_hierprob3d_training.sh /path/to/garmentor/directory <hierprob3d_data_root> <lsun_original_data>
+    garmentor/setup_scripts/setup_hierprob3d_training.sh /path/to/garmentor/directory <hierprob3d_data_root> <lsun_images>
     ```
 
 Your `<hierprob3d_data_root>` should now look like this:
