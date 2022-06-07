@@ -49,24 +49,72 @@ Please note: You will need to download roughly 168 GB of data.
     * Option 2:
         * Manually download the dataset from [this](http://dl.yf.io/lsun/scenes/) website to `<lsun_zipped>`
 5) Extract the downloaded `*.zip` files to `<lsun_unzipped>`
-    * It's not a problem if you're unable to unzip the files that contain the test images 
+    * Do **not** extract the test images
 6) To extract the images from the unzipped databases, you can
     * Option 1:
         * Use the previously created Python environment and run, from within the cloned `lsun_for_garmentor` repository,
             ```
-            python data.py export <list all extracted folders from inside <lsun_unzipped> > --out_dir <lsun_images>
+            python data.py export <list all extracted folders from inside <lsun_unzipped> > --out_dir <lsun_images> [--max_extract X]
             ```
+            * The `--max_extract X` option allows you to only extract a maximum of `X` images from each database
     * Option 2:
         * Run
             ```bash
-            garmentor/setup_scripts/setup_hierprob3d_data.sh /path/to/garmentor/directory <lsun_unzipped> <lsun_images>
+            garmentor/setup_scripts/setup_hierprob3d_data.sh /path/to/garmentor/directory <lsun_unzipped> <lsun_images> [X]
             ```
+            * Specifying `X` is optional and lets you set the maximum number of images that should be extracted from each database
+    * `lsun_images` should now look like this:
+        ```bash
+        <lsun_images>/
+        ├── bedroom_train_lmdb_images
+        ├── bedroom_val_lmdb_images
+        ├── bridge_train_lmdb_images
+        ├── bridge_val_lmdb_images
+        ├── church_outdoor_train_lmdb_images
+        ├── church_outdoor_val_lmdb_images
+        ├── classroom_train_lmdb_images
+        ├── classroom_val_lmdb_images
+        ├── conference_room_train_lmdb_images
+        ├── conference_room_val_lmdb_images
+        ├── dining_room_train_lmdb_images
+        ├── dining_room_val_lmdb_images
+        ├── kitchen_train_lmdb_images
+        ├── kitchen_val_lmdb_images
+        ├── living_room_train_lmdb_images
+        ├── living_room_val_lmdb_images
+        ├── restaurant_train_lmdb_images
+        ├── restaurant_val_lmdb_images
+        ├── tower_train_lmdb_images
+        └── tower_val_lmdb_images
+        ```
 5) Run
     ```bash
     garmentor/setup_scripts/setup_hierprob3d_training.sh /path/to/garmentor/directory <hierprob3d_data_root> <lsun_images>
     ```
 
-Your `<hierprob3d_data_root>` should now look like this:
+Your `<hierprob3d_data_root>` directory should now look like this:
 ```bash
+<hierprob3d_data_root>/
+├── cocoplus_regressor.npy
+├── J_regressor_extra.npy
+├── J_regressor_h36m.npy
+├── pose_hrnet_w48_384x288.pth
+├── poseMF_shapeGaussian_net_weights_female.tar
+├── poseMF_shapeGaussian_net_weights_male.tar
+├── poseMF_shapeGaussian_net_weights.tar
+├── smpl
+│   ├── SMPL_FEMALE.pkl
+│   ├── SMPL_MALE.pkl
+│   └── SMPL_NEUTRAL.pkl
+├── training
+│   ├── lsun_backgrounds
+│   │   ├── train
+│   │   └── val
+│   ├── smpl_train_poses.npz
+│   ├── smpl_train_textures.npz
+│   ├── smpl_val_poses.npz
+│   └── smpl_val_textures.npz
+└── UV_Processed.mat
+
 ```
 
