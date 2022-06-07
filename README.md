@@ -1,6 +1,6 @@
 # Garmentor: Parametric Pose, Shape, and Clothes In-The-Wild
 
-Work-in-progress
+<img src="https://github.com/kristijanbartol/garmentor/blob/master/assets/Garmentor_Pipeline_Overview.png" width="400">
 
 ## Installation
 
