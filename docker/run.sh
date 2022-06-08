@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [[ "$USER" == "kbartol" ]]; then
+if [[ "$USER" == "kristijan" ]]; then
 	REPO_DIR=/media/kristijan/kristijan-hdd-ex/garmentor/
 	BASE_DATA_DIR=/media/kristijan/kristijan-hdd-ex/datasets/
 	PW3D_DIR=${BASE_DATA_DIR}/3dpw/
