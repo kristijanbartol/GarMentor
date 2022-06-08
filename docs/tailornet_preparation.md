@@ -65,5 +65,9 @@ Your `<tailornet_data_root>` should now look similar to this (depending on the d
 │   └── test.txt
 ├── t-shirt_upper_boundary.npy
 └── weights
-    └── t-shirt_male_weights
+    └── t-shirt_male_weights/
+           ...
+    └── pant_male_weights/
+           ...
+    └── ...
 ```
