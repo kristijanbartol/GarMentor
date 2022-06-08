@@ -1,17 +1,19 @@
 #!/bin/bash
 
-if [[ "$USER" == "kristijan" ]]; then
+if [[ "$USER" == "kbartol" ]]; then
 	REPO_DIR=/media/kristijan/kristijan-hdd-ex/garmentor/
-	PW3D_DIR=TODO
-	SSP3D_DIR=TODO
-	TAILORNET_DATA_DIR=TODO
-	HIERPROB3D_DATA_DIR=TODO
+	BASE_DATA_DIR=/media/kristijan/kristijan-hdd-ex/datasets/
+	PW3D_DIR=${BASE_DATA_DIR}/3dpw/
+	SSP3D_DIR=${BASE_DATA_DIR}/SSP-3D/
+	TAILORNET_DATA_DIR=${BASE_DATA_DIR}/tailornet
+	HIERPROB3D_DATA_DIR=${BASE_DATA_DIR}/hierprob3d
 elif [[ "$USER" == "dbojanic" ]]; then
 	REPO_DIR=/home/dbojanic/garmentor/
-	PW3D_DIR=TODO
-	SSP3D_DIR=TODO
-	TAILORNET_DATA_DIR=TODO
-	HIERPROB3D_DATA_DIR=TODO
+	BASE_DATA_DIR=/home/dbojanic/data/
+	PW3D_DIR=${BASE_DATA_DIR}/3dpw/
+	SSP3D_DIR=${BASE_DATA_DIR}/SSP-3D/
+	TAILORNET_DATA_DIR=${BASE_DATA_DIR}/tailornet/
+	HIERPROB3D_DATA_DIR=${BASE_DATA_DIR}/hierprob3d/
 elif [[ "$USER" == "julien" ]]; then
 	REPO_DIR=/home/julien/git/garmentor
 	PW3D_DIR=/home/julien/data/3DPW
