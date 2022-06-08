@@ -19,19 +19,28 @@
     ```
     cd docker && bash build.sh
     ```
-3) Setup data required by TailorNet and HierProb3D:
+3) Update/Init the Git submodules 
+    ([tailornet_for_garmentor](https://github.com/kristijanbartol/tailornet_for_garmentor/tree/0b796fdea3c30c7dbcda14bb487ac6d292589c7e), [tailornet_dataset_for_garmentor](https://github.com/kristijanbartol/tailornet_dataset_for_garmentor/tree/5863a1123e2579a7b7dae5b7a9f558fa80722e91), [lsun_for_garmentor](https://github.com/jufi2112/lsun_for_garmentor/tree/92e855fbafec6988553ce1d94ff004d422ee11b8)). If it's the first time you check-out the submodules, use:
+    ```
+    git submodule update --init --recursive
+    ```
+    For any later submodule update, use:
+    ```
+    git submodule update --recursive --remote
+    ```
+5) Setup data required by TailorNet and HierProb3D:
     * TailorNet: Please refer to [this document](docs/tailornet_preparation.md)
     * HierProb3D: Please refer to [this document](docs/hierprob3d_preparation.md)
-4) Setup 3DPW and SSP-3D datasets:
+6) Setup 3DPW and SSP-3D datasets:
     * 3DPW: Please refer to [this document](docs/3dpw_preparation.md)
     * SSP-3D: Please refer to [this document](docs/ssp-3d_preparation.md)
-5) Adapt the `docker/run.sh` script to mount the root directories that you previously created into the docker container
+7) Adapt the `docker/run.sh` script to mount the root directories that you previously created into the docker container
     * `REPO_DIR` should point to the garmentor repository
     * `PW3D_DIR` should point to `<3dpw_root>`
     * `SSP3D_DIR` should point to `<ssp-3d_root>`
     * `TAILORNET_DATA_DIR` should point to `<tailornet_data_root>`
     * `HIERPROB3D_DATA_DIR` should point to `<hierprob3d_data_root>`
-6) To run the container with all data mounted in the correct places, you can now use
+8) To run the container with all data mounted in the correct places, you can now use
     ```bash
     docker/run.sh
     ```
