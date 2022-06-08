@@ -9,7 +9,7 @@
     * Only modify the filenames but keep the paths as they are
 5) Run
     ```bash
-    garmentor/setup_scripts/setup_tailornet.sh /path/to/garmentor/directory <tailornet_data_root>
+    garmentor/setup_scripts/setup_tailornet.sh /absolute/path/to/garmentor/directory <absolute_tailornet_data_root_dir>
     ```
     * This converts the SMPL models for use in TailorNet
 6) Download TailorNet dataset from [here](https://nextcloud.mpi-klsb.mpg.de/index.php/s/W7a57iXRG9Yms6P)
