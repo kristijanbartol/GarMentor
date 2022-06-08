@@ -33,7 +33,8 @@ RUN pip install \
 	tensorboard \
 	chumpy \
 	tensorboardX \
-	"protobuf<4.21.0"
+	"protobuf<4.21.0" \
+	lmdb
 
 # pytorch3d prebuilt wheel
 RUN pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py38_cu113_pyt1110/download.html
@@ -42,7 +43,7 @@ RUN pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfile
 RUN mkdir /git && cd /git && git clone https://github.com/MPI-IS/mesh && cd mesh && make all
 
 # clone SMPL-X code and make tools/clean_ch.py usable with Python 3
-RUN cd /git && git clone https://github.com/vchoutas/smplx && cd smplx/tools && \
+RUN cd /git && git clone https://github.com/vchoutas/smplx && cd smplx && git reset --hard 5fa20519735cceda19afed0beeabd53caef711cd && cd tools && \
 	sed -i "/body_data = / s/pickle.load(body_file)/pickle.load(body_file, encoding='latin1')/" clean_ch.py && \
 	sed -i "s/iteritems/items/g" clean_ch.py
 

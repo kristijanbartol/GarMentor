@@ -8,19 +8,31 @@
 - Linux or macOS
 - Python ≥ 3.6
 
-### Installation
+### Setup
 
-Install GPU-enabled docker. Then build docker image:
-
-```
-docker build -t <yourname>-garmentor docker
-```
-
-Then run the container:
-
-```
-bash docker/run.sh
-```
+1) Install Docker and the NVIDIA Container Toolkit (see e.g. [here](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker))
+2) Build our docker image (from within the `garmentor/` directory) with:
+    ```bash
+    docker build -t <username>-garmentor docker
+    ```
+    or execute the `build.sh` script **from within** the `garmentor/docker/` directory.
+3) Setup data required by TailorNet and HierProb3D:
+    * TailorNet: Please refer to [this document](docs/tailornet_preparation.md)
+    * HierProb3D: Please refer to [this document](docs/hierprob3d_preparation.md)
+4) Setup 3DPW and SSP-3D datasets:
+    * 3DPW: Please refer to [this document](docs/3dpw_preparation.md)
+    * SSP-3D: Please refer to [this document](docs/ssp-3d_preparation.md)
+5) Adapt the `docker/run.sh` script to mount the root directories that you previously created into the docker container
+    * `REPO_DIR` should point to the garmentor repository
+    * `PW3D_DIR` should point to `<3dpw_root>`
+    * `SSP3D_DIR` should point to `<ssp-3d_root>`
+    * `TAILORNET_DATA_DIR` should point to `<tailornet_data_root>`
+    * `HIERPROB3D_DATA_DIR` should point to `<hierprob3d_data_root>`
+6) To run the container with all data mounted in the correct places, you can now use
+    ```bash
+    docker/run.sh
+    ```
+The following sections give an overview on how to use HierProb3D for inference and training. While they also contain instructions on how to setup the code and data, if you have followed the above six steps, you are already ready to go and can ignore these instructions.
 
 ### Model files
 You will need to download the SMPL model. The [neutral model](http://smplify.is.tue.mpg.de) is required for training and running the demo code. If you want to evaluate the model on datasets with gendered SMPL labels (such as 3DPW and SSP-3D), the male and female models are available [here](http://smpl.is.tue.mpg.de). You will need to convert the SMPL model files to be compatible with python3 by removing any chumpy objects. To do so, please follow the instructions [here](https://github.com/vchoutas/smplx/tree/master/tools).
@@ -68,7 +80,7 @@ python run_evaluate.py -D ssp3d
 
 Download 3DPW from [here](https://virtualhumans.mpi-inf.mpg.de/3DPW/). You will need to preprocess the dataset first, to extract centred+cropped images and SMPL labels (adapted from [SPIN](https://github.com/nkolot/SPIN/tree/master/datasets/preprocess)):
 ```
-python data/pw3d_preprocess.py --dataset_path $3DPW_DIR_PATH
+python -m data.pw3d_preprocess --dataset_path $3DPW_DIR_PATH
 ```
 This should create a subdirectory with preprocessed files, such that the 3DPW directory has the following structure:
 ```
