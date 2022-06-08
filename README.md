@@ -15,7 +15,10 @@
     ```bash
     docker build -t <username>-garmentor docker
     ```
-    or execute the `build.sh` script **from within** the `garmentor/docker/` directory.
+    or execute the `build.sh` script **from within** the `garmentor/docker/` directory:
+    ```
+    cd docker && bash build.sh
+    ```
 3) Setup data required by TailorNet and HierProb3D:
     * TailorNet: Please refer to [this document](docs/tailornet_preparation.md)
     * HierProb3D: Please refer to [this document](docs/hierprob3d_preparation.md)
