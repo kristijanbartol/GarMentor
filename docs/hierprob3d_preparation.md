@@ -41,8 +41,7 @@ Please note: You will need to download roughly 168 GB of data.
             * `opencv-python`
             * `lmdb`
             * `tqdm`
-        * Clone [this](https://github.com/jufi2112/lsun_for_garmentor) repository 
-        * From within this repository, run
+        * From within `garmentor/lsun_for_garmentor`, run
             ```bash
             python3 download.py -o <lsun_zipped>
             ```
@@ -52,7 +51,7 @@ Please note: You will need to download roughly 168 GB of data.
     * Do **not** extract the test images
 6) To extract the images from the unzipped databases, you can
     * Option 1:
-        * Use the previously created Python environment and run, from within the cloned `lsun_for_garmentor` repository,
+        * Use the previously created Python environment and run, from within `garmentor/lsun_for_garmentor`:
             ```
             python data.py export <list all extracted folders from inside <lsun_unzipped> > --out_dir <lsun_images> [--max_extract X]
             ```
