@@ -1,13 +1,13 @@
 import torch
 import numpy as np
 
-from rigid_transform_utils import aa_rotate_translate_points_pytorch3d
+from utils.rigid_transform_utils import aa_rotate_translate_points_pytorch3d
 
 
 class VisLogger():
     
     _nrow = 4
-    _dist_samples = 200
+    _ndist_samples = 200
     
     def __init__(self, visdom, renderer):
         self.visdom = visdom
@@ -38,7 +38,7 @@ class VisLogger():
             cam_t=cam_t,
             lights_rgb_settings=settings)
         
-        rgb_out = renderer_pred_output['rgb_images'].permute(0, 3, 1, 2).contiguous()  # (1, 3, img_wh, img_wh)
+        rgb_out = renderer_pred_output['rgb_images'].permute(0, 3, 1, 2).contiguous()  # (N, C, img_wh, img_wh)
         self.visdom.images(rgb_out[:self._nrow], nrow=self._nrow, win='rgb_out')
         
     def vis_shape_dist(self, pred_shape_dist, target_shape):
@@ -51,8 +51,8 @@ class VisLogger():
             
             dists = []
             for pca_idx, (mean, std) in enumerate(zip(i_pred_shape_means, i_pred_shape_stds)):
-                dist = np.ones((self._dist_samples, 2)) * pca_idx
-                dist[:, 0] = np.random.normal(loc=mean, scale=std, size=(self._dist_samples,))
+                dist = np.ones((self._ndist_samples, 2)) * pca_idx
+                dist[:, 0] = np.random.normal(loc=mean, scale=std, size=(self._ndist_samples,))
                 dists.append(dist)
 
             dists = np.concatenate(dists, axis=0)

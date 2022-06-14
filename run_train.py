@@ -97,8 +97,7 @@ def run_train(device,
                                              bin_size=32)
     
     # Visualizer class to log the training progress.
-    if visdom is not None:
-        vis_logger = VisLogger(visdom=visdom, renderer=pytorch3d_renderer)
+    vis_logger = VisLogger(visdom=visdom, renderer=pytorch3d_renderer) if visdom is not None else None
 
     # ------------------------- Loss Function + Optimiser -------------------------
     criterion = PoseMFShapeGaussianLoss(loss_config=pose_shape_cfg.LOSS.STAGE1,
@@ -151,6 +150,8 @@ if __name__ == '__main__':
     if args.vis or args.vport != 8888:
         thread.start_new_thread(os.system, (f'visdom -p {args.vport} > /dev/null 2>&1',))
         visdom = vis.Visdom(port=args.vport)
+    else:
+        visdom = None
 
     run_train(device=device,
               experiment_dir=args.experiment_dir,
