@@ -2,6 +2,8 @@ import os
 import torch
 import torch.optim as optim
 import argparse
+import _thread as thread
+import visdom as vis
 
 from data.on_the_fly_smpl_train_dataset import OnTheFlySMPLTrainDataset
 from renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
@@ -17,11 +19,14 @@ from configs import paths
 
 from train.train_poseMF_shapeGaussian_net import train_poseMF_shapeGaussian_net
 
+from utils.visualize import VisLogger
+
 
 def run_train(device,
               experiment_dir,
               pose_shape_cfg_opts=None,
-              resume_from_epoch=None):
+              resume_from_epoch=None,
+              visdom=None):
 
     pose_shape_cfg = get_poseMF_shapeGaussian_cfg_defaults()
 
@@ -90,6 +95,10 @@ def run_train(device,
                                              perspective_focal_length=pose_shape_cfg.TRAIN.SYNTH_DATA.FOCAL_LENGTH ,
                                              render_rgb=True,
                                              bin_size=32)
+    
+    # Visualizer class to log the training progress.
+    if visdom is not None:
+        vis_logger = VisLogger(visdom=visdom, renderer=pytorch3d_renderer)
 
     # ------------------------- Loss Function + Optimiser -------------------------
     criterion = PoseMFShapeGaussianLoss(loss_config=pose_shape_cfg.LOSS.STAGE1,
@@ -115,7 +124,8 @@ def run_train(device,
                                    metrics=['PVE', 'PVE-SC', 'PVE-T-SC', 'MPJPE', 'MPJPE-SC', 'MPJPE-PA', 'joints2D-L2E'],
                                    model_save_dir=model_save_dir,
                                    logs_save_path=logs_save_path,
-                                   checkpoint=checkpoint)
+                                   checkpoint=checkpoint,
+                                   vis_logger=vis_logger)
 
 
 if __name__ == '__main__':
@@ -126,6 +136,10 @@ if __name__ == '__main__':
                         help='Command line options to modify experiment config e.g. ''-O TRAIN.NUM_EPOCHS 120'' will change number of training epochs to 120 in the config.')
     parser.add_argument('--resume_from_epoch', '-R', type=int, default=None,
                         help='Epoch to resume experiment from. If resuming, experiment_dir must already exist, with saved model checkpoints and config yaml file.')
+    parser.add_argument('--vis', dest='vis', action='store_true', 
+                        help='(optional) whether or not to visualize training progress details over time using Visdom')
+    parser.add_argument('--vport', type=int, default=8888,
+                        help='Epoch to resume experiment from. If resuming, experiment_dir must already exist, with saved model checkpoints and config yaml file.')
     parser.add_argument('--gpu', type=int, default=0)
     args = parser.parse_args()
 
@@ -133,8 +147,13 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print('\nDevice: {}'.format(device))
+    
+    if args.vis or args.vport != 8888:
+        thread.start_new_thread(os.system, (f'visdom -p {args.vport} > /dev/null 2>&1',))
+        visdom = vis.Visdom(port=args.vport)
 
     run_train(device=device,
               experiment_dir=args.experiment_dir,
               pose_shape_cfg_opts=args.pose_shape_cfg_opts,
-              resume_from_epoch=args.resume_from_epoch)
+              resume_from_epoch=args.resume_from_epoch,
+              visdom=visdom)
