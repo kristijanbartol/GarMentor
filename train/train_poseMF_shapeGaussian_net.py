@@ -38,7 +38,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                    model_save_dir,
                                    logs_save_path,
                                    save_val_metrics=['PVE-SC', 'MPJPE-PA'],
-                                   checkpoint=None):
+                                   checkpoint=None,
+                                   vis_logger=None):
     # Set up dataloaders
     train_dataloader = DataLoader(train_dataset,
                                   batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
@@ -368,6 +369,22 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                  batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
                                                  pred_reposed_vertices=pred_reposed_vertices_mean,
                                                  target_reposed_vertices=target_reposed_vertices)
+                
+                #############################################################
+                # ---------------- GENERATE VISUALIZATIONS ------------------
+                #############################################################
+                if vis_logger is not None:
+                    vis_logger.vis_rgb(rgb_in)
+                    vis_logger.vis_edge(edge_in)
+                    vis_logger.vis_j2d_heatmaps(j2d_heatmaps)
+                    vis_logger.vis_pred_rgb(pred_verts=pred_vertices_mode,
+                                            x_axis=x_axis,
+                                            angle=np.pi,
+                                            trans=torch.zeros(3, device=device).float(),
+                                            texture=texture,
+                                            cam_t=target_cam_t,
+                                            settings=lights_rgb_settings)
+                    vis_logger.vis_shape_dist(pred_shape_dist, target_shape)
 
         #############################################################
         # ------------- UPDATE METRICS HISTORY and SAVE -------------

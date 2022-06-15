@@ -34,7 +34,8 @@ RUN pip install \
 	chumpy \
 	tensorboardX \
 	"protobuf<4.21.0" \
-	lmdb
+	lmdb \
+	visdom
 
 # pytorch3d prebuilt wheel
 RUN pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py38_cu113_pyt1110/download.html
