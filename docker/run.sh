@@ -29,6 +29,7 @@ else
 fi
 
 docker run -it \
+	-p 8888:8888 \
 	--rm \
 	--runtime=nvidia --gpus all \
 	--shm-size=8gb \

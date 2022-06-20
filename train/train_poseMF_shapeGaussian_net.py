@@ -187,18 +187,30 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     lights_rgb_settings = augment_light(batch_size=1,
                                                         device=device,
                                                         rgb_augment_config=pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.RGB)
+                    
+                    print(f"train_poseMF_shapeGaussian_net::target_vertices_for_rendering: \n{target_vertices_for_rendering}")
+                    print(f"train_poseMF_shapeGaussian_net::texture: \n{texture}")
+                    print(f"train_poseMF_shapeGaussian_net::texture non-zero: \n{torch.nonzero(texture)}")
+                    print(f"train_poseMF_shapeGaussian_net::target_cam_t: \n{target_cam_t}")
+                    print(f"train_poseMF_shapeGaussian_net::lights_rgb_settings: \n{lights_rgb_settings}")
+                    
                     renderer_output = pytorch3d_renderer(vertices=target_vertices_for_rendering,
                                                          textures=texture,
                                                          cam_t=target_cam_t,
                                                          lights_rgb_settings=lights_rgb_settings)
+                    
+                    print(f"tran_poseMF_shapeGaussian_net.renderer_output: \n{renderer_output}", flush=True)
+                    
                     iuv_in = renderer_output['iuv_images'].permute(0, 3, 1, 2).contiguous()  # (bs, 3, img_wh, img_wh)
                     iuv_in[:, 1:, :, :] = iuv_in[:, 1:, :, :] * 255
                     iuv_in = iuv_in.round()
                     rgb_in = renderer_output['rgb_images'].permute(0, 3, 1, 2).contiguous()  # (bs, 3, img_wh, img_wh)
 
+                    print(f"train_poseMF_shapeGaussian_net.iuv_in: \n{iuv_in}", flush=True)
                     # Prepare seg for extreme crop augmentation
                     seg_extreme_crop = random_extreme_crop(seg=iuv_in[:, 0, :, :],
                                                            extreme_crop_probability=pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.PROXY_REP.EXTREME_CROP_PROB)
+                    print(f"train_poseMF_shapeGaussian_net.seg_extreme_crop: \n{seg_extreme_crop}", flush=True)
 
                     # Crop to person bounding box after bbox scale and centre augmentation
                     crop_outputs = batch_crop_pytorch_affine(input_wh=(pose_shape_cfg.DATA.PROXY_REP_SIZE, pose_shape_cfg.DATA.PROXY_REP_SIZE),

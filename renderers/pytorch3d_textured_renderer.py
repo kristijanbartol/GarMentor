@@ -5,6 +5,8 @@ from scipy.io import loadmat
 
 from configs import paths
 
+import matplotlib.pyplot as plt
+
 # Data structures and functions for rendering
 from pytorch3d.structures import Meshes
 from pytorch3d.renderer import (
@@ -144,6 +146,9 @@ class TexturedIUVRenderer(nn.Module):
         self.verts_iuv = verts_iuv.to(device)
         self.verts_map = verts_map.to(device)
         self.faces_densepose = faces_densepose.to(device)
+        
+        print(f"pytorch3d_textured_renderer.TexturedIUVRenderer.__init__::verts_iuv: \n{verts_iuv}", flush=True)
+        print(f"pytorch3d_textured_renderer.TexturedIUVRenderer.__init__::verts.shape(): \n{verts_iuv.shape()}", flush=True)
 
         # Cameras - pre-defined here but can be specified in forward pass if cameras will vary (e.g. random cameras)
         assert projection_type in ['perspective', 'orthographic'], print('Invalid projection type:', projection_type)
@@ -204,12 +209,15 @@ class TexturedIUVRenderer(nn.Module):
         # Shader for textured RGB output and IUV output
         blend_params = BlendParams(background_color=background_color)
         self.iuv_shader = HardPhongShader(device=device, cameras=self.cameras,
-                                          lights=self.lights_iuv_render, blend_params=blend_params)
+                                          lights=self.lights_iuv_render, blend_params=blend_params)        
         if self.render_rgb:
             self.rgb_shader = HardPhongShader(device=device, cameras=self.cameras,
                                               lights=self.lights_rgb_render, blend_params=blend_params)
 
         self.to(device)
+        
+        print(f"pytorch3d_textured_renderer.TexturedIUVRenderer.__init__::iuv_shader: \n{self.iuv_shader}", flush=True)
+        
 
     def to(self, device):
         # Rasterizer and shader have submodules which are not of type nn.Module
@@ -263,6 +271,12 @@ class TexturedIUVRenderer(nn.Module):
 
         textures_iuv = TexturesVertex(verts_features=self.verts_iuv)
         meshes_iuv = Meshes(verts=vertices, faces=self.faces_densepose, textures=textures_iuv)
+        
+        print(f"pytorch3d_textured_renderer.TexturedIUVRenderer::meshes_iuv: \n{meshes_iuv}", flush=True)
+        print(f"pytorch3d_textured_renderer.TexturedIUVRenderer::verts: \n{vertices}", flush=True)
+        print(f"pytorch3d_textured_renderer.TexturedIUVRenderer::faces_densepose: \n{self.faces_densepose}", flush=True)
+        print(f"pytorch3d_textured_renderer.TexturedIUVRenderer::textures: \n{textures_iuv}", flush=True)
+        
         if self.render_rgb:
             if verts_features is not None:
                 verts_features = verts_features[:, self.verts_map, :]  # From SMPL verts indexing (0 to 6889) to DP verts indexing (0 to 7828), verts shape is (B, 7829, 3)
@@ -284,5 +298,7 @@ class TexturedIUVRenderer(nn.Module):
 
         # Get depth image
         output['depth_images'] = zbuffers
+        
+        print(f"pytorch3d_textured_renderer.TexturedIUVRenderer::output['iuv_images'] non-zero: \n{torch.nonzero(output['iuv_images'])}", flush=True)
 
         return output
