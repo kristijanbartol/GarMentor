@@ -148,7 +148,7 @@ class TexturedIUVRenderer(nn.Module):
         self.faces_densepose = faces_densepose.to(device)
         
         print(f"pytorch3d_textured_renderer.TexturedIUVRenderer.__init__::verts_iuv: \n{verts_iuv}", flush=True)
-        print(f"pytorch3d_textured_renderer.TexturedIUVRenderer.__init__::verts.shape(): \n{verts_iuv.shape()}", flush=True)
+        print(f"pytorch3d_textured_renderer.TexturedIUVRenderer.__init__::verts.shape: \n{verts_iuv.shape}", flush=True)
 
         # Cameras - pre-defined here but can be specified in forward pass if cameras will vary (e.g. random cameras)
         assert projection_type in ['perspective', 'orthographic'], print('Invalid projection type:', projection_type)
