@@ -12,7 +12,8 @@ RUN apt update && apt install -y git \
 	libgl1-mesa-glx \
 	vim \
 	curl \
-	libboost-dev
+	libboost-dev \
+	tmux
 
 ENV BOOST_INCLUDE_DIRS=/usr/include/boost
 
@@ -35,7 +36,8 @@ RUN pip install \
 	tensorboardX \
 	"protobuf<4.21.0" \
 	lmdb \
-	visdom
+	visdom \
+	notebook
 
 # pytorch3d prebuilt wheel
 RUN pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py38_cu113_pyt1110/download.html
