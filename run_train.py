@@ -91,8 +91,6 @@ def run_train(device,
     pytorch3d_renderer = TexturedIUVRenderer(device=device,
                                              batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
                                              img_wh=pose_shape_cfg.DATA.PROXY_REP_SIZE,
-                                             projection_type='perspective',
-                                             perspective_focal_length=pose_shape_cfg.TRAIN.SYNTH_DATA.FOCAL_LENGTH ,
                                              render_rgb=True,
                                              bin_size=32)
     
