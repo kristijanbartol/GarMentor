@@ -188,12 +188,6 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                         device=device,
                                                         rgb_augment_config=pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.RGB)
                     
-                    print(f"train_poseMF_shapeGaussian_net::target_vertices_for_rendering: \n{target_vertices_for_rendering}")
-                    print(f"train_poseMF_shapeGaussian_net::texture: \n{texture}")
-                    print(f"train_poseMF_shapeGaussian_net::texture non-zero: \n{torch.nonzero(texture)}")
-                    print(f"train_poseMF_shapeGaussian_net::target_cam_t: \n{target_cam_t}")
-                    print(f"train_poseMF_shapeGaussian_net::lights_rgb_settings: \n{lights_rgb_settings}")
-                    
                     renderer_output = pytorch3d_renderer(vertices=target_vertices_for_rendering,
                                                          textures=texture,
                                                          cam_t=target_cam_t,
