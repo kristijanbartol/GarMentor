@@ -5,14 +5,17 @@ from scipy.io import loadmat
 
 from configs import paths
 
+import matplotlib.pyplot as plt
+
 # Data structures and functions for rendering
 from pytorch3d.structures import Meshes
 from pytorch3d.renderer import (
-    PerspectiveCameras,
-    OrthographicCameras,
+    look_at_view_transform,
+    FoVOrthographicCameras,
     PointLights,
     RasterizationSettings,
     MeshRasterizer,
+    MeshRenderer,
     HardPhongShader,
     TexturesUV,
     TexturesVertex,
@@ -77,8 +80,6 @@ class TexturedIUVRenderer(nn.Module):
                  img_wh=256,
                  cam_t=None,
                  cam_R=None,
-                 projection_type='perspective',
-                 perspective_focal_length=300,
                  orthographic_scale=0.9,
                  blur_radius=0.0,
                  faces_per_pixel=1,
@@ -146,35 +147,26 @@ class TexturedIUVRenderer(nn.Module):
         self.faces_densepose = faces_densepose.to(device)
 
         # Cameras - pre-defined here but can be specified in forward pass if cameras will vary (e.g. random cameras)
-        assert projection_type in ['perspective', 'orthographic'], print('Invalid projection type:', projection_type)
-        print('\nRenderer projection type:', projection_type)
-        self.projection_type = projection_type
         if cam_R is None:
             # Rotating 180° about z-axis to make pytorch3d camera convention same as what I've been using so far in my perspective_project_torch/NMR/pyrender
             # (Actually pyrender also has a rotation defined in the renderer to make it same as NMR.)
             cam_R = torch.tensor([[-1., 0., 0.],
-                                  [0., -1., 0.],
-                                  [0., 0., 1.]], device=device).float()
+                                  [0., 1., 0.],
+                                  [0., 0., -1.]], device=device).float()
             cam_R = cam_R[None, :, :].expand(batch_size, -1, -1)
         if cam_t is None:
             cam_t = torch.tensor([0., 0.2, 2.5]).float().to(device)[None, :].expand(batch_size, -1)
         # Pytorch3D camera is rotated 180° about z-axis to match my perspective_project_torch/NMR's projection convention.
         # So, need to also rotate the given camera translation (implemented below as elementwise-mul).
         cam_t = cam_t * torch.tensor([-1., -1., 1.], device=cam_t.device).float()
-        if projection_type == 'perspective':
-            self.cameras = PerspectiveCameras(device=device,
-                                              R=cam_R,
-                                              T=cam_t,
-                                              focal_length=perspective_focal_length,
-                                              principal_point=((img_wh/2., img_wh/2.),),
-                                              image_size=((img_wh, img_wh),))
-        elif projection_type == 'orthographic':
-            self.cameras = OrthographicCameras(device=device,
-                                               R=cam_R,
-                                               T=cam_t,
-                                               focal_length=orthographic_scale*(img_wh/2.),
-                                               principal_point=((img_wh / 2., img_wh / 2.),),
-                                               image_size=((img_wh, img_wh),))
+
+        self.cameras = FoVOrthographicCameras(device=device,
+                                            R=cam_R,
+                                            T=cam_t,
+                                            scale_xyz=((
+                                                orthographic_scale,
+                                                orthographic_scale,
+                                                1.0),))
 
         # Lights for textured RGB render - pre-defined here but can be specified in forward pass if lights will vary (e.g. random cameras)
         self.render_rgb = render_rgb
@@ -204,7 +196,7 @@ class TexturedIUVRenderer(nn.Module):
         # Shader for textured RGB output and IUV output
         blend_params = BlendParams(background_color=background_color)
         self.iuv_shader = HardPhongShader(device=device, cameras=self.cameras,
-                                          lights=self.lights_iuv_render, blend_params=blend_params)
+                                          lights=self.lights_iuv_render, blend_params=blend_params)        
         if self.render_rgb:
             self.rgb_shader = HardPhongShader(device=device, cameras=self.cameras,
                                               lights=self.lights_rgb_render, blend_params=blend_params)
@@ -263,6 +255,7 @@ class TexturedIUVRenderer(nn.Module):
 
         textures_iuv = TexturesVertex(verts_features=self.verts_iuv)
         meshes_iuv = Meshes(verts=vertices, faces=self.faces_densepose, textures=textures_iuv)
+        
         if self.render_rgb:
             if verts_features is not None:
                 verts_features = verts_features[:, self.verts_map, :]  # From SMPL verts indexing (0 to 6889) to DP verts indexing (0 to 7828), verts shape is (B, 7829, 3)

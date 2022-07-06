@@ -187,10 +187,12 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     lights_rgb_settings = augment_light(batch_size=1,
                                                         device=device,
                                                         rgb_augment_config=pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.RGB)
+                    
                     renderer_output = pytorch3d_renderer(vertices=target_vertices_for_rendering,
                                                          textures=texture,
                                                          cam_t=target_cam_t,
                                                          lights_rgb_settings=lights_rgb_settings)
+                    
                     iuv_in = renderer_output['iuv_images'].permute(0, 3, 1, 2).contiguous()  # (bs, 3, img_wh, img_wh)
                     iuv_in[:, 1:, :, :] = iuv_in[:, 1:, :, :] * 255
                     iuv_in = iuv_in.round()
