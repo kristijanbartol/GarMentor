@@ -23,6 +23,7 @@ from utils.visualize import VisLogger
 
 
 def run_train(device,
+              gender,
               experiment_dir,
               pose_shape_cfg_opts=None,
               resume_from_epoch=None,
@@ -81,7 +82,8 @@ def run_train(device,
                                           threshold=pose_shape_cfg.DATA.EDGE_THRESHOLD).to(device)
     # SMPL model
     smpl_model = SMPL(paths.SMPL,
-                      num_betas=pose_shape_cfg.MODEL.NUM_SMPL_BETAS).to(device)
+                      num_betas=pose_shape_cfg.MODEL.NUM_SMPL_BETAS,
+                      gender=gender).to(device)
 
     # 3D shape and pose distribution predictor
     pose_shape_model = PoseMFShapeGaussianNet(smpl_parents=smpl_model.parents.tolist(),
@@ -127,6 +129,8 @@ def run_train(device,
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--gender', '-G', type=str, choices=['male', 'female', 'neutral'], default='neutral',
+                        help='Select gender (both training data and SMPL model will be of that gender).')
     parser.add_argument('--experiment_dir', '-E', type=str,
                         help='Path to directory where logs and checkpoints are saved.')
     parser.add_argument('--pose_shape_cfg_opts', '-O', nargs='*', default=None,
@@ -152,6 +156,7 @@ if __name__ == '__main__':
         visdom = None
 
     run_train(device=device,
+              gender=args.gender,
               experiment_dir=args.experiment_dir,
               pose_shape_cfg_opts=args.pose_shape_cfg_opts,
               resume_from_epoch=args.resume_from_epoch,
