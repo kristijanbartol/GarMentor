@@ -301,8 +301,6 @@ def batch_crop_pytorch_affine(input_wh,
             else:
                 # Determine bounding box corners using given "bbox determiner"
                 body_pixels = torch.nonzero(bbox_determiner[i] != 0, as_tuple=False)
-                print(f"image_utils.batch_crop_pytorch_affine.bbox_determiner: \n{bbox_determiner}", flush=True)
-                print(f"image_utils.batch_crop_pytorch_affine.body_pixels: \n{body_pixels}", flush=True)
                 bbox_corners[i, :2], _ = torch.min(body_pixels, dim=0)  # Top left
                 bbox_corners[i, 2:], _ = torch.max(body_pixels, dim=0)  # Bot right
 
