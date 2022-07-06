@@ -132,6 +132,17 @@ python run_train.py -E experiments/exp_001
 ```
 As a sanity check, the script should find 91106 training poses, 125 + 792 training textures, 397582 training backgrounds, 33347 validation poses, 32 + 76 validation textures and 3000 validation backgrounds.
 
+## Visdom Support
+To run training with Visdom visualizations, specify the command line arguments (`--vis` or `--vport <port>`, or both), for example:
+
+```
+python run_train.py -E experiments/exp_001 --vis
+# OR
+python run_train.py -E experiments/exp_001 --port 8888
+```
+
+and track the progress in your browser on `localhost:<port>`, for example, `localhost:888`.
+
 ## Weaknesses and Future Research
 The following aspects of our method may be the subject of future research:
 - Mesh interpenetrations: this occurs occasionally amongst 3D mesh samples drawn from shape and pose distribution predictions. A sample inter-penetratation penalty may be useful.
