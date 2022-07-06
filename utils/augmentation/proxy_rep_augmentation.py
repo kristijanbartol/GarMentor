@@ -243,8 +243,6 @@ def random_extreme_crop(seg,
     :param extreme_crop_probability:
     :return: new_seg: part segmentations with regions to extreme crop
     """
-    print(f"proxy_rep_augmentation.random_extreme_crop.seg: \n{seg}", flush=True)
-    
     remove_legs_classes = torch.tensor([5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
                                        device=seg.device,
                                        dtype=seg.dtype)  # Legs and feet
