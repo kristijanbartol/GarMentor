@@ -10,6 +10,7 @@ from renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
 
 from models.poseMF_shapeGaussian_net import PoseMFShapeGaussianNet
 from models.smpl_official import SMPL
+from tailornet_for_garmentor.models.tailornet_model import get_best_runner as get_tn_runner
 from models.canny_edge_detector import CannyEdgeDetector
 
 from losses.matrix_fisher_loss import PoseMFShapeGaussianLoss
@@ -20,6 +21,8 @@ from configs import paths
 from train.train_poseMF_shapeGaussian_net import train_poseMF_shapeGaussian_net
 
 from utils.visualize import VisLogger
+
+from tailornet_for_garmentor.models.torch_smpl4garment import TorchSMPL4Garment
 
 
 def run_train(device,
@@ -81,9 +84,8 @@ def run_train(device,
                                           gaussian_filter_size=pose_shape_cfg.DATA.EDGE_GAUSSIAN_SIZE,
                                           threshold=pose_shape_cfg.DATA.EDGE_THRESHOLD).to(device)
     # SMPL model
-    smpl_model = SMPL(paths.SMPL,
-                      num_betas=pose_shape_cfg.MODEL.NUM_SMPL_BETAS,
-                      gender=gender).to(device)
+    smpl_model = TorchSMPL4Garment(gender=gender).to(device)
+    tailornet_model = get_tn_runner(gender=gender, garment_class='t-shirt')
 
     # 3D shape and pose distribution predictor
     pose_shape_model = PoseMFShapeGaussianNet(smpl_parents=smpl_model.parents.tolist(),
@@ -113,6 +115,7 @@ def run_train(device,
     train_poseMF_shapeGaussian_net(pose_shape_model=pose_shape_model,
                                    pose_shape_cfg=pose_shape_cfg,
                                    smpl_model=smpl_model,
+                                   tailornet_model=tailornet_model,
                                    edge_detect_model=edge_detect_model,
                                    pytorch3d_renderer=pytorch3d_renderer,
                                    device=device,
@@ -129,7 +132,7 @@ def run_train(device,
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--gender', '-G', type=str, choices=['male', 'female', 'neutral'], default='neutral',
+    parser.add_argument('--gender', '-G', type=str, choices=['male', 'female'], default='male',
                         help='Select gender (both training data and SMPL model will be of that gender).')
     parser.add_argument('--experiment_dir', '-E', type=str,
                         help='Path to directory where logs and checkpoints are saved.')

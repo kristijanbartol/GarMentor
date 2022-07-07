@@ -17,7 +17,7 @@ from utils.joints2d_utils import check_joints2d_visibility_torch, check_joints2d
 from utils.image_utils import batch_add_rgb_background, batch_crop_pytorch_affine
 from utils.sampling_utils import pose_matrix_fisher_sampling_torch
 
-from utils.augmentation.smpl_augmentation import normal_sample_shape
+from utils.augmentation.smpl_augmentation import normal_sample_params
 from utils.augmentation.cam_augmentation import augment_cam_t
 from utils.augmentation.proxy_rep_augmentation import augment_proxy_representation, random_extreme_crop
 from utils.augmentation.rgb_augmentation import augment_rgb
@@ -27,6 +27,7 @@ from utils.augmentation.lighting_augmentation import augment_light
 def train_poseMF_shapeGaussian_net(pose_shape_model,
                                    pose_shape_cfg,
                                    smpl_model,
+                                   tailornet_model,
                                    edge_detect_model,
                                    pytorch3d_renderer,
                                    device,
@@ -87,6 +88,10 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                         device=device, dtype=torch.float32) * pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.SMPL.SHAPE_STD
     mean_shape = torch.zeros(pose_shape_cfg.MODEL.NUM_SMPL_BETAS,
                              device=device, dtype=torch.float32)
+    delta_style_std_vector = torch.ones(pose_shape_cfg.MODEL.NUM_STYLE_PARAMS,
+                                        device=device, dtype=torch.float32) * pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.GARMENTOR.STYLE_STD
+    mean_style = torch.zeros(pose_shape_cfg.MODEL.NUM_STYLE_PARAMS,
+                             device=device, dtype=torch.float32)
     mean_cam_t = torch.tensor(pose_shape_cfg.TRAIN.SYNTH_DATA.MEAN_CAM_T,
                               device=device, dtype=torch.float32)
     mean_cam_t = mean_cam_t[None, :].expand(pose_shape_cfg.TRAIN.BATCH_SIZE, -1)
@@ -117,7 +122,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                 print('Validation.')
                 pose_shape_model.eval()
 
-            for batch_num, samples_batch in enumerate(tqdm(dataloaders[split])):
+            for _, samples_batch in enumerate(tqdm(dataloaders[split])):
                 #############################################################
                 # ---------------- SYNTHETIC DATA GENERATION ----------------
                 #############################################################
@@ -139,37 +144,51 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                                          axes=x_axis,
                                                                          rot_mult_order='post')
                     # Random sample body shape
-                    target_shape = normal_sample_shape(batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
-                                                       mean_shape=mean_shape,
-                                                       std_vector=delta_betas_std_vector)
+                    target_shape = normal_sample_params(batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
+                                                        mean_params=mean_shape,
+                                                        std_vector=delta_betas_std_vector)
+
+                    # Random sample garment parameters
+                    target_style = normal_sample_params(batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
+                                                        mean_params=mean_style,
+                                                        std_vector=delta_style_std_vector)
+
                     # Random sample camera translation
                     target_cam_t = augment_cam_t(mean_cam_t,
                                                  xy_std=pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.CAM.XY_STD,
                                                  delta_z_range=pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.CAM.DELTA_Z_RANGE)
 
-                    # Compute target vertices and joints
-                    target_smpl_output = smpl_model(body_pose=target_pose_rotmats,
-                                                    global_orient=target_glob_rotmats.unsqueeze(1),
-                                                    betas=target_shape,
-                                                    pose2rot=False)
-                    target_vertices = target_smpl_output.vertices
-                    target_joints_all = target_smpl_output.joints
-                    target_joints_h36m = target_joints_all[:, ALL_JOINTS_TO_H36M_MAP, :]
-                    target_joints_h36mlsp = target_joints_h36m[:, H36M_TO_J14, :]
+                    # Compute parameterized clothing displacements
+                    garment_displacements = tailornet_model.forward(thetas=target_pose,
+                                                            betas=target_shape,
+                                                            gammas=target_style)
 
-                    target_reposed_vertices = smpl_model(body_pose=torch.zeros_like(target_pose)[:, 3:],
-                                                         global_orient=torch.zeros_like(target_pose)[:, :3],
-                                                         betas=target_shape).vertices
+                    # Compute target vertices and joints
+                    target_smpl_output = smpl_model.forward(beta=target_shape, 
+                                                            theta=target_pose, 
+                                                            garment_class=tailornet_model.garment_class, 
+                                                            garment_d=garment_displacements)
+
+                    target_garment_verts = target_smpl_output.garment_verts
+                    target_body_verts = target_smpl_output.body_verts
+                    target_joints = target_smpl_output.joints
+
+                    target_reposed_smpl_output = smpl_model.forward(beta=target_shape, 
+                                                                    theta=torch.zeros_like(target_pose), 
+                                                                    garment_class=tailornet_model.garment_class, 
+                                                                    garment_d=garment_displacements)
+
+                    target_reposed_body_vertices = target_reposed_smpl_output.body_verts
 
                     # ------------ INPUT PROXY REPRESENTATION GENERATION + 2D TARGET JOINTS ------------
                     # Pose targets were flipped such that they are right way up in 3D space - i.e. wrong way up when projected
                     # Need to flip target_vertices_for_rendering 180° about x-axis so they are right way up when projected
                     # Need to flip target_joints_coco 180° about x-axis so they are right way up when projected
-                    target_vertices_for_rendering = aa_rotate_translate_points_pytorch3d(points=target_vertices,
+                    target_vertices_for_rendering = aa_rotate_translate_points_pytorch3d(points=target_body_verts,
                                                                                          axes=x_axis,
                                                                                          angles=np.pi,
                                                                                          translations=torch.zeros(3, device=device).float())
-                    target_joints_coco = aa_rotate_translate_points_pytorch3d(points=target_joints_all[:, ALL_JOINTS_TO_COCO_MAP, :],
+                    target_joints_coco = aa_rotate_translate_points_pytorch3d(points=target_joints,
                                                                               axes=x_axis,
                                                                               angles=np.pi,
                                                                               translations=torch.zeros(3, device=device).float())
@@ -339,8 +358,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
 
                     target_dict_for_loss = {'pose_params_rotmats': target_pose_rotmats,
                                             'shape_params': target_shape,
-                                            'verts': target_vertices,
-                                            'joints3D': target_joints_h36mlsp,
+                                            'verts': target_body_verts,
+                                            'joints3D': target_joints,
                                             'joints2D': target_joints2d_coco,
                                             'joints2D_vis': target_joints2d_visib_coco,
                                             'glob_rotmats': target_glob_rotmats}
@@ -370,7 +389,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                  target_dict=target_dict_for_loss,
                                                  batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
                                                  pred_reposed_vertices=pred_reposed_vertices_mean,
-                                                 target_reposed_vertices=target_reposed_vertices)
+                                                 target_reposed_vertices=target_reposed_body_vertices)
                 
                 #############################################################
                 # ---------------- GENERATE VISUALIZATIONS ------------------

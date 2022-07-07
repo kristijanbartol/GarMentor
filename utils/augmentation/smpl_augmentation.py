@@ -13,11 +13,19 @@ def uniform_sample_shape(batch_size, mean_shape, delta_betas_range):
     return shape  # (bs, num_smpl_betas)
 
 
-def normal_sample_shape(batch_size, mean_shape, std_vector):
+def normal_sample_params(batch_size, mean_params, std_vector):
     """
     Gaussian sampling of shape parameter deviations from the mean.
     """
-    shape = mean_shape + torch.randn(batch_size, mean_shape.shape[0], device=mean_shape.device)*std_vector
+    shape = mean_params + torch.randn(batch_size, mean_params.shape[0], device=mean_params.device)*std_vector
+    return shape  # (bs, num_smpl_betas)
+
+
+def normal_sample_style(batch_size, mean_style, std_vector):
+    """
+    Gaussian sampling of shape parameter deviations from the mean.
+    """
+    shape = mean_style + torch.randn(batch_size, mean_style.shape[0], device=mean_style.device)*std_vector
     return shape  # (bs, num_smpl_betas)
 
 
