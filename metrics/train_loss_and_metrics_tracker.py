@@ -116,25 +116,25 @@ class TrainingLossesAndMetricsTracker:
 
         # -------- Update metrics sums --------
         if 'PVE' in self.metrics_to_track:
-            pve_batch = np.linalg.norm(pred_dict['verts'] - target_dict['verts'], axis=-1)  # (bsize, 6890) or (bsize, num views, 6890)
+            pve_batch = np.linalg.norm(pred_dict['verts'] - target_dict['verts'], axis=-1)  # (bsize, nverts, 3) or (bsize, num views, nverts, 3)
             self.loss_metric_sums[split + '_PVE'] += np.sum(pve_batch)  # scalar
 
         # Scale and translation correction
         if 'PVE-SC' in self.metrics_to_track:
-            pred_vertices = pred_dict['verts']  # (bsize, 6890, 3) or (bsize, num views, 6890, 3)
-            target_vertices = target_dict['verts']  # (bsize, 6890, 3) or (bsize, num views, 6890, 3)
-            pred_vertices_sc = scale_and_translation_transform_batch(pred_vertices.reshape(-1, 6890, 3),
-                                                                     target_vertices.reshape(-1, 6890, 3))
-            pve_sc_batch = np.linalg.norm(pred_vertices_sc - target_vertices.reshape(-1, 6890, 3), axis=-1)  # (bsize, 6890) or (bsize*num views, 6890)
+            pred_vertices = pred_dict['verts']  # (bsize, nverts, 3) or (bsize, num views, nverts, 3)
+            target_vertices = target_dict['verts']  # (bsize, nverts, 3) or (bsize, num views, nverts, 3)
+            pred_vertices_sc = scale_and_translation_transform_batch(pred_vertices.reshape(batch_size, -1, 3),
+                                                                     target_vertices.reshape(batch_size, -1, 3))
+            pve_sc_batch = np.linalg.norm(pred_vertices_sc - target_vertices.reshape(batch_size, -1, 3), axis=-1)  # (bsize, nverts) or (bsize*num views, nverts)
             self.loss_metric_sums[split + '_PVE-SC'] += np.sum(pve_sc_batch)  # scalar
 
         # Procrustes analysis
         if 'PVE-PA' in self.metrics_to_track:
-            pred_vertices = pred_dict['verts']  # (bsize, 6890, 3)  or (bsize, num views, 6890, 3)
-            target_vertices = target_dict['verts']  # (bsize, 6890, 3) or (bsize, num views, 6890, 3)
-            pred_vertices_pa = procrustes_analysis_batch(pred_vertices.reshape(-1, 6890, 3),
-                                                         target_vertices.reshape(-1, 6890, 3))
-            pve_pa_batch = np.linalg.norm(pred_vertices_pa - target_vertices.reshape(-1, 6890, 3), axis=-1)  # (bsize, 6890) or (bsize*num views, 6890)
+            pred_vertices = pred_dict['verts']  # (bsize, num_verts, 3)  or (bsize, num views, nverts, 3)
+            target_vertices = target_dict['verts']  # (bsize, num_verts, 3) or (bsize, num views, nverts, 3)
+            pred_vertices_pa = procrustes_analysis_batch(pred_vertices.reshape(batch_size, -1, 3),
+                                                         target_vertices.reshape(batch_size, -1, 3))
+            pve_pa_batch = np.linalg.norm(pred_vertices_pa - target_vertices.reshape(batch_size, -1, 3), axis=-1)  # (bsize, nverts) or (bsize*num views, nverts)
             self.loss_metric_sums[split + '_PVE-PA'] += np.sum(pve_pa_batch)  # scalar
 
         # Reposed
@@ -146,45 +146,45 @@ class TrainingLossesAndMetricsTracker:
         if 'PVE-T-SC' in self.metrics_to_track:
             pred_reposed_vertices_sc = scale_and_translation_transform_batch(pred_reposed_vertices,
                                                                              target_reposed_vertices)
-            pvet_sc_batch = np.linalg.norm(pred_reposed_vertices_sc - target_reposed_vertices, axis=-1)  # (bs, 6890)
+            pvet_sc_batch = np.linalg.norm(pred_reposed_vertices_sc - target_reposed_vertices, axis=-1)  # (bs, num_verts)
             self.loss_metric_sums[split + '_PVE-T-SC'] += np.sum(pvet_sc_batch)  # scalar
 
         if 'MPJPE' in self.metrics_to_track:
-            mpjpe_batch = np.linalg.norm(pred_dict['joints3D'] - target_dict['joints3D'], axis=-1)  # (bsize, 14) or (bsize, num views, 14)
+            mpjpe_batch = np.linalg.norm(pred_dict['joints3D'] - target_dict['joints3D'], axis=-1)  # (bsize, njoints) or (bsize, njoints)
             self.loss_metric_sums[split + '_MPJPE'] += np.sum(mpjpe_batch)  # scalar
 
         # Scale and translation correction
         if 'MPJPE-SC' in self.metrics_to_track:
-            pred_joints3D_h36mlsp = pred_dict['joints3D']  # (bsize, 14, 3) or (bsize, num views, 14, 3)
-            target_joints3D_h36mlsp = target_dict['joints3D']  # (bsize, 14, 3) or (bsize, num views, 14, 3)
+            pred_joints3D_h36mlsp = pred_dict['joints3D']  # (bsize, njoints, 3) or (bsize, num views, njoints, 3)
+            target_joints3D_h36mlsp = target_dict['joints3D']  # (bsize, njoints, 3) or (bsize, num views, njoints, 3)
             pred_joints3D_h36mlsp_sc = scale_and_translation_transform_batch(pred_joints3D_h36mlsp.reshape(-1, 14, 3),
                                                                              target_joints3D_h36mlsp.reshape(-1, 14, 3))
             mpjpe_sc_batch = np.linalg.norm(pred_joints3D_h36mlsp_sc - target_joints3D_h36mlsp.reshape(-1, 14, 3),
-                                            axis=-1)  # (bsize, 14) or (bsize*num views, 14)
+                                            axis=-1)  # (bsize, njoints) or (bsize*num views, njoints)
             self.loss_metric_sums[split + '_MPJPE-SC'] += np.sum(mpjpe_sc_batch)  # scalar
 
         # Procrustes analysis
         if 'MPJPE-PA' in self.metrics_to_track:
-            pred_joints3D_h36mlsp = pred_dict['joints3D']  # (bsize, 14, 3) or (bsize, num views, 14, 3)
-            target_joints3D_h36mlsp = target_dict['joints3D']  # (bsize, 14, 3) or (bsize, num views, 14, 3)
+            pred_joints3D_h36mlsp = pred_dict['joints3D']  # (bsize, njoints, 3) or (bsize, num views, njoints, 3)
+            target_joints3D_h36mlsp = target_dict['joints3D']  # (bsize, njoints, 3) or (bsize, num views, njoints, 3)
             pred_joints3D_h36mlsp_pa = procrustes_analysis_batch(pred_joints3D_h36mlsp.reshape(-1, 14, 3),
                                                                  target_joints3D_h36mlsp.reshape(-1, 14, 3))
             mpjpe_pa_batch = np.linalg.norm(pred_joints3D_h36mlsp_pa - target_joints3D_h36mlsp.reshape(-1, 14, 3),
-                                            axis=-1)  # (bsize, 14) or (bsize*num views, 14)
+                                            axis=-1)  # (bsize, njoints) or (bsize*num views, njoints)
             self.loss_metric_sums[split + '_MPJPE-PA'] += np.sum(mpjpe_pa_batch)  # scalar
 
         if 'joints2D-L2E' in self.metrics_to_track:
-            pred_joints2D_coco = pred_dict['joints2D'] # (bsize, 17, 2) or (bsize, num views, 17, 2)
-            target_joints2D_coco = target_dict['joints2D']  # (bsize, 17, 2) or (bsize, num views, 17, 2)
+            pred_joints2D_coco = pred_dict['joints2D'] # (bsize, njoints, 2) or (bsize, num views, njoints, 2)
+            target_joints2D_coco = target_dict['joints2D']  # (bsize, njoints, 2) or (bsize, num views, njoints, 2)
             pred_joints2D_coco = undo_keypoint_normalisation(pred_joints2D_coco, self.img_wh)
-            joints2D_l2e_batch = np.linalg.norm(pred_joints2D_coco - target_joints2D_coco, axis=-1)  # (bsize, 17) or (bsize, num views, 17)
+            joints2D_l2e_batch = np.linalg.norm(pred_joints2D_coco - target_joints2D_coco, axis=-1)  # (bsize, njoints) or (bsize, num views, njoints)
             self.loss_metric_sums[split + '_joints2D-L2E'] += np.sum(joints2D_l2e_batch)  # scalar
 
         if 'joints2Dsamples-L2E' in self.metrics_to_track:
-            pred_joints2D_coco_samples = pred_dict['joints2Dsamples']  # (bsize, num_samples, 17, 2)
+            pred_joints2D_coco_samples = pred_dict['joints2Dsamples']  # (bsize, num_samples, njoints, 2)
 
-            target_joints2D_coco = np.tile(target_dict['joints2D'][:, None, :, :], (1, pred_joints2D_coco_samples.shape[1], 1, 1))  # (bsize, num_samples, 17, 2)
-            target_joints2d_vis_coco = np.tile(target_dict['joints2D_vis'][:, None, :], (1, pred_joints2D_coco_samples.shape[1], 1))   # (bsize, num_samples, 17)
+            target_joints2D_coco = np.tile(target_dict['joints2D'][:, None, :, :], (1, pred_joints2D_coco_samples.shape[1], 1, 1))  # (bsize, num_samples, njoints, 2)
+            target_joints2d_vis_coco = np.tile(target_dict['joints2D_vis'][:, None, :], (1, pred_joints2D_coco_samples.shape[1], 1))   # (bsize, num_samples, njoints)
             target_joints2D_coco = target_joints2D_coco[target_joints2d_vis_coco, :]  # (N, 2)
 
             pred_joints2D_coco_samples = pred_joints2D_coco_samples[target_joints2d_vis_coco, :]  # (N, 2)
