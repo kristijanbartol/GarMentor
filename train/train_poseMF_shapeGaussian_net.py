@@ -166,7 +166,6 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     # Compute target vertices and joints
                     target_smpl_output = smpl_model.forward(beta=target_shape, 
                                                             theta=target_pose, 
-                                                            garment_class=tailornet_model.garment_class, 
                                                             garment_d=target_garment_displacements)
 
                     target_garment_verts = target_smpl_output.garment_verts
@@ -177,7 +176,6 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
 
                     target_reposed_smpl_output = smpl_model.forward(beta=target_shape, 
                                                                     theta=torch.zeros_like(target_pose), 
-                                                                    garment_class=tailornet_model.garment_class, 
                                                                     garment_d=target_garment_displacements)
 
                     target_reposed_body_vertices = target_reposed_smpl_output.body_verts
@@ -186,7 +184,11 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     # Pose targets were flipped such that they are right way up in 3D space - i.e. wrong way up when projected
                     # Need to flip target_vertices_for_rendering 180° about x-axis so they are right way up when projected
                     # Need to flip target_joints_coco 180° about x-axis so they are right way up when projected
-                    target_vertices_for_rendering = aa_rotate_translate_points_pytorch3d(points=target_body_verts,
+                    target_body_vertices_for_rendering = aa_rotate_translate_points_pytorch3d(points=target_body_verts,
+                                                                                         axes=x_axis,
+                                                                                         angles=np.pi,
+                                                                                         translations=torch.zeros(3, device=device).float())
+                    target_garment_vertices_for_rendering = aa_rotate_translate_points_pytorch3d(points=target_garment_verts,
                                                                                          axes=x_axis,
                                                                                          angles=np.pi,
                                                                                          translations=torch.zeros(3, device=device).float())
@@ -209,15 +211,25 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                         device=device,
                                                         rgb_augment_config=pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.RGB)
                     
-                    renderer_output = pytorch3d_renderer(vertices=target_vertices_for_rendering,
-                                                         textures=texture,
+                    renderer_output = pytorch3d_renderer(body_vertices=target_body_vertices_for_rendering,
+                                                         garment_vertices=target_garment_vertices_for_rendering,
                                                          cam_t=target_cam_t,
                                                          lights_rgb_settings=lights_rgb_settings)
+                    #renderer_output = pytorch3d_renderer(vertices=target_body_vertices_for_rendering,
+                    #                                     textures=texture,
+                    #                                     cam_t=target_cam_t,
+                    #                                     lights_rgb_settings=lights_rgb_settings)
                     
                     iuv_in = renderer_output['iuv_images'].permute(0, 3, 1, 2).contiguous()  # (bs, 3, img_wh, img_wh)
                     iuv_in[:, 1:, :, :] = iuv_in[:, 1:, :, :] * 255
                     iuv_in = iuv_in.round()
                     rgb_in = renderer_output['rgb_images'].permute(0, 3, 1, 2).contiguous()  # (bs, 3, img_wh, img_wh)
+                    
+                    import cv2
+                    rgb_np = np.swapaxes(rgb_in[0].cpu().detach().numpy(), 0, 2)
+                    cv2.imwrite('rgb.png', rgb_np * 255.)
+                    iuv_np = np.swapaxes(iuv_in[0].cpu().detach().numpy(), 0, 2)
+                    cv2.imwrite('iuv.png', iuv_np * 255.)
 
                     # Prepare seg for extreme crop augmentation
                     seg_extreme_crop = random_extreme_crop(seg=iuv_in[:, 0, :, :],
@@ -294,7 +306,6 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
 
                     pred_smpl_output_mode = smpl_model.forward(beta=pred_shape_dist.loc, 
                                                          theta=pred_pose_rotmats_mode_ext, 
-                                                         garment_class=tailornet_model.garment_class, 
                                                          garment_d=target_garment_displacements)
 
                     pred_vertices_mode = pred_smpl_output_mode.body_verts  # (bs, 6890, 3)
@@ -314,7 +325,6 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     with torch.no_grad():
                         pred_reposed_smpl_output_mean = smpl_model.forward(beta=pred_shape_dist.loc, 
                                                                            theta=torch.zeros_like(target_pose), 
-                                                                           garment_class=tailornet_model.garment_class, 
                                                                            garment_d=target_garment_displacements)
                         pred_reposed_vertices_mean = pred_reposed_smpl_output_mean.body_verts  # (bs, 6890, 3)
 

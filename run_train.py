@@ -6,6 +6,7 @@ import _thread as thread
 import visdom as vis
 
 from data.on_the_fly_smpl_train_dataset import OnTheFlySMPLTrainDataset
+from renderers.non_textured_renderer import NonTexturedRenderer
 from renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
 
 from models.poseMF_shapeGaussian_net import PoseMFShapeGaussianNet
@@ -84,7 +85,7 @@ def run_train(device,
                                           gaussian_filter_size=pose_shape_cfg.DATA.EDGE_GAUSSIAN_SIZE,
                                           threshold=pose_shape_cfg.DATA.EDGE_THRESHOLD).to(device)
     # SMPL model
-    smpl_model = TorchSMPL4Garment(gender=gender).to(device)
+    smpl_model = TorchSMPL4Garment(gender=gender, garment_class='t-shirt').to(device)
     tailornet_model = get_tn_runner(gender=gender, garment_class='t-shirt')
 
     # 3D shape and pose distribution predictor
@@ -92,11 +93,19 @@ def run_train(device,
                                               config=pose_shape_cfg).to(device)
 
     # Pytorch3D renderer for synthetic data generation
-    pytorch3d_renderer = TexturedIUVRenderer(device=device,
+    #pytorch3d_renderer = TexturedIUVRenderer(device=device,
+    #                                         batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
+    #                                         img_wh=pose_shape_cfg.DATA.PROXY_REP_SIZE,
+    #                                         render_rgb=True,
+    #                                         bin_size=32)
+    pytorch3d_renderer = NonTexturedRenderer(device=device,
                                              batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
+                                             num_body_verts=27554,
+                                             num_garment_verts=7702,
                                              img_wh=pose_shape_cfg.DATA.PROXY_REP_SIZE,
-                                             render_rgb=True,
-                                             bin_size=32)
+                                             body_faces=smpl_model.body_faces,
+                                             garment_faces=smpl_model.garment_faces,
+                                             bin_size=0)
     
     # Visualizer class to log the training progress.
     vis_logger = VisLogger(visdom=visdom, renderer=pytorch3d_renderer) if visdom is not None else None
