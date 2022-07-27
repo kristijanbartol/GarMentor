@@ -215,21 +215,11 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                          garment_vertices=target_garment_vertices_for_rendering,
                                                          cam_t=target_cam_t,
                                                          lights_rgb_settings=lights_rgb_settings)
-                    #renderer_output = pytorch3d_renderer(vertices=target_body_vertices_for_rendering,
-                    #                                     textures=texture,
-                    #                                     cam_t=target_cam_t,
-                    #                                     lights_rgb_settings=lights_rgb_settings)
                     
                     iuv_in = renderer_output['iuv_images'].permute(0, 3, 1, 2).contiguous()  # (bs, 3, img_wh, img_wh)
                     iuv_in[:, 1:, :, :] = iuv_in[:, 1:, :, :] * 255
                     iuv_in = iuv_in.round()
                     rgb_in = renderer_output['rgb_images'].permute(0, 3, 1, 2).contiguous()  # (bs, 3, img_wh, img_wh)
-                    
-                    import cv2
-                    rgb_np = np.swapaxes(rgb_in[0].cpu().detach().numpy(), 0, 2)
-                    cv2.imwrite('rgb.png', rgb_np * 255.)
-                    iuv_np = np.swapaxes(iuv_in[0].cpu().detach().numpy(), 0, 2)
-                    cv2.imwrite('iuv.png', iuv_np * 255.)
 
                     # Prepare seg for extreme crop augmentation
                     seg_extreme_crop = random_extreme_crop(seg=iuv_in[:, 0, :, :],

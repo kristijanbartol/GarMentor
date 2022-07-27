@@ -44,6 +44,12 @@ class NonTexturedRenderer(nn.Module):
                  light_specular_color=((0.2, 0.2, 0.2),),
                  background_color=(0.0, 0.0, 0.0)):
         """
+        :device: CPU or CUDA
+        :batch_size: Batch size
+        :body_faces: Body mesh faces indices (F, 3)
+        :garment_faces: Garment faces indices (F, 3)
+        :num_body_verts: Body mesh vertices V=27554
+        :num_garment_verts: Garment mesh vertices V=7702
         :param img_wh: Size of rendered image.
         :param blur_radius: Float distance in the range [0, 2] used to expand the face
             bounding boxes for rasterization. Setting blur radius
@@ -169,13 +175,13 @@ class NonTexturedRenderer(nn.Module):
           FloatTensor of shape (B, image_size, image_size, faces_per_pixel)
           giving the signed Euclidean distance (in NDC units) in the x/y plane of each point closest to the pixel.
 
-        :param vertices: (B, N, 3)
-        :param textures: (B, tex_H, tex_W, 3)
+        :param body_vertices: (B, N, 3), N=27554
+        :param garment_vertices: (B, N, 3), N=7702
         :param cam_t: (B, 3)
         :param orthographic_scale: (B, 2)
         :param lights_rgb_settings: dict of lighting settings with location, ambient_color, diffuse_color and specular_color.
-        :returns rgb_images: (B, img_wh, img_wh, 3)
-        :returns iuv_images: (B, img_wh, img_wh, 3) IUV images give bodypart (I) + UV coordinate information. Parts are DP convention, indexed 1-24.
+        :returns rgb_images: (B, img_wh, img_wh, 3) rendered bodies and garments
+        :returns iuv_images: (B, img_wh, img_wh, 3) silhouettes
         :returns depth_images: (B, img_wh, img_wh)
         """
         if cam_t is not None:

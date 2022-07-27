@@ -93,11 +93,6 @@ def run_train(device,
                                               config=pose_shape_cfg).to(device)
 
     # Pytorch3D renderer for synthetic data generation
-    #pytorch3d_renderer = TexturedIUVRenderer(device=device,
-    #                                         batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
-    #                                         img_wh=pose_shape_cfg.DATA.PROXY_REP_SIZE,
-    #                                         render_rgb=True,
-    #                                         bin_size=32)
     pytorch3d_renderer = NonTexturedRenderer(device=device,
                                              batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
                                              num_body_verts=27554,
