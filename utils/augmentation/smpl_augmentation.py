@@ -1,6 +1,5 @@
+import numpy as np
 import torch
-
-from smplx.lbs import batch_rodrigues
 
 
 def uniform_sample_shape(batch_size, mean_shape, delta_betas_range):
@@ -19,6 +18,14 @@ def normal_sample_params(batch_size, mean_params, std_vector):
     """
     shape = mean_params + torch.randn(batch_size, mean_params.shape[0], device=mean_params.device)*std_vector
     return shape  # (bs, num_smpl_betas)
+
+
+def normal_sample_params_numpy(mean_params, std_vector):
+    """
+    Gaussian sampling of shape parameter deviations from the mean.
+    """
+    shape = mean_params + np.randn(mean_params.shape[0]) * std_vector
+    return shape  # (num_smpl_betas,)
 
 
 def normal_sample_style(batch_size, mean_style, std_vector):

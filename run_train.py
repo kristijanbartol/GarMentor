@@ -23,7 +23,7 @@ from train.train_poseMF_shapeGaussian_net import train_poseMF_shapeGaussian_net
 
 from utils.visualize import VisLogger
 
-from tailornet_for_garmentor.models.torch_smpl4garment import TorchSMPL4Garment
+from tailornet_for_garmentor.models.smpl4garment import SMPL4Garment
 
 
 def run_train(device,
@@ -85,7 +85,8 @@ def run_train(device,
                                           gaussian_filter_size=pose_shape_cfg.DATA.EDGE_GAUSSIAN_SIZE,
                                           threshold=pose_shape_cfg.DATA.EDGE_THRESHOLD).to(device)
     # SMPL model
-    smpl_model = TorchSMPL4Garment(gender=gender, garment_class='t-shirt').to(device)
+    smpl_model = SMPL4Garment(gender=gender)
+    #smpl_model = TorchSMPL4Garment(gender=gender, garment_class='t-shirt').to(device)
     tailornet_model = get_tn_runner(gender=gender, garment_class='t-shirt')
 
     # 3D shape and pose distribution predictor

@@ -95,8 +95,8 @@ class NonTexturedRenderer(nn.Module):
         self.img_wh = img_wh
         self.device = device
         
-        self.body_faces = body_faces.expand(batch_size, -1, -1).to(device)
-        self.garment_faces = garment_faces.expand(batch_size, -1, -1).to(device)
+        self.body_faces = torch.tensor(body_faces).expand(batch_size, -1, -1).to(device)
+        self.garment_faces = torch.tensor(garment_faces).expand(batch_size, -1, -1).to(device)
         self.garment_faces_offset = self.garment_faces + self.body_faces.max()
 
         # Cameras - pre-defined here but can be specified in forward pass if cameras will vary (e.g. random cameras)
