@@ -14,6 +14,7 @@ elif [[ "$USER" == "dbojanic" ]]; then
 	SSP3D_DIR=${BASE_DATA_DIR}/SSP-3D/
 	TAILORNET_DATA_DIR=${BASE_DATA_DIR}/tailornet/
 	HIERPROB3D_DATA_DIR=${BASE_DATA_DIR}/hierprob3d/
+	USER="kbartol"
 elif [[ "$USER" == "julien" ]]; then
 	REPO_DIR=/home/julien/git/garmentor
 	PW3D_DIR=/home/julien/data/3DPW
@@ -31,7 +32,7 @@ fi
 docker run -it \
 	-p 8888:8888 \
 	--rm \
-	--runtime=nvidia --gpus all \
+	--gpus all \
 	--shm-size=8gb \
 	--name $USER-garmentor \
 	-v ${REPO_DIR}:/garmentor \

@@ -405,7 +405,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     target_dict_for_loss = {'pose_params_rotmats': target_pose_rotmats,
                                             'shape_params': target_shape,
                                             'verts': target_body_verts,
-                                            'joints3D': pred_joints_h36mlsp_mode,
+                                            'joints3D': target_joints_h36mlsp,
                                             'joints2D': target_joints2d_coco,
                                             'joints2D_vis': target_joints2d_visib_coco,
                                             'glob_rotmats': target_glob_rotmats}
