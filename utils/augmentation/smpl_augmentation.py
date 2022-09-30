@@ -28,12 +28,12 @@ def normal_sample_params_numpy(mean_params, std_vector):
     return shape  # (num_smpl_betas,)
 
 
-def normal_sample_style(batch_size, mean_style, std_vector):
+def normal_sample_style_numpy(num_garment_classes, mean_params, std_vector):
     """
     Gaussian sampling of shape parameter deviations from the mean.
     """
-    shape = mean_style + torch.randn(batch_size, mean_style.shape[0], device=mean_style.device)*std_vector
-    return shape  # (bs, num_smpl_betas)
+    style = mean_params + np.randn((num_garment_classes, mean_params.shape[0])) * std_vector
+    return style  # (num_garment_classes, style_param_size,)
 
 
 def uniform_random_unit_vector(num_vectors):

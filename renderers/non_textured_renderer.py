@@ -21,12 +21,6 @@ from pytorch3d.renderer import (
 
 class NonTexturedRenderer(nn.Module):
     def __init__(self,
-                 device,
-                 batch_size,
-                 body_faces,
-                 garment_faces,
-                 num_body_verts,
-                 num_garment_verts,
                  img_wh=256,
                  cam_t=None,
                  cam_R=None,
@@ -93,10 +87,9 @@ class NonTexturedRenderer(nn.Module):
         """
         super().__init__()
         self.img_wh = img_wh
-        self.device = device
-        
-        self.body_faces = torch.tensor(body_faces).expand(batch_size, -1, -1).to(device)
-        self.garment_faces = torch.tensor(garment_faces).expand(batch_size, -1, -1).to(device)
+        self.device = 'cpu'
+
+        self.batch_size = 1
         self.garment_faces_offset = self.garment_faces + self.body_faces.max()
 
         # Cameras - pre-defined here but can be specified in forward pass if cameras will vary (e.g. random cameras)
@@ -105,15 +98,15 @@ class NonTexturedRenderer(nn.Module):
             # (Actually pyrender also has a rotation defined in the renderer to make it same as NMR.)
             cam_R = torch.tensor([[-1., 0., 0.],
                                   [0., 1., 0.],
-                                  [0., 0., -1.]], device=device).float()
-            cam_R = cam_R[None, :, :].expand(batch_size, -1, -1)
+                                  [0., 0., -1.]], device=self.device).float()
+            cam_R = cam_R[None, :, :].expand(self.batch_size, -1, -1)
         if cam_t is None:
-            cam_t = torch.tensor([0., 0.2, 2.5]).float().to(device)[None, :].expand(batch_size, -1)
+            cam_t = torch.tensor([0., 0.2, 2.5]).float().to(self.device)[None, :].expand(self.batch_size, -1)
         # Pytorch3D camera is rotated 180° about z-axis to match my perspective_project_torch/NMR's projection convention.
         # So, need to also rotate the given camera translation (implemented below as elementwise-mul).
-        cam_t = cam_t * torch.tensor([-1., -1., 1.], device=cam_t.device).float()
+        cam_t = cam_t * torch.tensor([-1., -1., 1.], device=self.device).float()
 
-        self.cameras = FoVOrthographicCameras(device=device,
+        self.cameras = FoVOrthographicCameras(device=self.device,
                                             R=cam_R,
                                             T=cam_t,
                                             scale_xyz=((
@@ -122,7 +115,7 @@ class NonTexturedRenderer(nn.Module):
                                                 1.0),))
 
         # Lights for textured RGB render - pre-defined here but can be specified in forward pass if lights will vary (e.g. random cameras)
-        self.lights_rgb_render = PointLights(device=device,
+        self.lights_rgb_render = PointLights(device=self.device,
                                                 location=light_t,
                                                 ambient_color=light_ambient_color,
                                                 diffuse_color=light_diffuse_color,
@@ -141,21 +134,17 @@ class NonTexturedRenderer(nn.Module):
 
         # Shader for textured RGB output and IUV output
         blend_params = BlendParams(background_color=background_color)
-        self.rgb_shader = HardPhongShader(device=device, cameras=self.cameras,
+        self.rgb_shader = HardPhongShader(device=self.device, cameras=self.cameras,
                                             lights=self.lights_rgb_render, blend_params=blend_params)
-        
-        self.body_verts_rgb_colors = torch.tensor([0., 0., 1.], device=device).repeat(batch_size, num_body_verts, 1)
-        self.garment_verts_rgb_colors = torch.tensor([1., 0., 0.], device=device).repeat(batch_size, num_garment_verts, 1)
 
-        self.to(device)
+        self.to(self.device)
 
     def to(self, device):
         # Rasterizer and shader have submodules which are not of type nn.Module
         self.rasterizer.to(device)
         self.rgb_shader.to(device)
-        self.body_verts_rgb_colors.to(device)
-        self.garment_verts_rgb_colors.to(device)
 
+    '''
     def forward(self, body_vertices, garment_vertices, cam_t=None, orthographic_scale=None, 
                 lights_rgb_settings=None):
         """
@@ -220,3 +209,85 @@ class NonTexturedRenderer(nn.Module):
         output['depth_images'] = zbuffers
 
         return output
+    '''
+
+    def forward(self, body_verts, body_faces, upper_garment_verts, 
+                upper_garment_faces, lower_garment_verts, lower_garment_faces, 
+                cam_t=None, orthographic_scale=None, 
+                lights_rgb_settings=None):
+
+        if cam_t is not None:
+            # Pytorch3D camera is rotated 180° about z-axis to match my perspective_project_torch/NMR's projection convention.
+            # So, need to also rotate the given camera translation (implemented below as elementwise-mul).
+            self.cameras.T = cam_t * torch.tensor([-1., -1., 1.], device=cam_t.device).float()
+        if orthographic_scale is not None and self.projection_type == 'orthographic':
+            self.cameras.focal_length = orthographic_scale * (self.img_wh / 2.0)
+
+        if lights_rgb_settings is not None:
+            self.lights_rgb_render.location = lights_rgb_settings['location']
+            self.lights_rgb_render.ambient_color = lights_rgb_settings['ambient_color']
+            self.lights_rgb_render.diffuse_color = lights_rgb_settings['diffuse_color']
+            self.lights_rgb_render.specular_color = lights_rgb_settings['specular_color']
+
+        num_body_verts = body_verts.shape[0]
+        num_upper_garment_verts = upper_garment_verts.shape[0] if upper_garment_verts is not None else 0
+        num_lower_garment_verts = lower_garment_verts.shape[0] if lower_garment_verts is not None else 0
+
+        total_num_verts = num_body_verts + num_upper_garment_verts + num_lower_garment_verts
+
+        if not torch.is_tensor(body_verts):
+            body_verts = torch.from_numpy(body_verts).unsqueeze(0).to(self.device)
+            body_faces = torch.from_numpy(body_faces).unsqueeze(0).to(self.device)
+            if upper_garment_verts is not None:
+                upper_garment_verts = torch.from_numpy(upper_garment_verts).unsqueeze(0).to(self.device)
+                upper_garment_faces = torch.from_numpy(upper_garment_faces).unsqueeze(0).to(self.device)
+            if lower_garment_verts is not None:
+                lower_garment_verts = torch.from_numpy(lower_garment_verts).unsqueeze(0).to(self.device)
+                lower_garment_faces = torch.from_numpy(lower_garment_faces).unsqueeze(0).to(self.device)
+
+        self.garment_faces_offset = self.garment_faces + self.body_faces.max()
+
+        union_verts = body_verts
+        union_faces = body_faces
+        faces_offset = body_faces.max()
+        if upper_garment_verts is not None:
+            union_verts = torch.cat([union_verts, upper_garment_verts], dim=1)
+            union_faces = torch.cat([union_faces, upper_garment_faces + faces_offset])
+            faces_offset += upper_garment_faces.max()
+        if lower_garment_verts is not None:
+            union_verts = torch.cat([union_verts, lower_garment_verts], dim=1)
+            union_faces = torch.cat([union_faces, lower_garment_faces + faces_offset])
+
+        union_verts_white_color = torch.tensor([1., 1., 1.], device=self.device).repeat(1, total_num_verts, 1)
+        upper_verts_white_color = torch.tensor([1., 1., 1.], device=self.device).repeat(1, num_upper_garment_verts, 1)
+        lower_verts_white_color = torch.tensor([1., 1., 1.], device=self.device).repeat(1, num_lower_garment_verts, 1)
+        
+        union_textures = Textures(verts_rgb=union_verts_white_color)
+
+        union_mesh = Meshes(
+            verts=union_verts,
+            faces=union_faces,
+            textures=union_textures
+        )
+
+        upper_mesh = Meshes(
+            verts=upper_garment_verts,
+            faces=upper_garment_faces,
+            textures=Textures(verts_rgb=upper_verts_white_color)
+        )
+
+        lower_mesh = Meshes(
+            verts=upper_garment_verts,
+            faces=upper_garment_faces,
+            textures=Textures(verts_rgb=lower_verts_white_color)
+        )
+
+        seg_maps = []
+        for mesh_to_render in [union_mesh, upper_mesh, lower_mesh]:
+            # Rasterize
+            fragments = self.rasterizer(mesh_to_render, cameras=self.cameras)
+
+            # Render cloth segmentations.
+            seg_maps.append(self.rgb_shader(fragments, mesh_to_render, lights=self.lights_rgb_render)[:, :, :, :3])
+
+        return seg_maps
