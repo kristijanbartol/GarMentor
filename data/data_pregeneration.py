@@ -192,7 +192,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
             delta_z_range=self.pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.CAM.DELTA_Z_RANGE)
 
         # Randomly sample garment classes (upper and lower garment class).
-        garment_class_pair = self.get_random_garment_classes()
+        garment_classes = GarmentClasses()
 
         # Randomly sample garment parameters.
         style_vector = normal_sample_style_numpy(
@@ -203,7 +203,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
         # Call the parametric model that encapsulates TN, SMPL, and interpenetration resolution.
         upper_smpl_output, lower_smpl_output = self.parametric_model.run(
             gender=gender,
-            garment_class_pair=garment_class_pair,
+            garment_classes=garment_classes,
             pose=pose,
             shape=shape,
             style_vector=style_vector
@@ -220,6 +220,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
             upper_garment_faces=upper_smpl_output.garment_faces,
             lower_garment_verts=lower_smpl_output.garment_verts,
             lower_garment_faces=lower_smpl_output.garment_faces,
+            garment_classes=garment_classes,
             cam_t=cam_t
         )
 

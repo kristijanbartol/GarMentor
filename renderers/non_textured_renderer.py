@@ -17,6 +17,7 @@ from pytorch3d.renderer import (
     HardPhongShader,
     BlendParams,
     Textures)
+from utils.garment_classes import GarmentClasses
 
 
 class NonTexturedRenderer(nn.Module):
@@ -213,7 +214,7 @@ class NonTexturedRenderer(nn.Module):
 
     def forward(self, body_verts, body_faces, upper_garment_verts, 
                 upper_garment_faces, lower_garment_verts, lower_garment_faces, 
-                cam_t=None, orthographic_scale=None, 
+                garment_classes, cam_t=None, orthographic_scale=None, 
                 lights_rgb_settings=None):
 
         if cam_t is not None:
@@ -282,15 +283,19 @@ class NonTexturedRenderer(nn.Module):
             textures=Textures(verts_rgb=lower_verts_white_color)
         )
 
-        seg_maps = []
-        for mesh_to_render in [union_mesh, upper_mesh, lower_mesh]:
+        seg_maps = torch.zeros((GarmentClasses.NUM_CLASSES+1, self.img_wh, self.img_wh, 3))
+        for mesh_to_render, map_idx in [
+                (union_mesh, 0), 
+                (upper_mesh, garment_classes.upper_label), 
+                (lower_mesh, garment_classes.lower_label)]:
             # Rasterize
             fragments = self.rasterizer(mesh_to_render, cameras=self.cameras)
 
             # Render cloth segmentations.
-            seg_maps.append(self.rgb_shader(fragments, mesh_to_render, lights=self.lights_rgb_render)[:, :, :, :3])
-        # TODO (kbartol): Replace all this crazy nonsense in the renderer.
+            seg_maps[map_idx] = self.rgb_shader(fragments, mesh_to_render, lights=self.lights_rgb_render)[0, :, :, :3]
+
         seg_maps = torch.cat(seg_maps, dim=0).cpu().detach().numpy()
+        # TODO: This is not enough to get the segmentation map - also need to reduce 3 channels into 1.
         seg_maps = np.astype(seg_maps, np.bool)
 
         return seg_maps

@@ -66,6 +66,7 @@ class PoseMFShapeGaussianNet(nn.Module):
 
         self.fc1 = nn.Linear(num_image_features, fc1_dim)
 
+        # TODO (kbartol): Add fc_style.
         self.fc_shape = nn.Linear(fc1_dim, self.num_shape_params * 2)  # Means and variances for SMPL betas and/or measurements
         self.fc_glob = nn.Linear(fc1_dim, self.num_glob_params)
         self.fc_cam = nn.Linear(fc1_dim, self.num_cam_params)
@@ -107,6 +108,7 @@ class PoseMFShapeGaussianNet(nn.Module):
         cam = delta_cam + self.init_cam  # (bsize, 3)
 
         # Input Feats/Shape/Glob/Cam embed
+        # TODO (kbartol): Add style parameters to the embedded representation.
         embed = self.activation(self.fc_embed(torch.cat([input_feats, shape_params, glob, cam], dim=1)))  # (bsize, embed dim)
 
         # Pose

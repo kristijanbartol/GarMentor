@@ -216,7 +216,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     j2d_heatmaps = j2d_heatmaps * target_joints2d_visib_coco[:, :, None, None]
 
                     # Concatenate edge-image and 2D joint heatmaps to create input proxy representation
-                    proxy_rep_input = torch.cat([edge_in, j2d_heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
+                    proxy_rep_input = torch.cat([edge_in, seg_maps, j2d_heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
 
                 with torch.set_grad_enabled(split == 'train'):
                     #############################################################
@@ -231,11 +231,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                         pred_glob_rotmats.unsqueeze(1), 
                         pred_pose_rotmats_mode), axis=1)
 
-                    # NOTE (kbartol): Still need an SMPL model here, but can use the original one!
-
-                    pred_smpl_output_mode = smpl_model.forward(beta=pred_shape_dist.loc, 
-                                                         theta=pred_pose_rotmats_mode_ext, 
-                                                         garment_d=target_garment_displacements)
+                    pred_smpl_output_mode = smpl_model.run(beta=pred_shape_dist.loc, 
+                                                           theta=pred_pose_rotmats_mode_ext)
 
                     pred_joints_mode = pred_smpl_output_mode.joints
                     pred_joints_h36m_mode = pred_joints_mode[:, BASE_JOINTS_TO_H36M_MAP, :]

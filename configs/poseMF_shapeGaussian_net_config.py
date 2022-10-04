@@ -1,11 +1,12 @@
 from yacs.config import CfgNode
 
+# TODO (kbartol): Add the probability for no clothes to these configuration.
 
 _C = CfgNode()
 
 # Model
 _C.MODEL = CfgNode()
-_C.MODEL.NUM_IN_CHANNELS = 18
+_C.MODEL.NUM_IN_CHANNELS = 18       # TODO (kbartol): Increase the number of channels by NUM_SEG_MAPS
 _C.MODEL.NUM_RESNET_LAYERS = 18
 _C.MODEL.EMBED_DIM = 256
 _C.MODEL.DELTA_I = True
