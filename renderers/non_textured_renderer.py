@@ -289,5 +289,8 @@ class NonTexturedRenderer(nn.Module):
 
             # Render cloth segmentations.
             seg_maps.append(self.rgb_shader(fragments, mesh_to_render, lights=self.lights_rgb_render)[:, :, :, :3])
+        # TODO (kbartol): Replace all this crazy nonsense in the renderer.
+        seg_maps = torch.cat(seg_maps, dim=0).cpu().detach().numpy()
+        seg_maps = np.astype(seg_maps, np.bool)
 
         return seg_maps

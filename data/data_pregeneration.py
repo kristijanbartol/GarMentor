@@ -56,7 +56,48 @@ class PreGeneratedSampleValues:
         return iter(data)
 
 
+class PreGeneratedValuesArray():
+
+    def __init__(self):
+        self.empty()
+        self.keys = []
+        self.numpied = False    # to avoid errors if requesting values many times
+
+    def empty(self):
+        self._samples_dict = {}
+
+    def _set_dict_keys(self, sample_dict_keys):
+        # Add 's' to key name specify plural.
+        self.keys = [x + 's' for x in sample_dict_keys]
+
+    def append(self, values):
+        # NOTE (kbartol): This is inefficient, but at least it encapsulates saving.
+        if not self._samples_dict:
+            self._set_dict_keys(values.keys())
+            for k in self.keys:
+                self._samples_dict[k] = []
+        for ks, k in zip(self.keys, values.keys()):
+            self._samples_dict[ks].append(values[k])
+
+    def get(self):
+        if not self.numpied:
+            for ks in self.keys:
+                self._samples_dict[ks] = np.array(self._samples_dict[ks])
+        self.numpied = True
+        return self._samples_dict
+
+
 class DataPreGenerator(object):
+
+    # The paths and template to files and folders where data will be stored.
+    # /data/garmentor/
+    #       {dataset_name}/
+    #           {gender}/
+    #               values.npy
+    #               rgb/
+    #                   {idx:5d}.png
+    #               segmentations/
+    #                   {idx:5d}_{garment_class}.png
 
     # Directory path templates.
     DATA_ROOT_DIR = '/data/garmentor/'
@@ -65,28 +106,14 @@ class DataPreGenerator(object):
 
     # Filename templates.
     IMG_NAME_TEMPLATE = '{idx:5d}.png'
-    SEG_MAP_TEMPLATE = '{idx:5d}_{garment_class}.png'
+    SEG_MAPS_NAME_TEMPLATE = '{idx:5d}.npy'
+    VALUES_FNAME = 'values.npy'
 
     def __init__(self):
-        # Define path to folders where data will be stored.
-        # /data/garmentor/
-        #       {dataset_name}/
-        #           {gender}/
-        #               values.npy
-        #               rgb/
-        #               segmentations/
         self.dataset_path_template = os.path.join(
             self.DATA_ROOT_DIR,
             '{dataset_name}',
             '{gender}'
-        )
-        self.img_dir_path_template = os.path.join(
-            self.dataset_path_template,
-            self.IMG_DIR
-        )
-        self.seg_maps_dir_path_template = os.path.join(
-            self.dataset_path_template,
-            self.SEG_MAPS_DIR
         )
 
         # Parametric models gathers TailorNet and SMPL4Garment functionalities.
@@ -96,7 +123,7 @@ class DataPreGenerator(object):
         self.renderer = None
 
         # Initialize lists to store relatively small values (e.g. not images and maps).
-        self.samples_values = []
+        self.samples_values = PreGeneratedValuesArray()
 
 
 class SurrealDataPreGenerator(DataPreGenerator):
@@ -105,9 +132,6 @@ class SurrealDataPreGenerator(DataPreGenerator):
 
     def __init__(self):
         super().__init__()
-
-        self.rgb_dir_path = os.path.join(self.DATA_ROOT_DIR, self.SURREAL_DIR, self.IMG_DIR)
-        self.seg_maps_dir_path = os.path.join(self.DATA_ROOT_DIR, self.SURREAL_DIR)
 
         # Load configuration.
         self.pose_shape_cfg = get_poseMF_shapeGaussian_cfg_defaults()
@@ -153,7 +177,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
             self.mean_cam_t[None, :], 
             (self.pose_shape_cfg.TRAIN.BATCH_SIZE, -1))
 
-    def generate_sample(self, idx, gender, garment_class_pair):
+    def generate_sample(self, idx, gender):
         pose = self.poses[idx]
 
         # Randomly sample body shape.
@@ -166,6 +190,9 @@ class SurrealDataPreGenerator(DataPreGenerator):
             self.mean_cam_t,
             xy_std=self.pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.CAM.XY_STD,
             delta_z_range=self.pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.CAM.DELTA_Z_RANGE)
+
+        # Randomly sample garment classes (upper and lower garment class).
+        garment_class_pair = self.get_random_garment_classes()
 
         # Randomly sample garment parameters.
         style_vector = normal_sample_style_numpy(
@@ -211,33 +238,43 @@ class SurrealDataPreGenerator(DataPreGenerator):
 
         return rgb_img, seg_maps, sample_values
 
-    def _save(self, sample_idx, gender, rgb_img, seg_maps, sample_values):
-        dataset_dir = self.dataset_path_template.format(
-            dataset=self.DATASET_NAME,
-            gender=gender
-        )
+    def _save_sample(self, dataset_dir, sample_idx, rgb_img, seg_maps, sample_values):
         if rgb_img is not None:
             img = Image.fromarray(rgb_img)
             img_dir = os.path.join(dataset_dir, self.IMG_DIR)
             img_path = os.path.join(img_dir, self.IMG_NAME_TEMPLATE.format(sample_idx))
             img.save(img_path)
 
-        for seg_map_idx, seg_map in enumerate(seg_maps):
-            seg_img = Image.fromarray(rgb_img)
-            seg_dir = os.path.join(dataset_dir, self.SEG_MAPS_DIR)
-            seg_path = os.path.join(
-                seg_dir, self.SEG_MAP_TEMPLATE.format(sample_idx, seg_map_idx))
-            seg_img.save(seg_path)
+        seg_dir = os.path.join(dataset_dir, self.SEG_MAPS_DIR)
+        seg_path = os.path.join(
+            seg_dir, self.SEG_MAPS_NAME_TEMPLATE.format(sample_idx))
+        np.save(seg_path, seg_maps)
 
         self.samples_values.append(sample_values)
 
+    def _save_params(self, dataset_dir):
+        params_path = os.path.join(dataset_dir, self.VALUES_FNAME)
+        np.save(params_path, self.samples_values.get())
+
     def generate(self):
         for gender in ['male', 'female']:
+            self.samples_values.empty()
+            dataset_dir = self.dataset_path_template.format(
+                dataset=self.DATASET_NAME,
+                gender=gender
+            )
+
             for pose_idx in range(self.poses.shape[0]):
-                garment_classes = self.get_random_garment_classes()
                 rgb_img, seg_maps, sample_values = self.generate_sample(
-                    pose_idx, gender, garment_classes)
-                self._save(pose_idx, gender, rgb_img, seg_maps, sample_values)
+                    pose_idx, gender)
+                self._save_sample(
+                    dataset_dir=dataset_dir, 
+                    sample_idx=pose_idx, 
+                    rgb_img=rgb_img, 
+                    seg_maps=seg_maps, 
+                    sample_values=sample_values
+                )
+            self._save_params(dataset_dir)
 
 
 if __name__ == '__main__':
