@@ -5,6 +5,8 @@ import numpy as np
 
 class GarmentClasses():
 
+    '''A garment classes management class.'''
+
     GARMENT_CLASSES = ['t-shirt', 'shirt', 'short-pant', 'pant', 'skirt']
     UPPER_GARMENT_CLASSES = ['t-shirt', 'shirt']
     LOWER_GARMENT_CLASSES = ['short-pant', 'pant', 'skirt']
@@ -69,13 +71,16 @@ class GarmentClasses():
         return np.array(binary_labels_vector, dtype=np.bool)
 
     def __init__(self, binary_labels_vector: np.ndarray = None):
+        '''If nothing is already provided, initialize random classes.'''
+
         if binary_labels_vector is None:
             self.labels_vector: np.ndarray = self._generate_random_garment_classes()
         else:
             self.labels_vector: np.ndarray = binary_labels_vector
 
     @property
-    def upper_label(self):
+    def upper_label(self) -> int:
+        '''Returns an int representing upper garment (see `GarmentClasses.GARMENT_DICT`).'''
         label_list = [x for x in self.UPPER_LABELS if self.label_vector[x] == 1]
         if len(label_list) == 0:
             return None
@@ -83,7 +88,8 @@ class GarmentClasses():
             return label_list[0]
 
     @property
-    def lower_label(self):
+    def lower_label(self) -> int:
+        '''Returns an int representing lower garment (see `GarmentClasses.GARMENT_DICT`).'''
         label_list = [x for x in self.LOWER_LABELS if self.label_vector[x] == 1]
         if len(label_list) == 0:
             return None
@@ -91,9 +97,11 @@ class GarmentClasses():
             return label_list[0]
 
     @property
-    def upper_class(self):
+    def upper_class(self) -> str:
+        '''Returns an upper garment class (see `GarmentClasses.GARMENT_CLASSES`).'''
         return self.GARMENT_CLASSES[self.upper_label]
 
     @property
-    def lower_class(self):
+    def lower_class(self) -> str:
+        '''Returns a lower garment class (see `GarmentClasses.GARMENT_CLASSES`).'''
         return self.GARMENT_CLASSES[self.lower_label]
