@@ -1,7 +1,5 @@
 from yacs.config import CfgNode
 
-# TODO (kbartol): Add the probability for no clothes to these configuration.
-
 _C = CfgNode()
 
 # Model
@@ -116,5 +114,5 @@ _C.LOSS.STAGE2.WEIGHTS.VERTS3D = 5000.0
 _C.LOSS.STAGE2.WEIGHTS.JOINTS3D = 5000.0
 
 
-def get_poseMF_shapeGaussian_cfg_defaults():
+def get_cfg_defaults():
     return _C.clone()

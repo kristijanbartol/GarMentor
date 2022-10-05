@@ -30,9 +30,7 @@ from tailornet_for_garmentor.utils.interpenetration import remove_interpenetrati
 def train_poseMF_shapeGaussian_net(pose_shape_model,
                                    pose_shape_cfg,
                                    smpl_model,
-                                   tailornet_model,
                                    edge_detect_model,
-                                   pytorch3d_renderer,
                                    device,
                                    train_dataset,
                                    val_dataset,
@@ -227,12 +225,11 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     # Pose F, U, V and rotmats_mode are (bs, 23, 3, 3) and Pose S is (bs, 23, 3)
 
                     pred_glob_rotmats = rot6d_to_rotmat(pred_glob)  # (bs, 3, 3)
-                    pred_pose_rotmats_mode_ext = torch.cat((
-                        pred_glob_rotmats.unsqueeze(1), 
-                        pred_pose_rotmats_mode), axis=1)
 
-                    pred_smpl_output_mode = smpl_model.run(beta=pred_shape_dist.loc, 
-                                                           theta=pred_pose_rotmats_mode_ext)
+                    pred_smpl_output_mode = smpl_model(body_pose=pred_pose_rotmats_mode,
+                                                       global_orient=pred_glob_rotmats.unsqueeze(1),
+                                                       betas=pred_shape_dist.loc,
+                                                       pose2rot=False)
 
                     pred_joints_mode = pred_smpl_output_mode.joints
                     pred_joints_h36m_mode = pred_joints_mode[:, BASE_JOINTS_TO_H36M_MAP, :]
@@ -257,12 +254,15 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                           'pose_params_S': pred_pose_S,
                                           'pose_params_V': pred_pose_V,
                                           'shape_params': pred_shape_dist,
+                                          'style_params': pred_style_dist,
                                           'joints3D': pred_joints_h36mlsp_mode,
                                           'joints2D': pred_joints2d_coco_samples,
                                           'glob_rotmats': pred_glob_rotmats}
 
+                    # TODO: To avoid passing garment_classes to this dict, select only the relevant style vector part.
                     target_dict_for_loss = {'pose_params_rotmats': target_pose_rotmats,
                                             'shape_params': target_shape,
+                                            'style_params': target_style_vector,
                                             'joints3D': target_joints_h36mlsp,
                                             'joints2D': target_joints2d_coco,
                                             'joints2D_vis': target_joints2d_visib_coco,

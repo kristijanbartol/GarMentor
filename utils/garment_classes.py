@@ -1,4 +1,6 @@
 import random
+from typing import List
+import numpy as np
 
 
 class GarmentClasses():
@@ -29,20 +31,24 @@ class GarmentClasses():
 
     NUM_CLASSES = len(GARMENT_CLASSES)
 
-    # TODO: Set this > 0. to use.
-    # TODO: Move this to configuration.
-    CLOTHLESS_PROB = 0.
+    CLOTHLESS_PROB = 0.05
 
-    def _generate_random_garment_classes(self):
+    def _generate_random_garment_classes(self) -> np.ndarray:
+        '''Generate random classes for upper for lower garment.'''
 
-        def get_random_garment_class(garment_classes):
+        def get_random_garment_class(garment_classes: List[str]) -> str:
+            '''Based on a random int in range, select the garment class.'''
             random_garment_int = random.randint(0, len(garment_classes) - 1)
             return garment_classes[random_garment_int]
 
-        upper_garment_class = get_random_garment_class(self.UPPER_GARMENT_CLASSES)
-        lower_garment_class = get_random_garment_class(self.LOWER_GARMENT_CLASSES)
+        upper_garment_class: str = get_random_garment_class(
+            self.UPPER_GARMENT_CLASSES
+        )
+        lower_garment_class: str = get_random_garment_class(
+            self.LOWER_GARMENT_CLASSES
+        )
 
-        random_number = random.uniform(0, 1)
+        random_number: float = random.uniform(0, 1)
         if random_number < self.CLOTHLESS_PROB:
             another_random_number = random.uniform(0, 1)
             if another_random_number < 0.5:
@@ -50,23 +56,23 @@ class GarmentClasses():
             else:
                 lower_garment_class = None
 
-        upper_label = self.UPPER_GARMENT_DICT[upper_garment_class]
-        lower_label = self.LOWER_GARMENT_DICT[lower_garment_class]
+        upper_label: int = self.UPPER_GARMENT_DICT[upper_garment_class]
+        lower_label: int = self.LOWER_GARMENT_DICT[lower_garment_class]
 
-        binary_label_vector = [0] * len(self.GARMENT_CLASSES)
+        binary_labels_vector: List[bool] = [0] * len(self.GARMENT_CLASSES)
         
         if upper_label is not None:
-            binary_label_vector[upper_label] = 1
+            binary_labels_vector[upper_label]: bool = 1
         if lower_label is not None:
-            binary_label_vector[lower_label] = 1
+            binary_labels_vector[lower_label]: bool = 1
 
-        return binary_label_vector
+        return np.array(binary_labels_vector, dtype=np.bool)
 
-    def __init__(self, binary_label_vector=None):
-        if binary_label_vector is None:
-            self.label_vector = self._generate_random_garment_classes()
+    def __init__(self, binary_labels_vector: np.ndarray = None):
+        if binary_labels_vector is None:
+            self.labels_vector: np.ndarray = self._generate_random_garment_classes()
         else:
-            self.label_vector = binary_label_vector
+            self.labels_vector: np.ndarray = binary_labels_vector
 
     @property
     def upper_label(self):

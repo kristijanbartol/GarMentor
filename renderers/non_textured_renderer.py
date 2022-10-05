@@ -1,14 +1,9 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from scipy.io import loadmat
-
-from configs import paths
-
-import matplotlib.pyplot as plt
 
 # Data structures and functions for rendering
-from pytorch3d.structures import Meshes, join_meshes_as_scene
+from pytorch3d.structures import Meshes
 from pytorch3d.renderer import (
     FoVOrthographicCameras,
     PointLights,
@@ -20,6 +15,7 @@ from pytorch3d.renderer import (
 from utils.garment_classes import GarmentClasses
 
 
+# TODO (kbartol): Will replace this torch-based renderer with the simpler one (issue #20).
 class NonTexturedRenderer(nn.Module):
     def __init__(self,
                  img_wh=256,
@@ -145,73 +141,6 @@ class NonTexturedRenderer(nn.Module):
         self.rasterizer.to(device)
         self.rgb_shader.to(device)
 
-    '''
-    def forward(self, body_vertices, garment_vertices, cam_t=None, orthographic_scale=None, 
-                lights_rgb_settings=None):
-        """
-        Render a batch of textured RGB images and IUV images from a batch of meshes.
-
-        Fragments output from rasterizer:
-        pix_to_face:
-          LongTensor of shape (B, image_size, image_size, faces_per_pixel)
-          specifying the indices of the faces (in the packed faces) which overlap each pixel in the image.
-        zbuf:
-          FloatTensor of shape (B, image_size, image_size, faces_per_pixel)
-          giving the z-coordinates of the nearest faces at each pixel in world coordinates, sorted in ascending z-order.
-        bary_coords:
-          FloatTensor of shape (B, image_size, image_size, faces_per_pixel, 3)
-          giving the barycentric coordinates in NDC units of the nearest faces at each pixel, sorted in ascending z-order.
-        pix_dists:
-          FloatTensor of shape (B, image_size, image_size, faces_per_pixel)
-          giving the signed Euclidean distance (in NDC units) in the x/y plane of each point closest to the pixel.
-
-        :param body_vertices: (B, N, 3), N=27554
-        :param garment_vertices: (B, N, 3), N=7702
-        :param cam_t: (B, 3)
-        :param orthographic_scale: (B, 2)
-        :param lights_rgb_settings: dict of lighting settings with location, ambient_color, diffuse_color and specular_color.
-        :returns rgb_images: (B, img_wh, img_wh, 3) rendered bodies and garments
-        :returns iuv_images: (B, img_wh, img_wh, 3) silhouettes
-        :returns depth_images: (B, img_wh, img_wh)
-        """
-        if cam_t is not None:
-            # Pytorch3D camera is rotated 180° about z-axis to match my perspective_project_torch/NMR's projection convention.
-            # So, need to also rotate the given camera translation (implemented below as elementwise-mul).
-            self.cameras.T = cam_t * torch.tensor([-1., -1., 1.], device=cam_t.device).float()
-        if orthographic_scale is not None and self.projection_type == 'orthographic':
-            self.cameras.focal_length = orthographic_scale * (self.img_wh / 2.0)
-
-        if lights_rgb_settings is not None:
-            self.lights_rgb_render.location = lights_rgb_settings['location']
-            self.lights_rgb_render.ambient_color = lights_rgb_settings['ambient_color']
-            self.lights_rgb_render.diffuse_color = lights_rgb_settings['diffuse_color']
-            self.lights_rgb_render.specular_color = lights_rgb_settings['specular_color']
-        
-        union_textures = Textures(
-            verts_rgb=torch.cat([self.body_verts_rgb_colors, self.garment_verts_rgb_colors], dim=1))
-
-        union_meshes = Meshes(
-            verts=torch.cat([body_vertices, garment_vertices], dim=1),
-            faces=torch.cat([self.body_faces, self.garment_faces_offset], dim=1),
-            textures=union_textures
-        )
-
-        # Rasterize
-        fragments = self.rasterizer(union_meshes, cameras=self.cameras)
-        zbuffers = fragments.zbuf[:, :, :, 0]
-
-        # Render RGB output.
-        output = {}
-        rgb_images = self.rgb_shader(fragments, union_meshes, lights=self.lights_rgb_render)[:, :, :, :3]
-        output['rgb_images'] = torch.clamp(rgb_images, max=1.0)
-        output['iuv_images'] = torch.where(output['rgb_images'] > 0., 1., 0.)
-
-        # Get depth image
-        output['depth_images'] = zbuffers
-
-        return output
-    '''
-
     def forward(self, body_verts, body_faces, upper_garment_verts, 
                 upper_garment_faces, lower_garment_verts, lower_garment_faces, 
                 garment_classes, cam_t=None, orthographic_scale=None, 
@@ -292,10 +221,9 @@ class NonTexturedRenderer(nn.Module):
             fragments = self.rasterizer(mesh_to_render, cameras=self.cameras)
 
             # Render cloth segmentations.
-            seg_maps[map_idx] = self.rgb_shader(fragments, mesh_to_render, lights=self.lights_rgb_render)[0, :, :, :3]
+            seg_maps[map_idx] = self.rgb_shader(fragments, mesh_to_render, lights=self.lights_rgb_render)[0, :, :, 0]
 
         seg_maps = torch.cat(seg_maps, dim=0).cpu().detach().numpy()
-        # TODO: This is not enough to get the segmentation map - also need to reduce 3 channels into 1.
         seg_maps = np.astype(seg_maps, np.bool)
 
         return seg_maps

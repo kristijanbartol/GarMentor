@@ -16,10 +16,10 @@ from models.canny_edge_detector import CannyEdgeDetector
 
 from losses.matrix_fisher_loss import PoseMFShapeGaussianLoss
 
-from configs.poseMF_shapeGaussian_net_config import get_poseMF_shapeGaussian_cfg_defaults
+from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
 from configs import paths
 
-from train.train_poseMF_shapeGaussian_net import train_poseMF_shapeGaussian_net
+from train.train_network import train_poseMF_shapeGaussian_net
 
 from utils.visualize import VisLogger
 
@@ -33,7 +33,7 @@ def run_train(device,
               resume_from_epoch=None,
               visdom=None):
 
-    pose_shape_cfg = get_poseMF_shapeGaussian_cfg_defaults()
+    pose_shape_cfg = get_cfg_defaults()
 
     model_save_dir = os.path.join(experiment_dir, 'saved_models')
     logs_save_path = os.path.join(experiment_dir, 'log.pkl')
@@ -85,9 +85,10 @@ def run_train(device,
                                           gaussian_filter_size=pose_shape_cfg.DATA.EDGE_GAUSSIAN_SIZE,
                                           threshold=pose_shape_cfg.DATA.EDGE_THRESHOLD).to(device)
     # SMPL model
-    
-    smpl_model = SMPL4Garment(gender=gender)
-    #smpl_model = TorchSMPL4Garment(gender=gender, garment_class='t-shirt').to(device)
+    smpl_model = SMPL(paths.SMPL,
+                      num_betas=pose_shape_cfg.MODEL.NUM_SMPL_BETAS,
+                      gender=gender).to(device)
+    smpl4garment_model = SMPL4Garment(gender=gender)
     tailornet_model = get_tn_runner(gender=gender, garment_class='t-shirt')
 
     # 3D shape and pose distribution predictor
@@ -121,9 +122,7 @@ def run_train(device,
     train_poseMF_shapeGaussian_net(pose_shape_model=pose_shape_model,
                                    pose_shape_cfg=pose_shape_cfg,
                                    smpl_model=smpl_model,
-                                   tailornet_model=tailornet_model,
                                    edge_detect_model=edge_detect_model,
-                                   pytorch3d_renderer=pytorch3d_renderer,
                                    device=device,
                                    train_dataset=train_dataset,
                                    val_dataset=val_dataset,
