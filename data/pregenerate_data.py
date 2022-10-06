@@ -1,19 +1,23 @@
 from typing import List, Tuple, Union
 from dataclasses import dataclass, fields
 import numpy as np
-from models.parametric_model import ParametricModel
 import os
 from PIL import Image
+import sys
+
+_module_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(_module_dir))
 
 from configs import paths
 from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
 from utils.augmentation.smpl_augmentation import (
-    normal_sample_params_numpy,
+    normal_sample_shape_numpy,
     normal_sample_style_numpy
 )
+from models.parametric_model import ParametricModel
 from utils.augmentation.cam_augmentation import augment_cam_t_numpy
-from renderers.non_textured_renderer import NonTexturedRenderer
 from utils.garment_classes import GarmentClasses
+from renderers.non_textured_renderer import NonTexturedRenderer
 
 
 @dataclass
@@ -163,19 +167,16 @@ class SurrealDataPreGenerator(DataPreGenerator):
         self.mean_cam_t = np.array(
             self.cfg.TRAIN.SYNTH_DATA.MEAN_CAM_T, 
             dtype=np.float32)
-        self.mean_cam_t = np.broadcast_to(
-            self.mean_cam_t[None, :], 
-            (self.cfg.TRAIN.BATCH_SIZE, -1))
 
     def generate_sample(self, 
-                        idx: int, 
-                        gender: str
+                        gender: str,
+                        idx: int
                         ) -> Tuple[np.ndarray, np.ndarray, PreGeneratedSampleValues]:
         '''Generate a single training sample.'''
 
         pose: np.ndarray = self.poses[idx]
 
-        shape: np.ndarray = normal_sample_params_numpy(
+        shape: np.ndarray = normal_sample_shape_numpy(
             mean_params=self.mean_shape,
             std_vector=self.delta_betas_std_vector)
 
@@ -190,6 +191,12 @@ class SurrealDataPreGenerator(DataPreGenerator):
             num_garment_classes=GarmentClasses.NUM_CLASSES,
             mean_params=self.mean_style,
             std_vector=self.delta_style_std_vector)
+
+        print(f'Sample #{idx} ({gender}):')
+        print(f'\tPose: {pose}')
+        print(f'\tShape: {shape}')
+        print(f'\tCam T: {cam_t}')
+        print(f'\tStyle: {style_vector}')
 
         upper_smpl_output, lower_smpl_output = self.parametric_model.run(
             gender=gender,
@@ -237,11 +244,13 @@ class SurrealDataPreGenerator(DataPreGenerator):
             img_dir = os.path.join(dataset_dir, self.IMG_DIR)
             img_path = os.path.join(img_dir, self.IMG_NAME_TEMPLATE.format(sample_idx))
             img.save(img_path)
+            print(f'Saved image: {img_path}')
 
         seg_dir = os.path.join(dataset_dir, self.SEG_MAPS_DIR)
         seg_path = os.path.join(
             seg_dir, self.SEG_MAPS_NAME_TEMPLATE.format(sample_idx))
         np.save(seg_path, seg_maps)
+        print(f'Saved segmentation maps: {seg_path}')
 
         self.samples_values.append(sample_values)
 
@@ -250,6 +259,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
 
         values_path = os.path.join(dataset_dir, self.VALUES_FNAME)
         np.save(values_path, self.samples_values.get())
+        print(f'Saved samples values to {values_path}!')
 
     def generate(self) -> None:
         '''(Pre-)generate the whole dataset.'''
@@ -257,13 +267,16 @@ class SurrealDataPreGenerator(DataPreGenerator):
         for gender in ['male', 'female']:
             self.samples_values.empty()
             dataset_dir = self.dataset_path_template.format(
-                dataset=self.DATASET_NAME,
+                dataset_name=self.DATASET_NAME,
                 gender=gender
             )
 
-            for pose_idx in range(self.poses.shape[0]):
+            num_samples_per_gender = self.poses.shape[0]
+            print(f'Generating {num_samples_per_gender} samples per gender...')
+
+            for pose_idx in range(num_samples_per_gender):
                 rgb_img, seg_maps, sample_values = self.generate_sample(
-                    pose_idx, gender)
+                    gender, pose_idx)
                 self._save_sample(
                     dataset_dir=dataset_dir, 
                     sample_idx=pose_idx, 
@@ -275,4 +288,5 @@ class SurrealDataPreGenerator(DataPreGenerator):
 
 
 if __name__ == '__main__':
-    data_pregenerator = SurrealDataPreGenerator()
+    surreal_pregenerator = SurrealDataPreGenerator()
+    surreal_pregenerator.generate()

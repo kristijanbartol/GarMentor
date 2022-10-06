@@ -87,7 +87,6 @@ class NonTexturedRenderer(nn.Module):
         self.device = 'cpu'
 
         self.batch_size = 1
-        self.garment_faces_offset = self.garment_faces + self.body_faces.max()
 
         # Cameras - pre-defined here but can be specified in forward pass if cameras will vary (e.g. random cameras)
         if cam_R is None:
@@ -174,8 +173,6 @@ class NonTexturedRenderer(nn.Module):
             if lower_garment_verts is not None:
                 lower_garment_verts = torch.from_numpy(lower_garment_verts).unsqueeze(0).to(self.device)
                 lower_garment_faces = torch.from_numpy(lower_garment_faces).unsqueeze(0).to(self.device)
-
-        self.garment_faces_offset = self.garment_faces + self.body_faces.max()
 
         union_verts = body_verts
         union_faces = body_faces

@@ -7,16 +7,16 @@ class GarmentClasses():
 
     '''A garment classes management class.'''
 
-    GARMENT_CLASSES = ['t-shirt', 'shirt', 'short-pant', 'pant', 'skirt']
+    # NOTE: Skirt is not used, for now.
+    GARMENT_CLASSES = ['t-shirt', 'shirt', 'short-pant', 'pant']
     UPPER_GARMENT_CLASSES = ['t-shirt', 'shirt']
-    LOWER_GARMENT_CLASSES = ['short-pant', 'pant', 'skirt']
+    LOWER_GARMENT_CLASSES = ['short-pant', 'pant']
     
     GARMENT_DICT = {
         't-shirt': 0,
         'shirt': 1,
         'short-pant': 2,
-        'pant': 3,
-        'skirt': 4
+        'pant': 3
     }
     UPPER_GARMENT_DICT = {
         't-shirt': 0,
@@ -24,12 +24,11 @@ class GarmentClasses():
     }
     LOWER_GARMENT_DICT = {
         'short-pant': 2,
-        'pant': 3,
-        'skirt': 4
+        'pant': 3
     }
 
     UPPER_LABELS = [0, 1]
-    LOWER_LABELS = [2, 3, 4]
+    LOWER_LABELS = [2, 3]
 
     NUM_CLASSES = len(GARMENT_CLASSES)
 
@@ -58,14 +57,13 @@ class GarmentClasses():
             else:
                 lower_garment_class = None
 
-        upper_label: int = self.UPPER_GARMENT_DICT[upper_garment_class]
-        lower_label: int = self.LOWER_GARMENT_DICT[lower_garment_class]
-
         binary_labels_vector: List[bool] = [0] * len(self.GARMENT_CLASSES)
         
-        if upper_label is not None:
+        if upper_garment_class is not None:
+            upper_label: int = self.UPPER_GARMENT_DICT[upper_garment_class]
             binary_labels_vector[upper_label]: bool = 1
-        if lower_label is not None:
+        if lower_garment_class is not None:
+            lower_label: int = self.LOWER_GARMENT_DICT[lower_garment_class]
             binary_labels_vector[lower_label]: bool = 1
 
         return np.array(binary_labels_vector, dtype=np.bool)
@@ -81,7 +79,7 @@ class GarmentClasses():
     @property
     def upper_label(self) -> int:
         '''Returns an int representing upper garment (see `GarmentClasses.GARMENT_DICT`).'''
-        label_list = [x for x in self.UPPER_LABELS if self.label_vector[x] == 1]
+        label_list = [x for x in self.UPPER_LABELS if self.labels_vector[x] == 1]
         if len(label_list) == 0:
             return None
         else:
@@ -90,7 +88,7 @@ class GarmentClasses():
     @property
     def lower_label(self) -> int:
         '''Returns an int representing lower garment (see `GarmentClasses.GARMENT_DICT`).'''
-        label_list = [x for x in self.LOWER_LABELS if self.label_vector[x] == 1]
+        label_list = [x for x in self.LOWER_LABELS if self.labels_vector[x] == 1]
         if len(label_list) == 0:
             return None
         else:

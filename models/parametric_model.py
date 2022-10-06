@@ -22,10 +22,10 @@ class ParametricModel(object):
         self.smpl_model_dict = dict()
         self.tailornet_model_dict = dict()
         for gender in ['male', 'female']:
-            self.smpl_model[gender] = SMPL4Garment(gender=gender)
-            self.tailornet_model[gender] = dict()
-            for garment_class in ['t-shirt']:   # for now, use only T-shirt
-                self.tailornet_model[gender][garment_class] = get_tn_runner(
+            self.smpl_model_dict[gender] = SMPL4Garment(gender=gender)
+            self.tailornet_model_dict[gender] = dict()
+            for garment_class in GarmentClasses.GARMENT_CLASSES:
+                self.tailornet_model_dict[gender][garment_class] = get_tn_runner(
                     gender=gender, garment_class=garment_class)
 
     def _run_tailornet(self, 
@@ -81,15 +81,15 @@ class ParametricModel(object):
             lower.garment_verts = remove_interpenetration_fast(
                 garment_verts=lower.garment_verts,
                 garment_faces=lower.garment_faces,
-                base_verts=lower.body_verts,
-                base_faces=lower.body_faces
+                body_verts=lower.body_verts,
+                body_faces=lower.body_faces
             )
         if upper is not None:
             upper.garment_verts = remove_interpenetration_fast(
                 garment_verts=upper.garment_verts,
                 garment_faces=upper.garment_faces,
-                base_verts=upper.body_verts,
-                base_faces=upper.body_faces
+                body_verts=upper.body_verts,
+                body_faces=upper.body_faces
             )
         
         if lower is not None and upper is not None:
@@ -101,8 +101,8 @@ class ParametricModel(object):
             upper.garment_verts = remove_interpenetration_fast(
                 garment_verts=upper.garment_verts,
                 garment_faces=upper.garment_faces,
-                base_verts=body_lower_verts,
-                base_faces=body_lower_faces
+                body_verts=body_lower_verts,
+                body_faces=body_lower_faces
             )
 
         return upper, lower
