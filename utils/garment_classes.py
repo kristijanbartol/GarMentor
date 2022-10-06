@@ -34,7 +34,19 @@ class GarmentClasses():
 
     CLOTHLESS_PROB = 0.05
 
-    def _generate_random_garment_classes(self) -> np.ndarray:
+    def _set_binary_vector(self, upper_garment_class, lower_garment_class):
+        binary_labels_vector: List[bool] = [0] * len(self.GARMENT_CLASSES)
+        
+        if upper_garment_class is not None:
+            upper_label: int = self.UPPER_GARMENT_DICT[upper_garment_class]
+            binary_labels_vector[upper_label]: bool = 1
+        if lower_garment_class is not None:
+            lower_label: int = self.LOWER_GARMENT_DICT[lower_garment_class]
+            binary_labels_vector[lower_label]: bool = 1
+
+        self.labels_vector = np.array(binary_labels_vector, dtype=np.bool)
+
+    def _generate_random_garment_classes(self) -> None:
         '''Generate random classes for upper for lower garment.'''
 
         def get_random_garment_class(garment_classes: List[str]) -> str:
@@ -57,28 +69,27 @@ class GarmentClasses():
             else:
                 lower_garment_class = None
 
-        binary_labels_vector: List[bool] = [0] * len(self.GARMENT_CLASSES)
-        
-        if upper_garment_class is not None:
-            upper_label: int = self.UPPER_GARMENT_DICT[upper_garment_class]
-            binary_labels_vector[upper_label]: bool = 1
-        if lower_garment_class is not None:
-            lower_label: int = self.LOWER_GARMENT_DICT[lower_garment_class]
-            binary_labels_vector[lower_label]: bool = 1
+        self._set_binary_vector(upper_garment_class, lower_garment_class)        
 
-        return np.array(binary_labels_vector, dtype=np.bool)
-
-    def __init__(self, binary_labels_vector: np.ndarray = None):
+    def __init__(self, upper_class: str = None, lower_class: str = None):
         '''If nothing is already provided, initialize random classes.'''
 
-        if binary_labels_vector is None:
+        if upper_class is None or lower_class is None:
             self.labels_vector: np.ndarray = self._generate_random_garment_classes()
         else:
-            self.labels_vector: np.ndarray = binary_labels_vector
+            self._set_binary_vector(upper_class, lower_class)
+
+    @property
+    def labels(self) -> dict:
+        return {
+            'upper': self.upper_label,
+            'lower': self.lower_label
+        }
 
     @property
     def upper_label(self) -> int:
         '''Returns an int representing upper garment (see `GarmentClasses.GARMENT_DICT`).'''
+
         label_list = [x for x in self.UPPER_LABELS if self.labels_vector[x] == 1]
         if len(label_list) == 0:
             return None
@@ -88,11 +99,19 @@ class GarmentClasses():
     @property
     def lower_label(self) -> int:
         '''Returns an int representing lower garment (see `GarmentClasses.GARMENT_DICT`).'''
+
         label_list = [x for x in self.LOWER_LABELS if self.labels_vector[x] == 1]
         if len(label_list) == 0:
             return None
         else:
             return label_list[0]
+
+    @property
+    def classes(self) -> dict:
+        return {
+            'upper': self.upper_class,
+            'lower': self.lower_class
+        }
 
     @property
     def upper_class(self) -> str:

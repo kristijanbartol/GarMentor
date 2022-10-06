@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Dict, Tuple, Union
 from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
 import torch
 import numpy as np
@@ -16,32 +16,48 @@ class ParametricModel(object):
 
     '''Gathers functionalities of TailorNet and SMPL4Garment.'''
 
-    def __init__(self):
+    def __init__(self, 
+                 gender: str, 
+                 garment_classes: GarmentClasses):
         '''Initialize TailorNet and SMPL dictionaries for each garment and gender.'''
 
-        self.smpl_model_dict = dict()
-        self.tailornet_model_dict = dict()
-        for gender in ['male', 'female']:
-            self.smpl_model_dict[gender] = SMPL4Garment(gender=gender)
-            self.tailornet_model_dict[gender] = dict()
-            for garment_class in GarmentClasses.GARMENT_CLASSES:
-                self.tailornet_model_dict[gender][garment_class] = get_tn_runner(
-                    gender=gender, garment_class=garment_class)
+        self.garment_classes = garment_classes
+        self.classes = {
+            'upper': garment_classes.upper_class,
+            'lower': garment_classes.lower_class
+        }
+        self.labels = {
+            'upper': garment_classes.upper_label,
+            'lower': garment_classes.lower_label
+        }
+        print(f'Initializing ({gender}, {self.classes["upper"]}, ' \
+            f'{self.classes["lower"]}) model...')
+
+        self.smpl_model = SMPL4Garment(gender=gender)
+        self.tn_models = {
+            'upper': get_tn_runner(gender=gender, garment_class=self.classes['upper']),
+            'lower': get_tn_runner(gender=gender, garment_class=self.classes['lower'])
+        }
 
     def _run_tailornet(self, 
-                       gender: str, 
-                       garment_class: str, 
+                       garment_part: str, 
                        pose: np.ndarray, 
                        shape: np.ndarray, 
-                       style: np.ndarray) -> np.ndarray:
+                       style_vector: np.ndarray) -> np.ndarray:
         '''Estimate garment displacement given the parameters.'''
 
-        if garment_class is None:
+        assert(garment_part in ['upper', 'lower'])
+        if self.classes[garment_part] is None:
             return None
+
+        style = style_vector[self.labels[garment_part]]
         norm_pose = normalize_y_rotation(pose)
 
+        print(f'Running TailorNet ({garment_part} -> {self.classes[garment_part]}' \
+            f'(label={self.labels[garment_part]}))...')
+
         with torch.no_grad():
-            garment_disp = self.tailornet_model_dict[gender][garment_class].forward(
+            garment_disp = self.tn_models[garment_part].forward(
                 thetas=torch.from_numpy(norm_pose[None, :].astype(np.float32)).cuda(),
                 betas=torch.from_numpy(shape[None, :].astype(np.float32)).cuda(),
                 gammas=torch.from_numpy(style[None, :].astype(np.float32)).cuda(),
@@ -49,26 +65,26 @@ class ParametricModel(object):
         return garment_disp[0].cpu().numpy()
 
     def _run_smpl4garment(self, 
-                          gender: str, 
-                          garment_class: str, 
+                          garment_part: str, 
                           pose: np.ndarray, 
                           shape: np.ndarray, 
                           garment_disp: np.ndarray) -> SMPL4GarmentOutput:
         '''Run SMPL4Garment model given the parameters and garment displacements.'''
 
-        if garment_class is None:
+        if self.classes[garment_part] is None:
             return None
 
-        return self.smpl_model_dict[gender].run(
+        print(f'Running SMPL4Garment ({self.classes[garment_part]})...')
+
+        return self.smpl_model.run(
             beta=shape, 
             theta=pose, 
-            garment_class=garment_class, 
+            garment_class=self.classes[garment_part], 
             garment_d=garment_disp)
 
     @staticmethod
-    def _remove_interpenetrations(upper: SMPL4GarmentOutput, 
-                                  lower: SMPL4GarmentOutput
-                                  ) -> Tuple[SMPL4GarmentOutput, SMPL4GarmentOutput]:
+    def _remove_interpenetrations(
+        smpl_outputs: Dict[str, SMPL4GarmentOutput]) -> Dict[str, SMPL4GarmentOutput]:
         ''' Resolve complex interpenetrations between the meshes.
         
             First resolve interpenetrations between the body and lower garment
@@ -77,6 +93,9 @@ class ParametricModel(object):
             interpenetrations between the concatenated body-lower mesh and the
             upper mesh.
         '''
+        lower = smpl_outputs['lower']
+        upper = smpl_outputs['upper']
+
         if lower is not None:
             lower.garment_verts = remove_interpenetration_fast(
                 garment_verts=lower.garment_verts,
@@ -105,48 +124,34 @@ class ParametricModel(object):
                 body_faces=body_lower_faces
             )
 
-        return upper, lower
+        return {
+            'upper': upper,
+            'lower': lower
+        }
 
     def run(self, 
-            gender: str, 
-            garment_classes: GarmentClasses, 
             pose: np.ndarray, 
             shape: np.ndarray, 
             style_vector: np.ndarray
-            ) -> Tuple[SMPL4GarmentOutput, SMPL4GarmentOutput]:
+            ) -> Dict[str, SMPL4GarmentOutput]:
         '''Run the parametric model (TN, SMPL) and solve interpenetrations.'''
 
-        upper_garment_disp = self._run_tailornet(
-            gender=gender,
-            garment_class=garment_classes.upper_class,
-            pose=pose,
-            shape=shape,
-            style=style_vector[garment_classes.upper_label]
-        )
-        lower_garment_disp = self._run_tailornet(
-            gender=gender,
-            garment_class=garment_classes.lower_class,
-            pose=pose, 
-            shape=shape, 
-            style=style_vector[garment_classes.lower_label]
-        )
+        smpl_outputs = {}
+        for garment_part in ['upper', 'lower']:
+            garment_disp = self._run_tailornet(
+                garment_part=garment_part,
+                pose=pose,
+                shape=shape,
+                style_vector=style_vector
+            )
+            smpl_output = self._run_smpl4garment(
+                garment_part=garment_part,
+                pose=pose,
+                shape=shape,
+                garment_disp=garment_disp
+            )
+            smpl_outputs[garment_part] = smpl_output
 
-        upper_smpl_output = self._run_smpl4garment(
-            gender=gender,
-            garment_class=garment_classes.upper_class,
-            pose=pose,
-            shape=shape,
-            garment_disp=upper_garment_disp
-        )
-        lower_smpl_output = self._run_smpl4garment(
-            gender=gender,
-            garment_class=garment_classes.lower_class,
-            pose=pose,
-            shape=shape,
-            garment_disp=lower_garment_disp
-        )
+        smpl_outputs = self._remove_interpenetrations(smpl_outputs)
 
-        upper_smpl_output, lower_smpl_output = self._remove_interpenetrations(
-            upper_smpl_output, lower_smpl_output)
-
-        return upper_smpl_output, lower_smpl_output
+        return smpl_outputs

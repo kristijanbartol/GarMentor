@@ -145,10 +145,11 @@ class NonTexturedRenderer(nn.Module):
                 garment_classes, cam_t=None, orthographic_scale=None, 
                 lights_rgb_settings=None):
 
+        cam_t_tensor = torch.from_numpy(cam_t.astype(np.float32)).float()
         if cam_t is not None:
             # Pytorch3D camera is rotated 180° about z-axis to match my perspective_project_torch/NMR's projection convention.
             # So, need to also rotate the given camera translation (implemented below as elementwise-mul).
-            self.cameras.T = cam_t * torch.tensor([-1., -1., 1.], device=cam_t.device).float()
+            self.cameras.T = cam_t_tensor * torch.tensor([-1., -1., 1.]).float()[None, :].expand(self.batch_size, -1)
         if orthographic_scale is not None and self.projection_type == 'orthographic':
             self.cameras.focal_length = orthographic_scale * (self.img_wh / 2.0)
 
@@ -164,26 +165,29 @@ class NonTexturedRenderer(nn.Module):
 
         total_num_verts = num_body_verts + num_upper_garment_verts + num_lower_garment_verts
 
-        if not torch.is_tensor(body_verts):
-            body_verts = torch.from_numpy(body_verts).unsqueeze(0).to(self.device)
-            body_faces = torch.from_numpy(body_faces).unsqueeze(0).to(self.device)
-            if upper_garment_verts is not None:
-                upper_garment_verts = torch.from_numpy(upper_garment_verts).unsqueeze(0).to(self.device)
-                upper_garment_faces = torch.from_numpy(upper_garment_faces).unsqueeze(0).to(self.device)
-            if lower_garment_verts is not None:
-                lower_garment_verts = torch.from_numpy(lower_garment_verts).unsqueeze(0).to(self.device)
-                lower_garment_faces = torch.from_numpy(lower_garment_faces).unsqueeze(0).to(self.device)
+        body_faces = body_faces.astype(np.int32)
+        upper_garment_faces = upper_garment_faces.astype(np.int32)
+        lower_garment_faces = lower_garment_faces.astype(np.int32)
+
+        body_verts = torch.from_numpy(body_verts).float().unsqueeze(0).to(self.device)
+        body_faces = torch.from_numpy(body_faces).unsqueeze(0).to(self.device)
+        if upper_garment_verts is not None:
+            upper_garment_verts = torch.from_numpy(upper_garment_verts).float().unsqueeze(0).to(self.device)
+            upper_garment_faces = torch.from_numpy(upper_garment_faces).unsqueeze(0).to(self.device)
+        if lower_garment_verts is not None:
+            lower_garment_verts = torch.from_numpy(lower_garment_verts).float().unsqueeze(0).to(self.device)
+            lower_garment_faces = torch.from_numpy(lower_garment_faces).unsqueeze(0).to(self.device)
 
         union_verts = body_verts
         union_faces = body_faces
         faces_offset = body_faces.max()
         if upper_garment_verts is not None:
             union_verts = torch.cat([union_verts, upper_garment_verts], dim=1)
-            union_faces = torch.cat([union_faces, upper_garment_faces + faces_offset])
+            union_faces = torch.cat([union_faces, upper_garment_faces + faces_offset], dim=1)
             faces_offset += upper_garment_faces.max()
         if lower_garment_verts is not None:
             union_verts = torch.cat([union_verts, lower_garment_verts], dim=1)
-            union_faces = torch.cat([union_faces, lower_garment_faces + faces_offset])
+            union_faces = torch.cat([union_faces, lower_garment_faces + faces_offset], dim=1)
 
         union_verts_white_color = torch.tensor([1., 1., 1.], device=self.device).repeat(1, total_num_verts, 1)
         upper_verts_white_color = torch.tensor([1., 1., 1.], device=self.device).repeat(1, num_upper_garment_verts, 1)
@@ -204,18 +208,21 @@ class NonTexturedRenderer(nn.Module):
         )
 
         lower_mesh = Meshes(
-            verts=upper_garment_verts,
-            faces=upper_garment_faces,
+            verts=lower_garment_verts,
+            faces=lower_garment_faces,
             textures=Textures(verts_rgb=lower_verts_white_color)
         )
 
         seg_maps = torch.zeros((GarmentClasses.NUM_CLASSES+1, self.img_wh, self.img_wh, 3))
         for mesh_to_render, map_idx in [
                 (union_mesh, 0), 
-                (upper_mesh, garment_classes.upper_label), 
-                (lower_mesh, garment_classes.lower_label)]:
+                (upper_mesh, garment_classes.labels['upper']), 
+                (lower_mesh, garment_classes.labels['lower'])]:
             # Rasterize
             fragments = self.rasterizer(mesh_to_render, cameras=self.cameras)
+
+            print(fragments.shape)
+            print(mesh_to_render.shape)
 
             # Render cloth segmentations.
             seg_maps[map_idx] = self.rgb_shader(fragments, mesh_to_render, lights=self.lights_rgb_render)[0, :, :, 0]

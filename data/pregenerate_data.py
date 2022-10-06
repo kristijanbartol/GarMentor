@@ -1,4 +1,4 @@
-from typing import List, Tuple, Union
+from typing import List, Tuple
 from dataclasses import dataclass, fields
 import numpy as np
 import os
@@ -30,7 +30,6 @@ class PreGeneratedSampleValues:
     style_vector: np.ndarray            # (4, 10)
     cam_t: np.ndarray                   # (3,)
     joints: np.ndarray                  # (17, 3)
-    garment_labels_vector: np.ndarray   # (5,)
 
     def __getitem__(self, key):
         return getattr(self, key)
@@ -59,13 +58,9 @@ class PreGeneratedValuesArray():
     '''A class used to keep track of an array of pregenerated sampled values.'''
 
     def __init__(self):
-        self.empty()
+        self._samples_dict = {}
         self.keys = []
         self.numpied = False    # to avoid errors if requesting values many times
-
-    def empty(self) -> None:
-        '''Empty samples dict (used as latent data collection).'''
-        self._samples_dict = {}
 
     def _set_dict_keys(self, sample_dict_keys: List[str]) -> None:
         '''Add 's' to key name specify plural.'''
@@ -97,11 +92,12 @@ class DataPreGenerator(object):
         /data/garmentor/
             {dataset_name}/
                 {gender}/
-                    values.npy
-                    rgb/
-                        {idx:5d}.png
-                    segmentations/
-                        {idx:5d}_{garment_class}.png
+                    {garment_class_pair}/
+                        values.npy
+                        rgb/
+                            {idx:5d}.png
+                        segmentations/
+                            {idx:5d}_{garment_class}.png
     '''
 
     DATA_ROOT_DIR = '/data/garmentor/'
@@ -116,11 +112,9 @@ class DataPreGenerator(object):
         self.dataset_path_template = os.path.join(
             self.DATA_ROOT_DIR,
             '{dataset_name}',
-            '{gender}'
+            '{gender}',
+            '{upper_garment_class}+{lower_garment_class}'
         )
-        self.parametric_model = ParametricModel()
-        self.samples_values = PreGeneratedValuesArray()
-        self.renderer = None
 
 
 class SurrealDataPreGenerator(DataPreGenerator):
@@ -169,8 +163,9 @@ class SurrealDataPreGenerator(DataPreGenerator):
             dtype=np.float32)
 
     def generate_sample(self, 
+                        idx: int,
                         gender: str,
-                        idx: int
+                        parametric_model: ParametricModel
                         ) -> Tuple[np.ndarray, np.ndarray, PreGeneratedSampleValues]:
         '''Generate a single training sample.'''
 
@@ -185,8 +180,6 @@ class SurrealDataPreGenerator(DataPreGenerator):
             xy_std=self.cfg.TRAIN.SYNTH_DATA.AUGMENT.CAM.XY_STD,
             delta_z_range=self.cfg.TRAIN.SYNTH_DATA.AUGMENT.CAM.DELTA_Z_RANGE)
 
-        garment_classes = GarmentClasses()
-
         style_vector: np.ndarray = normal_sample_style_numpy(
             num_garment_classes=GarmentClasses.NUM_CLASSES,
             mean_params=self.mean_style,
@@ -198,22 +191,20 @@ class SurrealDataPreGenerator(DataPreGenerator):
         print(f'\tCam T: {cam_t}')
         print(f'\tStyle: {style_vector}')
 
-        upper_smpl_output, lower_smpl_output = self.parametric_model.run(
-            gender=gender,
-            garment_classes=garment_classes,
+        smpl_outputs = parametric_model.run(
             pose=pose,
             shape=shape,
             style_vector=style_vector
         )
 
         seg_maps: np.ndarray = self.renderer(
-            body_verts=upper_smpl_output.body_verts,
-            body_faces=upper_smpl_output.body_faces,
-            upper_garment_verts=upper_smpl_output.garment_verts,
-            upper_garment_faces=upper_smpl_output.garment_faces,
-            lower_garment_verts=lower_smpl_output.garment_verts,
-            lower_garment_faces=lower_smpl_output.garment_faces,
-            garment_classes=garment_classes,
+            body_verts=smpl_outputs['upper'].body_verts,
+            body_faces=smpl_outputs['upper'].body_faces,
+            upper_garment_verts=smpl_outputs['upper'].garment_verts,
+            upper_garment_faces=smpl_outputs['upper'].garment_faces,
+            lower_garment_verts=smpl_outputs['lower'].garment_verts,
+            lower_garment_faces=smpl_outputs['lower'].garment_faces,
+            garment_classes=parametric_model.garment_classes,
             cam_t=cam_t
         )
 
@@ -225,8 +216,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
             shape=shape,
             style_vector=style_vector,
             cam_t=cam_t,
-            joints=upper_smpl_output.joints,
-            garment_labels_vector=garment_classes.labels_vector
+            joints=smpl_outputs['upper'].joints
         )
 
         return rgb_img, seg_maps, sample_values
@@ -236,7 +226,8 @@ class SurrealDataPreGenerator(DataPreGenerator):
                      sample_idx: int, 
                      rgb_img: np.ndarray, 
                      seg_maps: np.ndarray, 
-                     sample_values: PreGeneratedSampleValues) -> None:
+                     sample_values: PreGeneratedSampleValues,
+                     samples_values: PreGeneratedValuesArray) -> None:
         '''Save RGB, seg maps (disk), and the values to the array (RAM).'''
 
         if rgb_img is not None:
@@ -252,39 +243,54 @@ class SurrealDataPreGenerator(DataPreGenerator):
         np.save(seg_path, seg_maps)
         print(f'Saved segmentation maps: {seg_path}')
 
-        self.samples_values.append(sample_values)
+        samples_values.append(sample_values)
 
-    def _save_values(self, dataset_dir: str) -> None:
+    def _save_values(self, 
+                     samples_values: PreGeneratedValuesArray, 
+                     dataset_dir: str) -> None:
         '''Save all sample values as a dictionary of numpy arrays.'''
 
         values_path = os.path.join(dataset_dir, self.VALUES_FNAME)
-        np.save(values_path, self.samples_values.get())
+        np.save(values_path, samples_values.get())
         print(f'Saved samples values to {values_path}!')
 
     def generate(self) -> None:
         '''(Pre-)generate the whole dataset.'''
 
         for gender in ['male', 'female']:
-            self.samples_values.empty()
-            dataset_dir = self.dataset_path_template.format(
-                dataset_name=self.DATASET_NAME,
-                gender=gender
-            )
+            for upper_class in GarmentClasses.UPPER_GARMENT_CLASSES:
+                for lower_class in GarmentClasses.LOWER_GARMENT_CLASSES:
+                    garment_classes = GarmentClasses(upper_class, lower_class)
+                    parametric_model = ParametricModel(
+                        gender=gender, 
+                        garment_classes=garment_classes
+                    )
+                    samples_values = PreGeneratedValuesArray()
 
-            num_samples_per_gender = self.poses.shape[0]
-            print(f'Generating {num_samples_per_gender} samples per gender...')
+                    dataset_dir = self.dataset_path_template.format(
+                        dataset_name=self.DATASET_NAME,
+                        gender=gender,
+                        upper_garment_class=upper_class,
+                        lower_garment_class=lower_class
+                    )
+                    num_samples = self.poses.shape[0]
+                    subset_str = f'{gender}-{upper_class}-{lower_class}'
+                    print(f'Generating {num_samples} samples for {subset_str}...')
 
-            for pose_idx in range(num_samples_per_gender):
-                rgb_img, seg_maps, sample_values = self.generate_sample(
-                    gender, pose_idx)
-                self._save_sample(
-                    dataset_dir=dataset_dir, 
-                    sample_idx=pose_idx, 
-                    rgb_img=rgb_img, 
-                    seg_maps=seg_maps, 
-                    sample_values=sample_values
-                )
-            self._save_params(dataset_dir)
+                    for pose_idx in range(num_samples):
+                        rgb_img, seg_maps, sample_values = self.generate_sample(
+                            idx=pose_idx, 
+                            gender=gender, 
+                            parametric_model=parametric_model)
+                        self._save_sample(
+                            dataset_dir=dataset_dir, 
+                            sample_idx=pose_idx, 
+                            rgb_img=rgb_img, 
+                            seg_maps=seg_maps, 
+                            sample_values=sample_values,
+                            samples_values=samples_values
+                        )
+                    self._save_values(samples_values, dataset_dir)
 
 
 if __name__ == '__main__':
