@@ -136,7 +136,7 @@ class ParametricModel(object):
             ) -> Dict[str, SMPL4GarmentOutput]:
         '''Run the parametric model (TN, SMPL) and solve interpenetrations.'''
 
-        smpl_outputs = {}
+        smpl_output_dict = {}
         for garment_part in ['upper', 'lower']:
             garment_disp = self._run_tailornet(
                 garment_part=garment_part,
@@ -150,8 +150,8 @@ class ParametricModel(object):
                 shape=shape,
                 garment_disp=garment_disp
             )
-            smpl_outputs[garment_part] = smpl_output
+            smpl_output_dict[garment_part] = smpl_output
 
-        smpl_outputs = self._remove_interpenetrations(smpl_outputs)
+        smpl_output_dict = self._remove_interpenetrations(smpl_output_dict)
 
-        return smpl_outputs
+        return smpl_output_dict

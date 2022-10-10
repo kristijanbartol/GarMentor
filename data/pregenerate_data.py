@@ -17,7 +17,7 @@ from utils.augmentation.smpl_augmentation import (
 from models.parametric_model import ParametricModel
 from utils.augmentation.cam_augmentation import augment_cam_t_numpy
 from utils.garment_classes import GarmentClasses
-from renderers.non_textured_renderer import NonTexturedRenderer
+from renderers.surreal_renderer import SurrealRenderer
 
 
 @dataclass
@@ -129,7 +129,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
         super().__init__()
         self.cfg = get_cfg_defaults()
         self._init_useful_arrays()
-        self.renderer = NonTexturedRenderer()
+        self.renderer = SurrealRenderer()
         self.poses = self._load_poses()
 
     def _load_poses(self) -> np.ndarray:
@@ -191,32 +191,24 @@ class SurrealDataPreGenerator(DataPreGenerator):
         print(f'\tCam T: {cam_t}')
         print(f'\tStyle: {style_vector}')
 
-        smpl_outputs = parametric_model.run(
+        smpl_output_dict = parametric_model.run(
             pose=pose,
             shape=shape,
             style_vector=style_vector
         )
 
         seg_maps: np.ndarray = self.renderer(
-            body_verts=smpl_outputs['upper'].body_verts,
-            body_faces=smpl_outputs['upper'].body_faces,
-            upper_garment_verts=smpl_outputs['upper'].garment_verts,
-            upper_garment_faces=smpl_outputs['upper'].garment_faces,
-            lower_garment_verts=smpl_outputs['lower'].garment_verts,
-            lower_garment_faces=smpl_outputs['lower'].garment_faces,
+            smpl_output_dict,
             garment_classes=parametric_model.garment_classes,
             cam_t=cam_t
         )
-
-        # TODO: Render RGB image here (issue #20).
-        rgb_img: np.ndarray = None
 
         sample_values = PreGeneratedSampleValues(
             pose=pose,
             shape=shape,
             style_vector=style_vector,
             cam_t=cam_t,
-            joints=smpl_outputs['upper'].joints
+            joints=smpl_output_dict['upper'].joints
         )
 
         return rgb_img, seg_maps, sample_values

@@ -3,13 +3,17 @@
 from enum import Enum
 
 
-class NoColors(Enum):
+class Colors(Enum):
+    pass
+
+
+class NoColors(Colors):
     
     WHITE  = (1., 1., 1.)
     BLACK  = (0., 0., 0.)
 
 
-class GarmentColors(Enum):
+class GarmentColors(Colors):
     
     BLACK  = NoColors.BLACK
     GRAY   = (169., 169., 169.) / 255.
@@ -35,7 +39,7 @@ class GarmentColors(Enum):
     DARK_GOLDER = (139., 101., 8.) / 255.
     
 
-class BodyColors(Enum):
+class BodyColors(Colors):
     
     WHITE_SKIN  = (255., 211., 155.) / 255.
     DARK_SKIN   = (40., 40., 40.) / 255.

@@ -1,5 +1,5 @@
 import random
-from typing import List
+from typing import Dict, List
 import numpy as np
 
 
@@ -80,7 +80,7 @@ class GarmentClasses():
             self._set_binary_vector(upper_class, lower_class)
 
     @property
-    def labels(self) -> dict:
+    def labels(self) -> Dict[str, int]:
         return {
             'upper': self.upper_label,
             'lower': self.lower_label
@@ -107,7 +107,7 @@ class GarmentClasses():
             return label_list[0]
 
     @property
-    def classes(self) -> dict:
+    def classes(self) -> Dict[str, str]:
         return {
             'upper': self.upper_class,
             'lower': self.lower_class
@@ -116,9 +116,15 @@ class GarmentClasses():
     @property
     def upper_class(self) -> str:
         '''Returns an upper garment class (see `GarmentClasses.GARMENT_CLASSES`).'''
-        return self.GARMENT_CLASSES[self.upper_label]
+        if self.upper_label is None:
+            return None
+        else:
+            return self.GARMENT_CLASSES[self.upper_label]
 
     @property
     def lower_class(self) -> str:
         '''Returns a lower garment class (see `GarmentClasses.GARMENT_CLASSES`).'''
-        return self.GARMENT_CLASSES[self.lower_label]
+        if self.lower_label is None:
+            return None
+        else:
+            return self.GARMENT_CLASSES[self.lower_label]
