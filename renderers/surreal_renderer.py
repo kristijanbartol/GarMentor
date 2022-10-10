@@ -11,7 +11,7 @@ import pyrender
 
 from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
 
-from utils.colors import Colors, NoColors, BodyColors, GarmentColors, A
+from utils.colors import Colors, NoColors, BodyColors, GarmentColors, N, A
 from utils.garment_classes import GarmentClasses
 
 
@@ -20,6 +20,7 @@ class SurrealRenderer:
     def __init__(self, 
                  img_wh: int = 256,
                  intensity: float = 3.0):
+        '''Initialize SURREAL renderer and fixed properties.'''
         
         self.img_wh = img_wh
 
@@ -39,15 +40,18 @@ class SurrealRenderer:
     @staticmethod
     def _color_to_material_pallete(pallete: Colors
                                    ) -> List[pyrender.Material]:
+        '''Create material pallete from the color pallete.'''
+        
         return [pyrender.MetallicRoughnessMaterial(
                 metallicFactor=0.0,
                 alphaMode='OPAQUE',
-                baseColorFactor=A(color)
+                baseColorFactor=A(N(color.value))
             ) for color in pallete]
         
     @staticmethod
     def _select_random_material(pallete: pyrender.Material
                                 ) -> pyrender.Material:
+        '''Select random material from the material pallete.'''
         return pallete[random.randint(0, len(pallete) - 1)]
         
     def _render_scene(self, 
@@ -57,6 +61,7 @@ class SurrealRenderer:
                       camera_pose: np.ndarray, 
                       light: pyrender.light.Light,
                       light_pose: np.ndarray) -> np.ndarray:
+        '''Lower-level scene rendering given a list of meshes and scene data.'''
         scene = pyrender.Scene()
         for mesh_idx, mesh in enumerate(meshes):
             if mesh is not None:
@@ -73,18 +78,21 @@ class SurrealRenderer:
     def _extract_segmentation_maps(self, 
                                    render_imgs: Dict[str, np.ndarray]
                                    ) -> Dict[str, np.ndarray]:
+        '''Extract segmentation maps based on rendered RGB images.'''
         seg_maps = {}
         for img_key in render_imgs:
             seg_maps[img_key] = np.zeros((self.img_wh, self.img_wh), 
                                           dtype=np.bool)
             img = render_imgs[img_key]
-            background_pixels = np.all(img == NoColors.WHITE, axis=2)
+            background_pixels = np.all(img == N(NoColors.WHITE.value), axis=2)
             seg_maps[img_key][background_pixels] = 1
         return seg_maps
     
     @staticmethod
     def _smpl_to_trimesh(smpl_output_dict: Dict[str, SMPL4GarmentOutput]
                          ) -> Tuple[trimesh.Trimesh, Dict[str, trimesh.Trimesh]]:
+        '''Extract trimesh Meshes from SMPL4Garment output (verts and faces).'''
+        
         body_mesh = trimesh.Trimesh(
             vertices=smpl_output_dict['upper'].body_verts,
             faces=smpl_output_dict['upper'].body_faces
@@ -100,6 +108,8 @@ class SurrealRenderer:
     def _seg_maps_to_features(self,
                                seg_maps: Dict[str, np.ndarray], 
                                garment_classes: GarmentClasses) -> np.ndarray:
+        '''Organize segmentation maps according to garment class labels.'''
+        
         seg_maps_features = np.zeros(
             (GarmentClasses.NUM_CLASSES + 1, self.img_wh, self.img_wh), 
             dtype=np.bool)
@@ -112,7 +122,8 @@ class SurrealRenderer:
     def render(self, 
                smpl_output_dict: Dict[str, SMPL4GarmentOutput],
                garment_classes: GarmentClasses
-               ) -> Tuple[np.ndarray[np.float32], np.ndarray[np.bool]]:
+               ) -> Tuple[np.ndarray, np.ndarray]:
+        '''Render SMPL4Garment meshes (RGB and segmentations maps).'''
         
         body_mesh, garment_meshes = self._smpl_to_trimesh(smpl_output_dict)
         

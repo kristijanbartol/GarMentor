@@ -197,7 +197,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
             style_vector=style_vector
         )
 
-        seg_maps: np.ndarray = self.renderer(
+        rgb_img, seg_maps = self.renderer.render(
             smpl_output_dict,
             garment_classes=parametric_model.garment_classes,
             cam_t=cam_t
