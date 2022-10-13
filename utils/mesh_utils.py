@@ -14,13 +14,10 @@ def concatenate_meshes(vertices_list: List[np.ndarray],     # N[(V, 3)]
         concat_vertices.shape[0] == sum(vertices_list_lengths))
 
     faces_list_with_offsets = [faces_list[0]]
-    for idx in range(len(faces_list) - 1):
-        faces_list_with_offsets.append(faces_list[idx + 1] + faces_list[idx].max())
+    num_vertices = 0
+    for idx in range(len(faces_list)):
+        faces_list_with_offsets.append(faces_list[idx] + num_vertices)
+        num_vertices += vertices_list[idx].shape[0]
     concat_faces = np.concatenate(faces_list_with_offsets, axis=0)
-
-    faces_list_lengths = [x.shape[0] for x in faces_list]
-    assert(concat_faces.shape[1] == 3 and \
-        concat_faces.max() > faces_list[0].max() and \
-        concat_faces.shape[0] == sum(faces_list_lengths))
 
     return concat_vertices, concat_faces

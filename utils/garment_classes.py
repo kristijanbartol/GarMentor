@@ -32,7 +32,8 @@ class GarmentClasses():
 
     NUM_CLASSES = len(GARMENT_CLASSES)
 
-    CLOTHLESS_PROB = 0.05
+    # NOTE (kbartol): Clothless currently not supported.
+    CLOTHLESS_PROB = 0.0
 
     def _set_binary_vector(self, upper_garment_class, lower_garment_class):
         binary_labels_vector: List[bool] = [0] * len(self.GARMENT_CLASSES)

@@ -15,9 +15,9 @@ from utils.augmentation.smpl_augmentation import (
     normal_sample_style_numpy
 )
 from models.parametric_model import ParametricModel
+from renderers.surreal_renderer import SurrealRenderer
 from utils.augmentation.cam_augmentation import augment_cam_t_numpy
 from utils.garment_classes import GarmentClasses
-from renderers.surreal_renderer import SurrealRenderer
 
 
 @dataclass
@@ -104,8 +104,8 @@ class DataPreGenerator(object):
     IMG_DIR = 'rgb/'
     SEG_MAPS_DIR = 'segmentations/'
 
-    IMG_NAME_TEMPLATE = '{idx:5d}.png'
-    SEG_MAPS_NAME_TEMPLATE = '{idx:5d}.npy'
+    IMG_NAME_TEMPLATE = '{idx:05d}.png'
+    SEG_MAPS_NAME_TEMPLATE = '{idx:05d}.npy'
     VALUES_FNAME = 'values.npy'
 
     def __init__(self):
@@ -129,7 +129,10 @@ class SurrealDataPreGenerator(DataPreGenerator):
         super().__init__()
         self.cfg = get_cfg_defaults()
         self._init_useful_arrays()
-        self.renderer = SurrealRenderer()
+        self.renderer = SurrealRenderer(
+            device='cuda:0',
+            batch_size=1
+        )
         self.poses = self._load_poses()
 
     def _load_poses(self) -> np.ndarray:
@@ -197,7 +200,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
             style_vector=style_vector
         )
 
-        rgb_img, seg_maps = self.renderer.render(
+        rgb_img, seg_maps = self.renderer(
             smpl_output_dict,
             garment_classes=parametric_model.garment_classes,
             cam_t=cam_t
@@ -212,6 +215,16 @@ class SurrealDataPreGenerator(DataPreGenerator):
         )
 
         return rgb_img, seg_maps, sample_values
+    
+    @staticmethod
+    def _create_dirs(dataset_dir, img_dirname, seg_dirname):
+        img_dir = os.path.join(dataset_dir, img_dirname)
+        seg_dir = os.path.join(dataset_dir, seg_dirname)
+        
+        if not os.path.exists(img_dir):
+            os.makedirs(img_dir)
+        if not os.path.exists(seg_dir):
+            os.makedirs(seg_dir)
 
     def _save_sample(self, 
                      dataset_dir: str, 
@@ -221,17 +234,24 @@ class SurrealDataPreGenerator(DataPreGenerator):
                      sample_values: PreGeneratedSampleValues,
                      samples_values: PreGeneratedValuesArray) -> None:
         '''Save RGB, seg maps (disk), and the values to the array (RAM).'''
+        
+        self._create_dirs(
+            dataset_dir=dataset_dir,
+            img_dirname=self.IMG_DIR,
+            seg_dirname=self.SEG_MAPS_DIR)
 
         if rgb_img is not None:
+            rgb_img = (rgb_img * 255).astype(np.uint8)
             img = Image.fromarray(rgb_img)
             img_dir = os.path.join(dataset_dir, self.IMG_DIR)
-            img_path = os.path.join(img_dir, self.IMG_NAME_TEMPLATE.format(sample_idx))
+            img_path = os.path.join(
+                img_dir, self.IMG_NAME_TEMPLATE.format(idx=sample_idx))
             img.save(img_path)
             print(f'Saved image: {img_path}')
 
         seg_dir = os.path.join(dataset_dir, self.SEG_MAPS_DIR)
         seg_path = os.path.join(
-            seg_dir, self.SEG_MAPS_NAME_TEMPLATE.format(sample_idx))
+            seg_dir, self.SEG_MAPS_NAME_TEMPLATE.format(idx=sample_idx))
         np.save(seg_path, seg_maps)
         print(f'Saved segmentation maps: {seg_path}')
 
