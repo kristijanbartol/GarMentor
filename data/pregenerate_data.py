@@ -1,6 +1,7 @@
 from typing import List, Tuple
 from dataclasses import dataclass, fields
 import numpy as np
+import torch
 import os
 from PIL import Image
 import sys
@@ -285,7 +286,8 @@ class SurrealDataPreGenerator(DataPreGenerator):
                         upper_garment_class=upper_class,
                         lower_garment_class=lower_class
                     )
-                    num_samples = self.poses.shape[0]
+                    #num_samples = self.poses.shape[0]
+                    num_samples = 20000
                     subset_str = f'{gender}-{upper_class}-{lower_class}'
                     print(f'Generating {num_samples} samples for {subset_str}...')
 
@@ -303,6 +305,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
                             samples_values=samples_values
                         )
                     self._save_values(samples_values, dataset_dir)
+                    torch.cuda.empty_cache()
 
 
 if __name__ == '__main__':
