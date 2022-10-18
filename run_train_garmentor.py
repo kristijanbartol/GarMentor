@@ -58,10 +58,14 @@ def run_train(device,
     # ------------------------- Datasets -------------------------
     train_dataset = SurrealTrainDataset(
         gender=gender,
+        data_split='train',
+        train_val_ratio=0.8,
         backgrounds_dir_path=paths.TRAIN_BACKGROUNDS_PATH
     )
     val_dataset = SurrealTrainDataset(
         gender=gender,
+        data_split='valid',
+        train_val_ratio=0.8,
         backgrounds_dir_path=paths.VAL_BACKGROUNDS_PATH
     )
     print("\nTraining poses found:", len(train_dataset))

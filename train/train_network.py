@@ -148,8 +148,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     # Add background rgb
                     # NOTE: The last seg map (-1) is the whole body seg map.
                     rgb_in = batch_add_rgb_background(backgrounds=background,
-                                                      rgb=rgb_in,
-                                                      seg=seg_maps[-1])
+                                                    rgb=rgb_in,
+                                                    seg=seg_maps[-1])
                     # Apply RGB-based render augmentations + 2D joints augmentations
                     rgb_in = sample_batch.rgb_img
                     if rgb_in is not None:

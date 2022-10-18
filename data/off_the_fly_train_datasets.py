@@ -1,6 +1,6 @@
-from functools import cache
+from typing import List, Optional, Union
 import numpy as np
-from typing import Dict, List, Optional, Union
+from tqdm import tqdm
 from dataclasses import dataclass, fields
 import os
 import torch
@@ -60,23 +60,21 @@ class Values:
         self.cam_ts = []
         self.jointss = []
         self.garment_labelss = []
-        
-        self.garment_lengths = []
     
-    def load(self, np_path):
+    def load(self, 
+             np_path: str, 
+             split_slice: slice = slice(None)
+             ) -> None:
         data = np.load(np_path, allow_pickle=True).item()
         
-        self.poses.append(data['poses'])
-        self.shapes.append(data['shapes'])
-        self.style_vectors.append(data['style_vectors'])
-        self.cam_ts.append(data['cam_ts'])
-        self.jointss.append(data['jointss'])
-        self.garment_labelss(data['garment_labelss'])
+        self.poses.append(data['poses'][split_slice])
+        self.shapes.append(data['shapes'][split_slice])
+        self.style_vectors.append(data['style_vectors'][split_slice])
+        self.cam_ts.append(data['cam_ts'][split_slice])
+        self.jointss.append(data['jointss'][split_slice])
+        self.garment_labelss.append(data['garment_labelss'][split_slice])
         
-        self.garment_lengths.append(self.poses[-1].shape[0])
-        
-    @cache
-    def numpy(self):
+    def numpy(self) -> None:
         self.poses = np.concatenate(self.poses, axis=0)
         self.shapes = np.concatenate(self.shapes, axis=0)
         self.style_vectors = np.concatenate(self.style_vectors, axis=0)
@@ -113,6 +111,10 @@ class TrainDataset(Dataset):
     VALUES_FNAME = DataPreGenerator.VALUES_FNAME
 
 
+TRAIN = 'train'
+VALID = 'valid'
+
+
 class SurrealTrainDataset(TrainDataset):
 
     '''An instance of train dataset specific to SURREAL dataset.'''
@@ -121,28 +123,50 @@ class SurrealTrainDataset(TrainDataset):
 
     def __init__(self,
                  gender: str,
+                 data_split: str,
+                 train_val_ratio: float,
                  backgrounds_dir_path: str,
                  img_wh: int = 256):
         '''Initialize paths, load samples's values, and segmentation maps.'''
 
         super().__init__()
+        print(f'Loading {data_split} data...')
         
         dataset_gender_dir = os.path.join(
             self.DATA_ROOT_DIR,
             self.DATASET_NAME,
             gender)
 
-        self.garment_class_list, garment_dirnames = self._get_all_garment_pairs()
+        self.garment_class_list, garment_dirnames = self._get_all_garment_pairs(
+            dataset_gender_dir=dataset_gender_dir
+        )
         garment_dirpaths = [
             os.path.join(dataset_gender_dir, x) for x in garment_dirnames]
         
-        self.values = self._load_values(garment_dirpaths)
-        self.seg_maps = self._load_seg_maps(garment_dirpaths)
-        self.rgb_imgs = self._load_rgb_imgs(garment_dirpaths)
-
-        self.backgrounds_paths = sorted([os.path.join(backgrounds_dir_path, f)
-                                         for f in os.listdir(backgrounds_dir_path)
-                                         if f.endswith('.jpg')])
+        data_split_slices_list = self._get_slices(
+            garment_dirpaths=garment_dirpaths,
+            data_split=data_split,
+            train_val_ratio=train_val_ratio
+        )
+        
+        self.values = self._load_values(
+            garment_dirpaths,
+            data_split_slices_list=data_split_slices_list
+        )
+        self.seg_maps = self._load_seg_maps(
+            garment_dirpaths=garment_dirpaths, 
+            seg_maps_dir=self.SEG_MAPS_DIRNAME,
+            data_split_slices_list=data_split_slices_list
+        )
+        self.rgb_imgs = self._load_rgb_imgs(
+            garment_dirpaths=garment_dirpaths,
+            rgb_imgs_dir=self.IMG_DIRNAME,
+            data_split_slices_list=data_split_slices_list
+        )
+        self.backgrounds_paths = self._load_backgrounds(
+            backgrounds_dir_path=backgrounds_dir_path,
+            num_backgrounds=10000
+        )
         self.img_wh = img_wh
         
     @staticmethod
@@ -158,39 +182,81 @@ class SurrealTrainDataset(TrainDataset):
         return garment_class_list, garment_dirnames
     
     @staticmethod
-    def _load_values(garment_dirpaths: List[str]) -> Values:
-        values = Values()
+    def _get_slices(garment_dirpaths: List[str],
+                    data_split: str,
+                    train_val_ratio: float
+                    ) -> List[int]:
+        slices_per_garment = []
         for garment_dirpath in garment_dirpaths:
+            values = np.load(
+                os.path.join(garment_dirpath, 'values.npy'),
+                allow_pickle=True
+            ).item()
+            num_samples = values['poses'].shape[0]
+            if data_split == TRAIN:
+                _slice = slice(0, num_samples * train_val_ratio)
+            elif data_split == VALID:
+                _slice = slice(num_samples * train_val_ratio, -1)
+            else:
+                raise Exception('Data split should be either train or val!')
+            slices_per_garment.append(_slice)
+        return slices_per_garment
+            
+    @staticmethod
+    def _load_values(garment_dirpaths: List[str],
+                     slice_list: List[slice]) -> Values:
+        print('Loading values...')
+        values = Values()
+        for garment_idx, garment_dirpath in enumerate(garment_dirpaths):
             values_fpath = os.path.join(garment_dirpath, 'values.npy')
-            values.load(values_fpath)
-        values.finish()
+            values.load(values_fpath, slice_list[garment_idx])
+        values.numpy()
         return values
 
     @staticmethod
     def _load_seg_maps(garment_dirpaths: List[str], 
-                       seg_maps_dir: str
+                       seg_maps_dir: str,
+                       slice_list: List[slice]
                        ) -> np.ndarray:
         '''Load all segmentation maps in proper order.'''
 
-        seg_maps = []
-        for garment_dirpath in garment_dirpaths:
+        print('Loading segmaps...')
+        seg_mapss = []
+        for garment_idx, garment_dirpath in enumerate(garment_dirpaths):
             seg_maps_dir = os.path.join(garment_dirpath, seg_maps_dir)
-            for f in sorted(os.listdir(seg_maps_dir)):
+            seg_files = sorted(
+                os.listdir(seg_maps_dir))[slice_list[garment_idx]]
+            for f in tqdm(seg_files):
                 seg_maps_path = os.path.join(seg_maps_dir, f)
-                seg_maps.append(np.load(seg_maps_path))
-        return np.array(seg_maps, dtype=np.bool)
+                seg_mapss.append(np.load(seg_maps_path, dtype=bool))
+        return np.concatenate(seg_mapss, axis=0)
     
     @staticmethod
     def _load_rgb_imgs(garment_dirpaths: List[str],
-                       rgb_imgs_dir: str
+                       rgb_imgs_dir: str,
+                       slice_list: List[slice]
                        ) -> np.ndarray:
+        print('Loading RGB images...')
         rgb_imgs = []
-        for garment_dirpath in garment_dirpaths:
+        for garment_idx, garment_dirpath in enumerate(garment_dirpaths):
             rgb_imgs_dir = os.path.join(garment_dirpath, rgb_imgs_dir)
-            for f in sorted(os.listdir(rgb_imgs_dir)):
+            rgb_files = sorted(os.listdir(rgb_imgs_dir))[slice_list[garment_idx]]
+            for f in tqdm(rgb_files):
                 rgb_img_path = os.path.join(rgb_imgs_dir, f)
                 rgb_imgs.append(imageio.imread(rgb_img_path))
-        return np.array(rgb_imgs, dtype=np.float32)
+        return np.concatenate(rgb_imgs, axis=0)
+    
+    @staticmethod
+    def _load_backgrounds(backgrounds_dir_path: str, 
+                          num_backgrounds: int = -1) -> List[str]:
+        print('Loading background paths...')
+        backgrounds_paths = []
+        for f in tqdm(sorted(os.listdir(backgrounds_dir_path)[:num_backgrounds])):
+            if f.endswith('.jpg'):
+                backgrounds_paths.append(
+                    os.path.join(backgrounds_dir_path, f)
+                )
+        return backgrounds_paths
 
     def __len__(self) -> int:
         '''Get dataset length (used by DataLoader).'''
@@ -236,6 +302,6 @@ class SurrealTrainDataset(TrainDataset):
             cam_t=self._to_tensor(self.values['cam_ts'][index]),
             joints=self._to_tensor(self.values['jointss'][index]),
             garment_labels_vector=self._to_tensor(self.values['garment_labelss'][index]),
-            seg_maps=self._to_tensor(self.all_seg_maps[index], np.bool),
+            seg_maps=self._to_tensor(self.seg_maps[index], np.bool),
             background=self._load_background(num_samples)
         )

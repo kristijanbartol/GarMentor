@@ -107,7 +107,7 @@ class DataPreGenerator(object):
     SEG_MAPS_DIR = 'segmentations/'
 
     IMG_NAME_TEMPLATE = '{idx:05d}.png'
-    SEG_MAPS_NAME_TEMPLATE = '{idx:05d}.npy'
+    SEG_MAPS_NAME_TEMPLATE = '{idx:05d}.npz'
     VALUES_FNAME = 'values.npy'
 
     def __init__(self):
@@ -255,7 +255,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
         seg_dir = os.path.join(dataset_dir, self.SEG_MAPS_DIR)
         seg_path = os.path.join(
             seg_dir, self.SEG_MAPS_NAME_TEMPLATE.format(idx=sample_idx))
-        np.save(seg_path, seg_maps)
+        np.savez_compressed(seg_path, seg_maps=seg_maps.astype(bool))
         print(f'Saved segmentation maps: {seg_path}')
 
         samples_values.append(sample_values)
