@@ -123,7 +123,8 @@ RUN python3.7 -m pip install --ignore-installed PyYAML \
 	traitlets==5.1.1 \
 	pygments==2.4.1 \
 	jupyter \
-	chumpy
+	chumpy \
+	visdom
 
 RUN python3.7 -m pip install --upgrade ipykernel
 

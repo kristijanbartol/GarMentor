@@ -12,19 +12,11 @@ from metrics.train_loss_and_metrics_tracker import TrainingLossesAndMetricsTrack
 from utils.checkpoint_utils import load_training_info_from_checkpoint
 from utils.cam_utils import perspective_project_torch, orthographic_project_torch
 from utils.rigid_transform_utils import rot6d_to_rotmat, aa_rotate_translate_points_pytorch3d, aa_rotate_rotmats_pytorch3d
-from utils.label_conversions import convert_2Djoints_to_gaussian_heatmaps_torch, convert_densepose_seg_to_14part_labels, \
-    ALL_JOINTS_TO_H36M_MAP, ALL_JOINTS_TO_COCO_MAP, H36M_TO_J17, H36M_TO_J14, TWENTYFOUR_PART_SEG_TO_COCO_JOINTS_MAP, BASE_JOINTS_TO_COCO_MAP, BASE_JOINTS_TO_H36M_MAP
-from utils.joints2d_utils import check_joints2d_visibility_torch, check_joints2d_occluded_torch
-from utils.image_utils import batch_add_rgb_background, batch_crop_pytorch_affine
-from utils.sampling_utils import pose_matrix_fisher_sampling_torch
-
-from utils.augmentation.smpl_augmentation import normal_sample_params
-from utils.augmentation.cam_augmentation import augment_cam_t
-from utils.augmentation.proxy_rep_augmentation import augment_proxy_representation, random_extreme_crop
+from utils.label_conversions import convert_2Djoints_to_gaussian_heatmaps_torch, \
+    H36M_TO_J14, BASE_JOINTS_TO_COCO_MAP, BASE_JOINTS_TO_H36M_MAP
+from utils.joints2d_utils import check_joints2d_visibility_torch
+from utils.image_utils import batch_add_rgb_background
 from utils.augmentation.rgb_augmentation import augment_rgb
-from utils.augmentation.lighting_augmentation import augment_light
-
-from tailornet_for_garmentor.utils.interpenetration import remove_interpenetration_fast
 
 
 def train_poseMF_shapeGaussian_net(pose_shape_model,
@@ -83,41 +75,17 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                       current_epoch=current_epoch)
 
     # Useful tensors that are re-used and can be pre-defined
-    # NOTE (kbartol): For now, keeping these tensors as they don't hurt.
     x_axis = torch.tensor([1., 0., 0.],
                           device=device, dtype=torch.float32)
-    delta_betas_std_vector = torch.ones(pose_shape_cfg.MODEL.NUM_SMPL_BETAS,
-                                        device=device, dtype=torch.float32) * pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.SMPL.SHAPE_STD
-    mean_shape = torch.zeros(pose_shape_cfg.MODEL.NUM_SMPL_BETAS,
-                             device=device, dtype=torch.float32)
-    delta_style_std_vector = torch.ones(pose_shape_cfg.MODEL.NUM_STYLE_PARAMS,
-                                        device=device, dtype=torch.float32) * pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.GARMENTOR.STYLE_STD
-    mean_style = torch.zeros(pose_shape_cfg.MODEL.NUM_STYLE_PARAMS,
-                             device=device, dtype=torch.float32)
     mean_cam_t = torch.tensor(pose_shape_cfg.TRAIN.SYNTH_DATA.MEAN_CAM_T,
                               device=device, dtype=torch.float32)
     mean_cam_t = mean_cam_t[None, :].expand(pose_shape_cfg.TRAIN.BATCH_SIZE, -1)
 
     # Starting training loop
-    current_loss_stage = 1
     for epoch in range(current_epoch, pose_shape_cfg.TRAIN.NUM_EPOCHS):
         print('\nEpoch {}/{}'.format(epoch, pose_shape_cfg.TRAIN.NUM_EPOCHS - 1))
         print('-' * 10)
         metrics_tracker.initialise_loss_metric_sums()
-
-        # NOTE (kbartol): Will not have two training stages.
-        '''
-        if epoch >= pose_shape_cfg.LOSS.STAGE_CHANGE_EPOCH and current_loss_stage == 1:
-            # Apply 2D samples losses + 3D mode losses + change weighting from this epoch onwards.
-            criterion.loss_config = pose_shape_cfg.LOSS.STAGE2
-            print('Stage 2 loss config:\n', criterion.loss_config)
-            print('Sample on CPU:', pose_shape_cfg.LOSS.SAMPLE_ON_CPU)
-
-            metrics_tracker.metrics_to_track.append('joints2Dsamples-L2E')
-            print('Tracking metrics:', metrics_tracker.metrics_to_track)
-
-            current_loss_stage = 2
-        '''
 
         for split in ['train', 'val']:
             if split == 'train':
@@ -136,8 +104,6 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     # Load target pose and random background/texture
                     target_pose = sample_batch.pose.to(device)  # (bs, 72)
                     background = sample_batch.background.to(device)  # (bs, 3, img_wh, img_wh)
-                    # TODO (kbartol): Load texture.
-                    #texture = sample_batch['texture'].to(device)  # (bs, 1200, 800, 3)
 
                     # Convert target_pose from axis angle to rotmats
                     target_pose_rotmats = batch_rodrigues(target_pose.contiguous().view(-1, 3)).view(-1, 24, 3, 3)
@@ -178,28 +144,25 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     target_joints2d_visib_coco = check_joints2d_visibility_torch(target_joints2d_coco,
                                                                                  pose_shape_cfg.DATA.PROXY_REP_SIZE)  # (batch_size, 17)
 
-                    # TODO (kbartol): Augment light, i.e., emulate it somehow.
-
-                    # TODO (kbartol): Check if joints are occluded by the body (need IUV map?).
-
                     seg_maps = sample_batch.seg_maps
                     # Add background rgb
-                    # TODO (kbartol): Need to have all the seg maps, including the blank ones!
-                    # NOTE (kbartol): seg_maps[0] is used as a whole-body segmentation map, be careful.
+                    # NOTE: The last seg map (-1) is the whole body seg map.
                     rgb_in = batch_add_rgb_background(backgrounds=background,
                                                       rgb=rgb_in,
-                                                      seg=seg_maps[0])
+                                                      seg=seg_maps[-1])
                     # Apply RGB-based render augmentations + 2D joints augmentations
-                    # TODO: Render proper RGB. For now, rgb_img is None.
                     rgb_in = sample_batch.rgb_img
                     if rgb_in is not None:
-                        rgb_in, target_joints2d_coco_input, target_joints2d_visib_coco = augment_rgb(rgb=rgb_in,
-                                                                                                    joints2D=target_joints2d_coco_input,
-                                                                                                    joints2D_visib=target_joints2d_visib_coco,
-                                                                                                    rgb_augment_config=pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.RGB)
+                        rgb_in, target_joints2d_coco_input, target_joints2d_visib_coco = augment_rgb(
+                            rgb=rgb_in,
+                            joints2D=target_joints2d_coco_input,
+                            joints2D_visib=target_joints2d_visib_coco,
+                            rgb_augment_config=pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.RGB
+                        )
                         # Compute edge-images edges
                         edge_detector_output = edge_detect_model(rgb_in)
-                        edge_in = edge_detector_output['thresholded_thin_edges'] if pose_shape_cfg.DATA.EDGE_NMS else edge_detector_output['thresholded_grad_magnitude']
+                        edge_in = edge_detector_output['thresholded_thin_edges'] \
+                            if pose_shape_cfg.DATA.EDGE_NMS else edge_detector_output['thresholded_grad_magnitude']
                     else:
                         edge_in = torch.zeros((
                             pose_shape_cfg.TRAIN.BATCH_SIZE, 
@@ -214,14 +177,15 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     j2d_heatmaps = j2d_heatmaps * target_joints2d_visib_coco[:, :, None, None]
 
                     # Concatenate edge-image and 2D joint heatmaps to create input proxy representation
-                    proxy_rep_input = torch.cat([edge_in, seg_maps, j2d_heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
+                    #proxy_rep_input = torch.cat([edge_in, seg_maps, j2d_heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
+                    proxy_rep_input = torch.cat([edge_in, j2d_heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
 
                 with torch.set_grad_enabled(split == 'train'):
                     #############################################################
                     # ---------------------- FORWARD PASS -----------------------
                     #############################################################
                     pred_pose_F, pred_pose_U, pred_pose_S, pred_pose_V, pred_pose_rotmats_mode, \
-                    pred_shape_dist, pred_glob, pred_cam_wp = pose_shape_model(proxy_rep_input)
+                        pred_shape_dist, pred_glob, pred_cam_wp = pose_shape_model(proxy_rep_input)
                     # Pose F, U, V and rotmats_mode are (bs, 23, 3, 3) and Pose S is (bs, 23, 3)
 
                     pred_glob_rotmats = rot6d_to_rotmat(pred_glob)  # (bs, 3, 3)
@@ -254,12 +218,11 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                           'pose_params_S': pred_pose_S,
                                           'pose_params_V': pred_pose_V,
                                           'shape_params': pred_shape_dist,
-                                          'style_params': pred_style_dist,
+                                          #'style_params': pred_style_dist,
                                           'joints3D': pred_joints_h36mlsp_mode,
                                           'joints2D': pred_joints2d_coco_samples,
                                           'glob_rotmats': pred_glob_rotmats}
 
-                    # TODO: To avoid passing garment_classes to this dict, select only the relevant style vector part.
                     target_dict_for_loss = {'pose_params_rotmats': target_pose_rotmats,
                                             'shape_params': target_shape,
                                             'style_params': target_style_vector,
@@ -297,8 +260,9 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                 # ---------------- GENERATE VISUALIZATIONS ------------------
                 #############################################################
                 if vis_logger is not None:
+                    vis_logger.vis_rgb(rgb_in)
+                    vis_logger.vis_edge(edge_in)
                     vis_logger.vis_j2d_heatmaps(j2d_heatmaps)
-                    # TODO: Visualize seg maps, RGBs, edges, and estimations.
 
         #############################################################
         # ------------- UPDATE METRICS HISTORY and SAVE -------------

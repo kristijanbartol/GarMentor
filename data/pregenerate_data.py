@@ -29,6 +29,7 @@ class PreGeneratedSampleValues:
     pose: np.ndarray                    # (72,)
     shape: np.ndarray                   # (10,)
     style_vector: np.ndarray            # (4, 10)
+    garment_labels: np.ndarray          # (4,)
     cam_t: np.ndarray                   # (3,)
     joints: np.ndarray                  # (17, 3)
 
@@ -211,6 +212,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
             pose=pose,
             shape=shape,
             style_vector=style_vector,
+            garment_labels=parametric_model.garment_classes.labels_vector,
             cam_t=cam_t,
             joints=smpl_output_dict['upper'].joints
         )
