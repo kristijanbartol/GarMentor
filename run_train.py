@@ -1,17 +1,14 @@
 import os
+from data.off_the_fly_train_datasets import SurrealTrainDataset
+from renderers.surreal_renderer import SurrealRenderer
 import torch
 import torch.optim as optim
 import argparse
 import _thread as thread
 import visdom as vis
 
-from data.on_the_fly_smpl_train_dataset import OnTheFlySMPLTrainDataset
-from renderers.non_textured_renderer import NonTexturedRenderer
-from renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
-
 from models.poseMF_shapeGaussian_net import PoseMFShapeGaussianNet
 from models.smpl_official import SMPL
-from tailornet_for_garmentor.models.tailornet_model import get_best_runner as get_tn_runner
 from models.canny_edge_detector import CannyEdgeDetector
 
 from losses.matrix_fisher_loss import PoseMFShapeGaussianLoss
@@ -22,8 +19,6 @@ from configs import paths
 from train.train_network import train_poseMF_shapeGaussian_net
 
 from utils.visualize import VisLogger
-
-from tailornet_for_garmentor.models.smpl4garment import SMPL4Garment
 
 
 def run_train(device,
@@ -61,21 +56,21 @@ def run_train(device,
 
     print('\n', pose_shape_cfg)
     # ------------------------- Datasets -------------------------
-    train_dataset = OnTheFlySMPLTrainDataset(poses_path=paths.TRAIN_POSES_PATH,
-                                             textures_path=paths.TRAIN_TEXTURES_PATH,
-                                             backgrounds_dir_path=paths.TRAIN_BACKGROUNDS_PATH,
-                                             params_from='not_amass',
-                                             img_wh=pose_shape_cfg.DATA.PROXY_REP_SIZE)
-    val_dataset = OnTheFlySMPLTrainDataset(poses_path=paths.VAL_POSES_PATH,
-                                           textures_path=paths.VAL_TEXTURES_PATH,
-                                           backgrounds_dir_path=paths.VAL_BACKGROUNDS_PATH,
-                                           params_from='all',
-                                           img_wh=pose_shape_cfg.DATA.PROXY_REP_SIZE)
+    train_dataset = SurrealTrainDataset(
+        gender=gender,
+        data_split='train',
+        train_val_ratio=0.8,
+        backgrounds_dir_path=paths.TRAIN_BACKGROUNDS_PATH
+    )
+    val_dataset = SurrealTrainDataset(
+        gender=gender,
+        data_split='valid',
+        train_val_ratio=0.8,
+        backgrounds_dir_path=paths.VAL_BACKGROUNDS_PATH
+    )
     print("\nTraining poses found:", len(train_dataset))
-    print("Training textures found (grey, nongrey):", len(train_dataset.grey_textures), len(train_dataset.nongrey_textures))
     print("Training backgrounds found:", len(train_dataset.backgrounds_paths))
     print("Validation poses found:", len(val_dataset))
-    print("Validation textures found (grey, nongrey):", len(val_dataset.grey_textures), len(val_dataset.nongrey_textures))
     print("Validation backgrounds found:", len(val_dataset.backgrounds_paths), '\n')
 
     # ------------------------- Models -------------------------
@@ -88,22 +83,13 @@ def run_train(device,
     smpl_model = SMPL(paths.SMPL,
                       num_betas=pose_shape_cfg.MODEL.NUM_SMPL_BETAS,
                       gender=gender).to(device)
-    smpl4garment_model = SMPL4Garment(gender=gender)
-    tailornet_model = get_tn_runner(gender=gender, garment_class='t-shirt')
 
     # 3D shape and pose distribution predictor
     pose_shape_model = PoseMFShapeGaussianNet(smpl_parents=smpl_model.parents.tolist(),
                                               config=pose_shape_cfg).to(device)
 
     # Pytorch3D renderer for synthetic data generation
-    pytorch3d_renderer = NonTexturedRenderer(device=device,
-                                             batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
-                                             num_body_verts=27554,
-                                             num_garment_verts=7702,
-                                             img_wh=pose_shape_cfg.DATA.PROXY_REP_SIZE,
-                                             body_faces=smpl_model.body_faces,
-                                             garment_faces=smpl_model.garment_faces,
-                                             bin_size=0)
+    pytorch3d_renderer = SurrealRenderer(device=device, batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE)
     
     # Visualizer class to log the training progress.
     vis_logger = VisLogger(visdom=visdom, renderer=pytorch3d_renderer) if visdom is not None else None
