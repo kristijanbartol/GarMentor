@@ -151,17 +151,17 @@ class SurrealTrainDataset(TrainDataset):
         
         self.values = self._load_values(
             garment_dirpaths,
-            data_split_slices_list=data_split_slices_list
+            slice_list=data_split_slices_list
         )
         self.seg_maps = self._load_seg_maps(
             garment_dirpaths=garment_dirpaths, 
             seg_maps_dir=self.SEG_MAPS_DIRNAME,
-            data_split_slices_list=data_split_slices_list
+            slice_list=data_split_slices_list
         )
         self.rgb_imgs = self._load_rgb_imgs(
             garment_dirpaths=garment_dirpaths,
             rgb_imgs_dir=self.IMG_DIRNAME,
-            data_split_slices_list=data_split_slices_list
+            slice_list=data_split_slices_list
         )
         self.backgrounds_paths = self._load_backgrounds(
             backgrounds_dir_path=backgrounds_dir_path,

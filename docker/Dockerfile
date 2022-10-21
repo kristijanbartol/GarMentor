@@ -124,7 +124,10 @@ RUN python3.7 -m pip install --ignore-installed PyYAML \
 	pygments==2.4.1 \
 	jupyter \
 	chumpy \
-	visdom
+	visdom \
+	open3d \
+	loguru \
+	omegaconf
 
 RUN python3.7 -m pip install --upgrade ipykernel
 
