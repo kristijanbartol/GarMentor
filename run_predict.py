@@ -9,7 +9,7 @@ from models.smpl_official import SMPL
 from models.pose2D_hrnet import PoseHighResolutionNet
 from models.canny_edge_detector import CannyEdgeDetector
 
-from configs.poseMF_shapeGaussian_net_config import get_poseMF_shapeGaussian_cfg_defaults
+from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
 from configs.pose2D_hrnet_config import get_pose2D_hrnet_cfg_defaults
 from configs import paths
 
@@ -31,7 +31,7 @@ def run_predict(device,
     # ------------------------- Models -------------------------
     # Configs
     pose2D_hrnet_cfg = get_pose2D_hrnet_cfg_defaults()
-    pose_shape_cfg = get_poseMF_shapeGaussian_cfg_defaults()
+    pose_shape_cfg = get_cfg_defaults()
     if pose_shape_cfg_path is not None:
         pose_shape_cfg.merge_from_file(pose_shape_cfg_path)
         print('\nLoaded Distribution Predictor config from', pose_shape_cfg_path)

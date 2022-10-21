@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from smplx.lbs import batch_rodrigues
+from psbody.mesh import Mesh
 from tqdm import tqdm
 
 from metrics.train_loss_and_metrics_tracker import TrainingLossesAndMetricsTracker
@@ -22,6 +23,8 @@ from utils.augmentation.cam_augmentation import augment_cam_t
 from utils.augmentation.proxy_rep_augmentation import augment_proxy_representation, random_extreme_crop
 from utils.augmentation.rgb_augmentation import augment_rgb
 from utils.augmentation.lighting_augmentation import augment_light
+
+from tailornet_for_garmentor.utils.interpenetration import remove_interpenetration_fast
 
 
 def train_poseMF_shapeGaussian_net(pose_shape_model,
@@ -162,23 +165,53 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     target_garment_displacements = tailornet_model.forward(thetas=target_pose,
                                                             betas=target_shape,
                                                             gammas=target_style)
+                    
+                    target_body_verts_np_list = []
+                    target_garment_verts_np_list = []
+                    for bidx in range(pose_shape_cfg.TRAIN.BATCH_SIZE):
+                        pred_verts_d = target_garment_displacements.cpu().numpy()[bidx]
+                        beta = target_shape.cpu().numpy()[bidx]
+                        theta = target_pose.cpu().numpy()[bidx]
 
-                    # Compute target vertices and joints
-                    target_smpl_output = smpl_model.forward(beta=target_shape, 
-                                                            theta=target_pose, 
-                                                            garment_d=target_garment_displacements)
-
-                    target_garment_verts = target_smpl_output.garment_verts
-                    target_body_verts = target_smpl_output.body_verts
-                    target_joints = target_smpl_output.joints
+                        # Compute target vertices and joints
+                        #target_smpl_output = smpl_model.forward(beta=target_shape, 
+                        #                                        theta=target_pose, 
+                        #                                        garment_d=target_garment_displacements)
+                        body_mesh, garment_mesh = smpl_model.run(beta=beta, 
+                                                        theta=theta, 
+                                                        garment_class='t-shirt', 
+                                                        garment_d=pred_verts_d)
+                        
+                        #target_body_verts_np = target_body_verts.cpu().detach().numpy()
+                        #target_garment_verts_np = target_garment_verts.cpu().detach().numpy()
+                        #target_body_faces_np = smpl_model.body_faces.cpu().detach().numpy()
+                        #target_garment_faces_np = smpl_model.garment_faces.cpu().detach().numpy()
+                    
+                        #body_mesh = Mesh(v=target_body_verts_np[bidx], f=target_body_faces_np)
+                        #garment_mesh = Mesh(v=target_garment_verts_np[bidx], f=target_garment_faces_np)
+                        target_body_verts_np_list.append(body_mesh.v)
+                        target_garment_verts_np_list.append(remove_interpenetration_fast(
+                            mesh=garment_mesh, 
+                            base=body_mesh).v)
+                    target_garment_verts = torch.from_numpy(
+                        np.array(target_garment_verts_np_list, dtype=np.float32)).to(device)
+                    target_body_verts = torch.from_numpy(
+                        np.array(target_body_verts_np_list, dtype=np.float32)).to(device)
+                    
+                    #target_garment_verts = target_smpl_output.garment_verts
+                    #target_body_verts = target_smpl_output.body_verts
+                    #target_joints = target_smpl_output.joints
+                    target_joints = torch.tensor(np.array(smpl_model.smpl_base.J, dtype=np.float32)).unsqueeze(0).repeat(pose_shape_cfg.TRAIN.BATCH_SIZE, 1, 1).to(device)
                     target_joints_h36m = target_joints[:, BASE_JOINTS_TO_H36M_MAP]
                     target_joints_h36mlsp = target_joints_h36m[:, H36M_TO_J14, :]
 
-                    target_reposed_smpl_output = smpl_model.forward(beta=target_shape, 
-                                                                    theta=torch.zeros_like(target_pose), 
-                                                                    garment_d=target_garment_displacements)
+                    # TODO: Also apply interpenetration to reposed SMPL.
+                    #target_reposed_smpl_output = smpl_model.forward(beta=target_shape, 
+                    #                                                theta=torch.zeros_like(target_pose), 
+                    #                                                garment_d=target_garment_displacements)
 
-                    target_reposed_body_vertices = target_reposed_smpl_output.body_verts
+                    #target_reposed_body_vertices = target_reposed_smpl_output.body_verts
+                    target_reposed_body_vertices = torch.zeros_like(target_body_verts)
 
                     # ------------ INPUT PROXY REPRESENTATION GENERATION + 2D TARGET JOINTS ------------
                     # Pose targets were flipped such that they are right way up in 3D space - i.e. wrong way up when projected
@@ -220,6 +253,12 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     iuv_in[:, 1:, :, :] = iuv_in[:, 1:, :, :] * 255
                     iuv_in = iuv_in.round()
                     rgb_in = renderer_output['rgb_images'].permute(0, 3, 1, 2).contiguous()  # (bs, 3, img_wh, img_wh)
+                    
+                    import cv2
+                    rgb_np = np.swapaxes(rgb_in[0].cpu().detach().numpy(), 0, 2)
+                    cv2.imwrite('rgb.png', rgb_np * 255.)
+                    iuv_np = np.swapaxes(iuv_in[0].cpu().detach().numpy(), 0, 2)
+                    cv2.imwrite('iuv.png', iuv_np * 255.)
 
                     # Prepare seg for extreme crop augmentation
                     seg_extreme_crop = random_extreme_crop(seg=iuv_in[:, 0, :, :],
@@ -366,7 +405,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     target_dict_for_loss = {'pose_params_rotmats': target_pose_rotmats,
                                             'shape_params': target_shape,
                                             'verts': target_body_verts,
-                                            'joints3D': pred_joints_h36mlsp_mode,
+                                            'joints3D': target_joints_h36mlsp,
                                             'joints2D': target_joints2d_coco,
                                             'joints2D_vis': target_joints2d_visib_coco,
                                             'glob_rotmats': target_glob_rotmats}

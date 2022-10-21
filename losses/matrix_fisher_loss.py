@@ -233,7 +233,7 @@ class PoseMFShapeGaussianLoss(nn.Module):
     NLL for Matrix-Fisher distribution over SMPL pose rotation matrices +
     NLL for Gaussian distribution over SMPL shape parameters +
     MSE loss for joints2D and glob rotmats.
-    Optional MSE losses for verts and joints3D.
+    Optional MSE loss for and joints3D (previously also verts3D).
     """
     def __init__(self,
                  loss_config,
@@ -245,7 +245,6 @@ class PoseMFShapeGaussianLoss(nn.Module):
         self.img_wh = img_wh
         self.joints2D_loss = nn.MSELoss(reduction=loss_config.REDUCTION)
         self.glob_rotmats_loss = nn.MSELoss(reduction=loss_config.REDUCTION)
-        self.verts3D_loss = nn.MSELoss(reduction=loss_config.REDUCTION)
         self.joints3D_loss = nn.MSELoss(reduction=loss_config.REDUCTION)
 
     def forward(self, target_dict, pred_dict):
@@ -285,9 +284,6 @@ class PoseMFShapeGaussianLoss(nn.Module):
         # Glob Rotmats MSE
         glob_rotmats_loss = self.glob_rotmats_loss(pred_dict['glob_rotmats'], target_dict['glob_rotmats'])
 
-        # Verts3D MSE
-        verts_loss = self.verts3D_loss(pred_dict['verts'], target_dict['verts'])
-
         # Joints3D MSE
         joints3D_loss = self.joints3D_loss(pred_dict['joints3D'], target_dict['joints3D'])
 
@@ -295,7 +291,6 @@ class PoseMFShapeGaussianLoss(nn.Module):
                      + shape_nll * self.loss_config.WEIGHTS.SHAPE \
                      + joints2D_loss * self.loss_config.WEIGHTS.JOINTS2D \
                      + glob_rotmats_loss * self.loss_config.WEIGHTS.GLOB_ROTMATS \
-                     + verts_loss * self.loss_config.WEIGHTS.VERTS3D \
                      + joints3D_loss * self.loss_config.WEIGHTS.JOINTS3D
 
         return total_loss

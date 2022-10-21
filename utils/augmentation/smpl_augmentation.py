@@ -1,6 +1,5 @@
+import numpy as np
 import torch
-
-from smplx.lbs import batch_rodrigues
 
 
 def uniform_sample_shape(batch_size, mean_shape, delta_betas_range):
@@ -21,12 +20,23 @@ def normal_sample_params(batch_size, mean_params, std_vector):
     return shape  # (bs, num_smpl_betas)
 
 
-def normal_sample_style(batch_size, mean_style, std_vector):
-    """
-    Gaussian sampling of shape parameter deviations from the mean.
-    """
-    shape = mean_style + torch.randn(batch_size, mean_style.shape[0], device=mean_style.device)*std_vector
-    return shape  # (bs, num_smpl_betas)
+def normal_sample_shape_numpy(mean_params: np.ndarray,      # (10,)
+                              std_vector: np.ndarray        # (10,)        
+                              ) -> np.ndarray:             # (10,)
+    '''Gaussian sampling of shape parameter deviations from the mean.'''
+
+    shape = mean_params + np.random.randn(mean_params.shape[0]) * std_vector
+    return shape
+
+
+def normal_sample_style_numpy(num_garment_classes: int,     
+                              mean_params: np.ndarray,      # (10,)
+                              std_vector: np.ndarray        # (10,)
+                              ) -> np.ndarray:              # (num_garment_classes, 10)
+    '''Normal sampling of style parameter deviations from the mean, for each garment.'''
+
+    style = mean_params + np.random.randn(num_garment_classes, mean_params.shape[0]) * std_vector
+    return style
 
 
 def uniform_random_unit_vector(num_vectors):

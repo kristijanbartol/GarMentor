@@ -7,6 +7,7 @@ if [[ "$USER" == "kristijan" ]]; then
 	SSP3D_DIR=${BASE_DATA_DIR}/SSP-3D/
 	TAILORNET_DATA_DIR=${BASE_DATA_DIR}/tailornet
 	HIERPROB3D_DATA_DIR=${BASE_DATA_DIR}/hierprob3d
+	GARMENTOR_DATA_DIR=${BASE_DATA_DIR}/garmentor
 elif [[ "$USER" == "dbojanic" ]]; then
 	REPO_DIR=/home/dbojanic/garmentor/
 	BASE_DATA_DIR=/home/dbojanic/data/
@@ -14,24 +15,28 @@ elif [[ "$USER" == "dbojanic" ]]; then
 	SSP3D_DIR=${BASE_DATA_DIR}/SSP-3D/
 	TAILORNET_DATA_DIR=${BASE_DATA_DIR}/tailornet/
 	HIERPROB3D_DATA_DIR=${BASE_DATA_DIR}/hierprob3d/
+	GARMENTOR_DATA_DIR=${BASE_DATA_DIR}/garmentor/
+	USER="kbartol"
 elif [[ "$USER" == "julien" ]]; then
 	REPO_DIR=/home/julien/git/garmentor
 	PW3D_DIR=/home/julien/data/3DPW
 	SSP3D_DIR=/home/julien/data/SSP-3D
 	TAILORNET_DATA_DIR=/home/julien/data/TailorNet
 	HIERPROB3D_DATA_DIR=/home/julien/data/HierProb3D
+	GARMENTOR_DATA_DIR=/home/julien/data/garmentor
 else
 	REPO_DIR=/path/to/garmentor/repository
 	PW3D_DIR=/path/to/3DPW/dataset
 	SSP3D_DIR=/path/to/SSP-3D/dataset
 	TAILORNET_DATA_DIR=/path/to/tailornet/data
 	HIERPROB3D_DATA_DIR=/path/to/hierprob3d/data
+	GARMENTOR_DATA_DIR=/path/to/garmentor/folder
 fi
 
 docker run -it \
 	-p 8888:8888 \
 	--rm \
-	--runtime=nvidia --gpus all \
+	--gpus all \
 	--shm-size=8gb \
 	--name $USER-garmentor \
 	-v ${REPO_DIR}:/garmentor \
@@ -39,4 +44,5 @@ docker run -it \
 	-v ${SSP3D_DIR}:/data/SSP-3D/ \
 	-v ${TAILORNET_DATA_DIR}:/data/tailornet/ \
 	-v ${HIERPROB3D_DATA_DIR}:/data/hierprob3d/ \
+	-v ${GARMENTOR_DATA_DIR}:/data/garmentor/ \
 	$USER-garmentor
