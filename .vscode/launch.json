@@ -15,7 +15,7 @@
                 //"--image_dir", "./demo/", "--save_dir", "./output/", "--visualise_samples", "--visualise_uncropped"     // predict
                 //"-D", "ssp3d", "-V", "-M"     // evaluate
                 //"--lsun_dir", "../lsun/", "--train_files_dir", "train_files/"     // copy LSUN
-                "-E", "experiments/test"            // train
+                "-E", "experiments/test", "--gpu", "1"           // train
             ]
         }
     ]

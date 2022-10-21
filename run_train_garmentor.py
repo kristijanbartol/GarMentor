@@ -89,7 +89,7 @@ def run_train(device,
                                               config=pose_shape_cfg).to(device)
 
     # Pytorch3D renderer for synthetic data generation
-    pytorch3d_renderer = SurrealRenderer()
+    pytorch3d_renderer = SurrealRenderer(device=device, batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE)
     
     # Visualizer class to log the training progress.
     vis_logger = VisLogger(visdom=visdom, renderer=pytorch3d_renderer) if visdom is not None else None

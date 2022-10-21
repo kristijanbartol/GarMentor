@@ -102,8 +102,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                 with torch.no_grad():
                     # ------------ RANDOM POSE, SHAPE, BACKGROUND, TEXTURE, CAMERA SAMPLING ------------
                     # Load target pose and random background/texture
-                    target_pose = sample_batch.pose.to(device)  # (bs, 72)
-                    background = sample_batch.background.to(device)  # (bs, 3, img_wh, img_wh)
+                    target_pose = sample_batch['pose'].to(device)  # (bs, 72)
+                    background = sample_batch['background'].to(device)  # (bs, 3, img_wh, img_wh)
 
                     # Convert target_pose from axis angle to rotmats
                     target_pose_rotmats = batch_rodrigues(target_pose.contiguous().view(-1, 3)).view(-1, 24, 3, 3)
@@ -116,15 +116,25 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                                          axes=x_axis,
                                                                          rot_mult_order='post')
 
-                    target_shape = sample_batch.shape.to(device)    # (bs, 10)
+                    target_shape = sample_batch['shape'].to(device)    # (bs, 10)
 
-                    target_style_vector = sample_batch.style_vector.to(device)  # (bs, num_garment_types+1, 10)
+                    target_style_vector = sample_batch['style_vector'].to(device)  # (bs, num_garment_types+1, 10)
 
-                    target_cam_t = sample_batch.cam_t.to(device)    # (bs, 3)
+                    target_cam_t = sample_batch['cam_t'].to(device)    # (bs, 3)
+                    
+                    target_smpl_output = smpl_model(body_pose=target_pose_rotmats,
+                                                    global_orient=target_glob_rotmats.unsqueeze(1),
+                                                    betas=target_shape,
+                                                    pose2rot=False)
 
-                    target_joints = sample_batch.joints.unsqueeze(0).repeat(pose_shape_cfg.TRAIN.BATCH_SIZE, 1, 1).to(device)
+                    target_vertices = target_smpl_output.vertices
+                    target_joints = sample_batch['joints'].to(device)
                     target_joints_h36m = target_joints[:, BASE_JOINTS_TO_H36M_MAP]
                     target_joints_h36mlsp = target_joints_h36m[:, H36M_TO_J14, :]
+                    
+                    target_reposed_vertices = smpl_model(body_pose=torch.zeros_like(target_pose)[:, 3:],
+                                                         global_orient=torch.zeros_like(target_pose)[:, :3],
+                                                         betas=target_shape).vertices
 
                     # ------------ INPUT PROXY REPRESENTATION GENERATION + 2D TARGET JOINTS ------------
                     # Pose targets were flipped such that they are right way up in 3D space - i.e. wrong way up when projected
@@ -144,18 +154,18 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     target_joints2d_visib_coco = check_joints2d_visibility_torch(target_joints2d_coco,
                                                                                  pose_shape_cfg.DATA.PROXY_REP_SIZE)  # (batch_size, 17)
 
-                    seg_maps = sample_batch.seg_maps
+                    seg_maps = sample_batch['seg_maps'].to(device)
+                    rgb_in = sample_batch['rgb_img'].to(device)
                     # Add background rgb
                     # NOTE: The last seg map (-1) is the whole body seg map.
-                    rgb_in = batch_add_rgb_background(backgrounds=background,
-                                                    rgb=rgb_in,
-                                                    seg=seg_maps[-1])
-                    # Apply RGB-based render augmentations + 2D joints augmentations
-                    rgb_in = sample_batch.rgb_img
                     if rgb_in is not None:
+                        rgb_in = batch_add_rgb_background(backgrounds=background,
+                                                        rgb=rgb_in,
+                                                        seg=seg_maps[:, -1])
+                    # Apply RGB-based render augmentations + 2D joints augmentations
                         rgb_in, target_joints2d_coco_input, target_joints2d_visib_coco = augment_rgb(
                             rgb=rgb_in,
-                            joints2D=target_joints2d_coco_input,
+                            joints2D=target_joints2d_coco,
                             joints2D_visib=target_joints2d_visib_coco,
                             rgb_augment_config=pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.RGB
                         )
@@ -195,6 +205,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                        betas=pred_shape_dist.loc,
                                                        pose2rot=False)
 
+                    pred_vertices_mode = pred_smpl_output_mode.vertices
                     pred_joints_mode = pred_smpl_output_mode.joints
                     pred_joints_h36m_mode = pred_joints_mode[:, BASE_JOINTS_TO_H36M_MAP, :]
                     pred_joints_h36mlsp_mode = pred_joints_h36m_mode[:, H36M_TO_J14, :]  # (bs, 14, 3)
@@ -207,6 +218,12 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                         translations=torch.zeros(3, device=device).float())
                     pred_joints2d_coco_mode = orthographic_project_torch(pred_joints_coco_mode,
                                                                          pred_cam_wp)  # (bs, 17, 2)
+                    
+                    with torch.no_grad():
+                        pred_reposed_smpl_output_mean = smpl_model(body_pose=torch.zeros_like(target_pose)[:, 3:],
+                                                                   global_orient=torch.zeros_like(target_pose)[:, :3],
+                                                                   betas=pred_shape_dist.loc)
+                        pred_reposed_vertices_mean = pred_reposed_smpl_output_mean.vertices  # (bs, 6890, 3)
 
                     pred_joints2d_coco_samples = pred_joints2d_coco_mode[:, None, :, :]  # (batch_size, 1, 17, 2)
 
@@ -218,6 +235,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                           'pose_params_S': pred_pose_S,
                                           'pose_params_V': pred_pose_V,
                                           'shape_params': pred_shape_dist,
+                                          'verts': pred_vertices_mode,
                                           #'style_params': pred_style_dist,
                                           'joints3D': pred_joints_h36mlsp_mode,
                                           'joints2D': pred_joints2d_coco_samples,
@@ -225,6 +243,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
 
                     target_dict_for_loss = {'pose_params_rotmats': target_pose_rotmats,
                                             'shape_params': target_shape,
+                                            'verts': target_vertices,
                                             'style_params': target_style_vector,
                                             'joints3D': target_joints_h36mlsp,
                                             'joints2D': target_joints2d_coco,
@@ -254,7 +273,9 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                  loss=loss,
                                                  pred_dict=pred_dict_for_loss,
                                                  target_dict=target_dict_for_loss,
-                                                 batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE)
+                                                 batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
+                                                 pred_reposed_vertices=pred_reposed_vertices_mean,
+                                                 target_reposed_vertices=target_reposed_vertices)
                 
                 #############################################################
                 # ---------------- GENERATE VISUALIZATIONS ------------------

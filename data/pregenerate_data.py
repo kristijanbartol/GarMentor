@@ -288,8 +288,8 @@ class SurrealDataPreGenerator(DataPreGenerator):
                         upper_garment_class=upper_class,
                         lower_garment_class=lower_class
                     )
-                    #num_samples = self.poses.shape[0]
-                    num_samples = 20000
+                    num_samples = self.poses.shape[0]
+                    #num_samples = 20000
                     subset_str = f'{gender}-{upper_class}-{lower_class}'
                     print(f'Generating {num_samples} samples for {subset_str}...')
 

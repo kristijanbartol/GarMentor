@@ -1,54 +1,16 @@
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 import numpy as np
 from tqdm import tqdm
 from dataclasses import dataclass, fields
 import os
 import torch
 import cv2
+from math import floor, ceil
 import imageio
 from torch.utils.data import Dataset
 
 from data.pregenerate_data import SurrealDataPreGenerator, DataPreGenerator
 from utils.garment_classes import GarmentClasses
-
-
-@dataclass
-class Sample:
-
-    '''A dataclass used to conveniently create batch sample.'''
-
-    pose: torch.Tensor                      # (B, 72)
-    shape: torch.Tensor                     # (B, 10)
-    style_vector: torch.Tensor              # (B, 4, 10)
-    cam_t: torch.Tensor                     # (B, 3)
-    joints: torch.Tensor                    # (B, 17, 3)
-    garment_labelss: torch.Tensor           # (B, 4)
-
-    seg_maps: torch.Tensor                      # (B, 4, WH, WH)
-    background: Optional[torch.Tensor] = None   # (B, C, WH, WH)
-    rgb_img: Optional[torch.Tensor] = None      # (B, C, WH, WH)
-    texture: Optional[torch.Tensor] = None      # (B, ?)
-
-    def __getitem__(self, key):
-        return getattr(self, key)
-
-    def get(self, key, default=None):
-        return getattr(self, key, default)
-
-    def __iter__(self):
-        return self.keys()
-
-    def keys(self):
-        keys = [t.name for t in fields(self)]
-        return iter(keys)
-
-    def values(self):
-        values = [getattr(self, t.name) for t in fields(self)]
-        return iter(values)
-
-    def items(self):
-        data = [(t.name, getattr(self, t.name)) for t in fields(self)]
-        return iter(data)
     
     
 class Values:
@@ -151,17 +113,17 @@ class SurrealTrainDataset(TrainDataset):
         
         self.values = self._load_values(
             garment_dirpaths,
-            data_split_slices_list=data_split_slices_list
+            slice_list=data_split_slices_list
         )
-        self.seg_maps = self._load_seg_maps(
+        self.seg_mapss = self._load_seg_maps(
             garment_dirpaths=garment_dirpaths, 
             seg_maps_dir=self.SEG_MAPS_DIRNAME,
-            data_split_slices_list=data_split_slices_list
+            slice_list=data_split_slices_list
         )
         self.rgb_imgs = self._load_rgb_imgs(
             garment_dirpaths=garment_dirpaths,
             rgb_imgs_dir=self.IMG_DIRNAME,
-            data_split_slices_list=data_split_slices_list
+            slice_list=data_split_slices_list
         )
         self.backgrounds_paths = self._load_backgrounds(
             backgrounds_dir_path=backgrounds_dir_path,
@@ -194,9 +156,9 @@ class SurrealTrainDataset(TrainDataset):
             ).item()
             num_samples = values['poses'].shape[0]
             if data_split == TRAIN:
-                _slice = slice(0, num_samples * train_val_ratio)
+                _slice = slice(0, floor(num_samples * train_val_ratio))
             elif data_split == VALID:
-                _slice = slice(num_samples * train_val_ratio, -1)
+                _slice = slice(ceil(num_samples * train_val_ratio), -1)
             else:
                 raise Exception('Data split should be either train or val!')
             slices_per_garment.append(_slice)
@@ -228,8 +190,8 @@ class SurrealTrainDataset(TrainDataset):
                 os.listdir(seg_maps_dir))[slice_list[garment_idx]]
             for f in tqdm(seg_files):
                 seg_maps_path = os.path.join(seg_maps_dir, f)
-                seg_mapss.append(np.load(seg_maps_path, dtype=bool))
-        return np.concatenate(seg_mapss, axis=0)
+                seg_mapss.append(np.load(seg_maps_path)['seg_maps'])
+        return np.stack(seg_mapss, axis=0).astype(bool)
     
     @staticmethod
     def _load_rgb_imgs(garment_dirpaths: List[str],
@@ -243,8 +205,8 @@ class SurrealTrainDataset(TrainDataset):
             rgb_files = sorted(os.listdir(rgb_imgs_dir))[slice_list[garment_idx]]
             for f in tqdm(rgb_files):
                 rgb_img_path = os.path.join(rgb_imgs_dir, f)
-                rgb_imgs.append(imageio.imread(rgb_img_path))
-        return np.concatenate(rgb_imgs, axis=0)
+                rgb_imgs.append(imageio.imread(rgb_img_path).transpose(2, 0, 1))
+        return np.stack(rgb_imgs, axis=0)
     
     @staticmethod
     def _load_backgrounds(backgrounds_dir_path: str, 
@@ -285,7 +247,7 @@ class SurrealTrainDataset(TrainDataset):
         '''To torch Tensor from NumPy, given the type.'''
         return torch.from_numpy(value.astype(type))
 
-    def __getitem__(self, index: Union[torch.Tensor, List]) -> Sample:
+    def __getitem__(self, index: Union[torch.Tensor, List]) -> Dict:
         '''Get the sample based on index, which can be a list of indices.'''
         
         if torch.is_tensor(index):
@@ -295,13 +257,14 @@ class SurrealTrainDataset(TrainDataset):
         else:
             num_samples = 1
 
-        return Sample(
-            pose=self._to_tensor(self.values['poses'][index]),
-            shape=self._to_tensor(self.values['shapes'][index]),
-            style_vector=self._to_tensor(self.values['style_vectors'][index]),
-            cam_t=self._to_tensor(self.values['cam_ts'][index]),
-            joints=self._to_tensor(self.values['jointss'][index]),
-            garment_labels_vector=self._to_tensor(self.values['garment_labelss'][index]),
-            seg_maps=self._to_tensor(self.seg_maps[index], np.bool),
-            background=self._load_background(num_samples)
-        )
+        return {
+            'pose': self._to_tensor(self.values.poses[index]),
+            'shape': self._to_tensor(self.values.shapes[index]),
+            'style_vector': self._to_tensor(self.values.style_vectors[index]),
+            'cam_t': self._to_tensor(self.values.cam_ts[index]),
+            'joints': self._to_tensor(self.values.jointss[index]),
+            'garment_labels': self._to_tensor(self.values.garment_labelss[index]),
+            'seg_maps': self._to_tensor(self.seg_mapss[index], np.bool),
+            'rgb_img': self._to_tensor(self.rgb_imgs[index], np.uint8),
+            'background': self._load_background(num_samples)
+        }
