@@ -107,6 +107,7 @@ class SurrealTrainDataset(TrainDataset):
         
         data_split_slices_list = self._get_slices(
             garment_dirpaths=garment_dirpaths,
+            values_fname=self.VALUES_FNAME,
             data_split=data_split,
             train_val_ratio=train_val_ratio
         )
@@ -145,13 +146,14 @@ class SurrealTrainDataset(TrainDataset):
     
     @staticmethod
     def _get_slices(garment_dirpaths: List[str],
+                    values_fname: str,
                     data_split: str,
                     train_val_ratio: float
                     ) -> List[int]:
         slices_per_garment = []
         for garment_dirpath in garment_dirpaths:
             values = np.load(
-                os.path.join(garment_dirpath, 'values.npy'),
+                os.path.join(garment_dirpath, values_fname),
                 allow_pickle=True
             ).item()
             num_samples = values['poses'].shape[0]
