@@ -8,6 +8,7 @@ if [[ "$USER" == "kristijan" ]]; then
 	TAILORNET_DATA_DIR=${BASE_DATA_DIR}/tailornet
 	HIERPROB3D_DATA_DIR=${BASE_DATA_DIR}/hierprob3d
 	GARMENTOR_DATA_DIR=${BASE_DATA_DIR}/garmentor
+	MGN_DATA_DIR=${BASE_DATA_DIR}/mgn
 elif [[ "$USER" == "dbojanic" ]]; then
 	REPO_DIR=/home/dbojanic/garmentor/
 	BASE_DATA_DIR=/home/dbojanic/data/
@@ -16,6 +17,7 @@ elif [[ "$USER" == "dbojanic" ]]; then
 	TAILORNET_DATA_DIR=${BASE_DATA_DIR}/tailornet/
 	HIERPROB3D_DATA_DIR=${BASE_DATA_DIR}/hierprob3d/
 	GARMENTOR_DATA_DIR=${BASE_DATA_DIR}/garmentor/
+	MGN_DATA_DIR=${BASE_DATA_DIR}/mgn
 	USER="kbartol"
 elif [[ "$USER" == "julien" ]]; then
 	REPO_DIR=/home/julien/git/garmentor
@@ -24,6 +26,7 @@ elif [[ "$USER" == "julien" ]]; then
 	TAILORNET_DATA_DIR=/home/julien/data/TailorNet
 	HIERPROB3D_DATA_DIR=/home/julien/data/HierProb3D
 	GARMENTOR_DATA_DIR=/home/julien/data/garmentor
+	MGN_DATA_DIR=/home/julien/data/mgn
 else
 	REPO_DIR=/path/to/garmentor/repository
 	PW3D_DIR=/path/to/3DPW/dataset
@@ -31,6 +34,7 @@ else
 	TAILORNET_DATA_DIR=/path/to/tailornet/data
 	HIERPROB3D_DATA_DIR=/path/to/hierprob3d/data
 	GARMENTOR_DATA_DIR=/path/to/garmentor/folder
+	MGN_DATA_DIR=/path/to/mgn/folder
 fi
 
 docker run -it \
@@ -45,4 +49,5 @@ docker run -it \
 	-v ${TAILORNET_DATA_DIR}:/data/tailornet/ \
 	-v ${HIERPROB3D_DATA_DIR}:/data/hierprob3d/ \
 	-v ${GARMENTOR_DATA_DIR}:/data/garmentor/ \
+	-v ${MGN_DATA_DIR}:/data/mgn/ \
 	$USER-garmentor

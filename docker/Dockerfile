@@ -96,6 +96,8 @@ RUN apt-get update && apt-get install -y git \
 	libboost-dev \
  	python3-pip \
  	vim \
+	unzip \
+	wget \
  	curl \
      && apt-get clean \
      && rm -rf /var/lib/apt/lists/*
