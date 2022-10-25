@@ -62,12 +62,11 @@ class PreGeneratedValuesArray():
 
     def __init__(self, samples_dict: dict = None):
         if samples_dict is not None:
-            self._samples_dict = {k: list(v) for k, v in samples_dict}
+            self._samples_dict = {k: list(v) for k, v in samples_dict.items()}
             self.keys = samples_dict.keys()
         else:
             self._samples_dict = {}
             self.keys = []
-        self.numpied = False    # to avoid errors if requesting values many times
 
     def _set_dict_keys(self, sample_dict_keys: List[str]) -> None:
         '''Add 's' to key name specify plural.'''
@@ -84,11 +83,10 @@ class PreGeneratedValuesArray():
 
     def get(self) -> dict:
         '''Get the dictionary with all np.ndarray items.'''
-        if not self.numpied:
-            for ks in self.keys:
-                self._samples_dict[ks] = np.array(self._samples_dict[ks])
-        self.numpied = True
-        return self._samples_dict
+        return_dict = {k: None for k, _ in self._samples_dict.items()}
+        for ks in self.keys:
+            return_dict[ks] = np.array(self._samples_dict[ks])
+        return return_dict
 
 
 class DataPreGenerator(object):
@@ -129,7 +127,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
     '''A data pregenerator class specific to SURREAL dataset.'''
 
     DATASET_NAME = 'surreal'
-    CHECKPOINT_COUNT = 1000
+    CHECKPOINT_COUNT = 10
 
     def __init__(self):
         '''Initialize useful arrays, renderer, and load poses.'''
@@ -276,7 +274,8 @@ class SurrealDataPreGenerator(DataPreGenerator):
         print(f'Saved segmentation maps: {seg_path}')
 
         samples_values.append(sample_values)
-        if sample_idx % self.CHECKPOINT_COUNT == 0:
+        if sample_idx % self.CHECKPOINT_COUNT == 0 and sample_idx != 0:
+            print(f'Saving values on checkpoint #{sample_idx}')
             self._save_values(samples_values, dataset_dir)
             
     def _create_values_array(self, dataset_dir: str
@@ -288,6 +287,9 @@ class SurrealDataPreGenerator(DataPreGenerator):
             samples_values = PreGeneratedValuesArray(
                 samples_dict=samples_dict
             )
+        else:
+            samples_values = PreGeneratedValuesArray()
+            num_generated = 0
         return samples_values, num_generated
     
     def _log_class(self, 
