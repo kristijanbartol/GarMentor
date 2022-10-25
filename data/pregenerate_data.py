@@ -5,6 +5,7 @@ import torch
 import os
 from PIL import Image
 import sys
+import argparse
 
 _module_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(_module_dir))
@@ -59,10 +60,13 @@ class PreGeneratedValuesArray():
 
     '''A class used to keep track of an array of pregenerated sampled values.'''
 
-    def __init__(self):
-        self._samples_dict = {}
-        self.keys = []
-        self.numpied = False    # to avoid errors if requesting values many times
+    def __init__(self, samples_dict: dict = None):
+        if samples_dict is not None:
+            self._samples_dict = {k: list(v) for k, v in samples_dict.items()}
+            self.keys = samples_dict.keys()
+        else:
+            self._samples_dict = {}
+            self.keys = []
 
     def _set_dict_keys(self, sample_dict_keys: List[str]) -> None:
         '''Add 's' to key name specify plural.'''
@@ -79,11 +83,10 @@ class PreGeneratedValuesArray():
 
     def get(self) -> dict:
         '''Get the dictionary with all np.ndarray items.'''
-        if not self.numpied:
-            for ks in self.keys:
-                self._samples_dict[ks] = np.array(self._samples_dict[ks])
-        self.numpied = True
-        return self._samples_dict
+        return_dict = {k: None for k, _ in self._samples_dict.items()}
+        for ks in self.keys:
+            return_dict[ks] = np.array(self._samples_dict[ks])
+        return return_dict
 
 
 class DataPreGenerator(object):
@@ -124,6 +127,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
     '''A data pregenerator class specific to SURREAL dataset.'''
 
     DATASET_NAME = 'surreal'
+    CHECKPOINT_COUNT = 10
 
     def __init__(self):
         '''Initialize useful arrays, renderer, and load poses.'''
@@ -136,6 +140,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
             batch_size=1
         )
         self.poses = self._load_poses()
+        self.num_poses = self.poses.shape[0]
 
     def _load_poses(self) -> np.ndarray:
         '''Load poses. Adapted from the original HierProb3D code.'''
@@ -174,7 +179,8 @@ class SurrealDataPreGenerator(DataPreGenerator):
                         ) -> Tuple[np.ndarray, np.ndarray, PreGeneratedSampleValues]:
         '''Generate a single training sample.'''
 
-        pose: np.ndarray = self.poses[idx]
+        # NOTE: We can generate more samples than poses, just start from beginning.
+        pose: np.ndarray = self.poses[idx % self.num_poses]
 
         shape: np.ndarray = normal_sample_shape_numpy(
             mean_params=self.mean_shape,
@@ -229,6 +235,15 @@ class SurrealDataPreGenerator(DataPreGenerator):
         if not os.path.exists(seg_dir):
             os.makedirs(seg_dir)
 
+    def _save_values(self, 
+                     samples_values: PreGeneratedValuesArray, 
+                     dataset_dir: str) -> None:
+        '''Save all sample values as a dictionary of numpy arrays.'''
+
+        values_path = os.path.join(dataset_dir, self.VALUES_FNAME)
+        np.save(values_path, samples_values.get())
+        print(f'Saved samples values to {values_path}!')
+
     def _save_sample(self, 
                      dataset_dir: str, 
                      sample_idx: int, 
@@ -259,57 +274,99 @@ class SurrealDataPreGenerator(DataPreGenerator):
         print(f'Saved segmentation maps: {seg_path}')
 
         samples_values.append(sample_values)
+        if sample_idx % self.CHECKPOINT_COUNT == 0 and sample_idx != 0:
+            print(f'Saving values on checkpoint #{sample_idx}')
+            self._save_values(samples_values, dataset_dir)
+            
+    def _create_values_array(self, dataset_dir: str
+                             ) -> Tuple[PreGeneratedValuesArray, int]:
+        values_fpath = os.path.join(dataset_dir, self.VALUES_FNAME)
+        if os.path.exists(values_fpath):
+            samples_dict = np.load(values_fpath, allow_pickle=True).item()
+            num_generated = samples_dict['poses'].shape[0]
+            samples_values = PreGeneratedValuesArray(
+                samples_dict=samples_dict
+            )
+        else:
+            samples_values = PreGeneratedValuesArray()
+            num_generated = 0
+        return samples_values, num_generated
+    
+    def _log_class(self, 
+                   gender: str, 
+                   upper_class: str, 
+                   lower_class: str, 
+                   num_samples_per_class: int,
+                   num_generated: int):
+        total_num_samples = self.num_poses \
+            if num_samples_per_class is None else num_samples_per_class
+        subset_str = f'{gender}-{upper_class}-{lower_class}'
+        num_samples_to_generate = total_num_samples - num_generated
+        print(f'Generating {total_num_samples}-{num_generated}='
+              f'{num_samples_to_generate} samples for {subset_str}...')
+        return total_num_samples
 
-    def _save_values(self, 
-                     samples_values: PreGeneratedValuesArray, 
-                     dataset_dir: str) -> None:
-        '''Save all sample values as a dictionary of numpy arrays.'''
-
-        values_path = os.path.join(dataset_dir, self.VALUES_FNAME)
-        np.save(values_path, samples_values.get())
-        print(f'Saved samples values to {values_path}!')
-
-    def generate(self) -> None:
+    def generate(self, 
+                 gender: str,
+                 upper_class: str,
+                 lower_class: str,
+                 num_samples_per_class: int) -> None:
         '''(Pre-)generate the whole dataset.'''
 
-        for gender in ['male', 'female']:
-            for upper_class in GarmentClasses.UPPER_GARMENT_CLASSES:
-                for lower_class in GarmentClasses.LOWER_GARMENT_CLASSES:
-                    garment_classes = GarmentClasses(upper_class, lower_class)
-                    parametric_model = ParametricModel(
-                        gender=gender, 
-                        garment_classes=garment_classes
-                    )
-                    samples_values = PreGeneratedValuesArray()
+        garment_classes = GarmentClasses(upper_class, lower_class)
+        parametric_model = ParametricModel(
+            gender=gender, 
+            garment_classes=garment_classes
+        )
+        dataset_dir = self.dataset_path_template.format(
+            dataset_name=self.DATASET_NAME,
+            gender=gender,
+            upper_garment_class=upper_class,
+            lower_garment_class=lower_class
+        )  
+        samples_values, num_generated = self._create_values_array(
+            dataset_dir=dataset_dir
+        )
+        total_num_samples = self._log_class(
+            gender=gender, 
+            upper_class=upper_class, 
+            lower_class=lower_class,
+            num_samples_per_class=num_samples_per_class,
+            num_generated=num_generated
+        )
 
-                    dataset_dir = self.dataset_path_template.format(
-                        dataset_name=self.DATASET_NAME,
-                        gender=gender,
-                        upper_garment_class=upper_class,
-                        lower_garment_class=lower_class
-                    )
-                    #num_samples = self.poses.shape[0]
-                    num_samples = 20000
-                    subset_str = f'{gender}-{upper_class}-{lower_class}'
-                    print(f'Generating {num_samples} samples for {subset_str}...')
-
-                    for pose_idx in range(num_samples):
-                        rgb_img, seg_maps, sample_values = self.generate_sample(
-                            idx=pose_idx, 
-                            gender=gender, 
-                            parametric_model=parametric_model)
-                        self._save_sample(
-                            dataset_dir=dataset_dir, 
-                            sample_idx=pose_idx, 
-                            rgb_img=rgb_img, 
-                            seg_maps=seg_maps, 
-                            sample_values=sample_values,
-                            samples_values=samples_values
-                        )
-                    self._save_values(samples_values, dataset_dir)
-                    torch.cuda.empty_cache()
+        for pose_idx in range(num_generated, total_num_samples):
+            rgb_img, seg_maps, sample_values = self.generate_sample(
+                idx=pose_idx, 
+                gender=gender, 
+                parametric_model=parametric_model)
+            self._save_sample(
+                dataset_dir=dataset_dir, 
+                sample_idx=pose_idx, 
+                rgb_img=rgb_img, 
+                seg_maps=seg_maps, 
+                sample_values=sample_values,
+                samples_values=samples_values
+            )
+        torch.cuda.empty_cache()
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--gender', '-G', type=str, choices=['male', 'female'],
+                        help='Gender string.')
+    parser.add_argument('--upper_class', '-U', type=str, choices=['t-shirt', 'shirt'],
+                        help='Upper class string.')
+    parser.add_argument('--lower_class', '-L', type=str, choices=['pant', 'short-pant'],
+                        help='Lower class string.')
+    parser.add_argument('--num_samples', '-N', type=int, default=None,
+                        help='Number of samples to have for the class after the generation is done.')
+    args = parser.parse_args()
+    
     surreal_pregenerator = SurrealDataPreGenerator()
-    surreal_pregenerator.generate()
+    surreal_pregenerator.generate(
+        gender=args.gender,
+        upper_class=args.upper_class,
+        lower_class=args.lower_class,
+        num_samples_per_class=args.num_samples
+    )
