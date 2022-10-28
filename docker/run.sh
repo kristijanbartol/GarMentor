@@ -9,6 +9,7 @@ if [[ "$USER" == "kristijan" ]]; then
 	HIERPROB3D_DATA_DIR=${BASE_DATA_DIR}/hierprob3d
 	GARMENTOR_DATA_DIR=${BASE_DATA_DIR}/garmentor
 	MGN_DATA_DIR=${BASE_DATA_DIR}/mgn
+	AGORA_DATA_DIR=${BASE_DATA_DIR}/agora
 elif [[ "$USER" == "dbojanic" ]]; then
 	REPO_DIR=/home/dbojanic/garmentor/
 	BASE_DATA_DIR=/home/dbojanic/data/
@@ -18,6 +19,7 @@ elif [[ "$USER" == "dbojanic" ]]; then
 	HIERPROB3D_DATA_DIR=${BASE_DATA_DIR}/hierprob3d/
 	GARMENTOR_DATA_DIR=${BASE_DATA_DIR}/garmentor/
 	MGN_DATA_DIR=${BASE_DATA_DIR}/mgn
+	AGORA_DATA_DIR=${BASE_DATA_DIR}/agora
 	USER="kbartol"
 elif [[ "$USER" == "julien" ]]; then
 	REPO_DIR=/home/julien/git/garmentor
@@ -27,6 +29,7 @@ elif [[ "$USER" == "julien" ]]; then
 	HIERPROB3D_DATA_DIR=/home/julien/data/HierProb3D
 	GARMENTOR_DATA_DIR=/home/julien/data/garmentor
 	MGN_DATA_DIR=/home/julien/data/mgn
+	AGORA_DATA_DIR=/home/julien/data/agora
 else
 	REPO_DIR=/path/to/garmentor/repository
 	PW3D_DIR=/path/to/3DPW/dataset
@@ -35,6 +38,7 @@ else
 	HIERPROB3D_DATA_DIR=/path/to/hierprob3d/data
 	GARMENTOR_DATA_DIR=/path/to/garmentor/folder
 	MGN_DATA_DIR=/path/to/mgn/folder
+	AGORA_DATA_DIR=/path/to/agora/folder
 fi
 
 docker run -it \
@@ -50,4 +54,5 @@ docker run -it \
 	-v ${HIERPROB3D_DATA_DIR}:/data/hierprob3d/ \
 	-v ${GARMENTOR_DATA_DIR}:/data/garmentor/ \
 	-v ${MGN_DATA_DIR}:/data/mgn/ \
+	-v ${AGORA_DATA_DIR}:/data/agora/ \
 	$USER-garmentor
