@@ -267,6 +267,15 @@ class PoseMFShapeGaussianLoss(nn.Module):
             shape_nll = torch.mean(shape_nll)
         elif self.loss_config.REDUCTION == 'sum':
             shape_nll = torch.sum(shape_nll)
+            
+        # Style NLL
+        style_nll_per_class = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=4)
+        # NOTE: Only 2/4 (if num_classes=4) NLL losses are non-zero, others are masked.
+        style_nll = target_dict['garment_classes'] * style_nll_per_class                                    # (batch_size, num_classes=4)
+        if self.loss_config.REDUCTION == 'mean':
+            style_nll = torch.mean(style_nll)
+        elif self.loss_config.REDUCTION == 'sum':
+            style_nll = torch.sum(style_nll)
 
         # Joints2D MSE
         target_joints2D = target_dict['joints2D']
@@ -289,6 +298,7 @@ class PoseMFShapeGaussianLoss(nn.Module):
 
         total_loss = pose_nll * self.loss_config.WEIGHTS.POSE \
                      + shape_nll * self.loss_config.WEIGHTS.SHAPE \
+                     + style_nll * self.loss_config.WEIGHTS.STYLE \
                      + joints2D_loss * self.loss_config.WEIGHTS.JOINTS2D \
                      + glob_rotmats_loss * self.loss_config.WEIGHTS.GLOB_ROTMATS \
                      + joints3D_loss * self.loss_config.WEIGHTS.JOINTS3D

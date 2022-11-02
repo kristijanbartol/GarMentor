@@ -112,7 +112,9 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
 
                     target_shape = sample_batch['shape'].to(device)    # (bs, 10)
 
-                    target_style_vector = sample_batch['style_vector'].to(device)  # (bs, num_garment_types+1, 10)
+                    target_style_vector = sample_batch['style_vector'].to(device)   # (bs, num_garment_classes=4, 10)
+                    assert(target_style_vector.shape[1] == 4)
+                    garment_labels = sample_batch['garment_labels'].to(device)      # (bs, num_garment_classes=4)
 
                     target_cam_t = sample_batch['cam_t'].to(device)    # (bs, 3)
                     
@@ -181,7 +183,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     # ---------------------- FORWARD PASS -----------------------
                     #############################################################
                     pred_pose_F, pred_pose_U, pred_pose_S, pred_pose_V, pred_pose_rotmats_mode, \
-                        pred_shape_dist, pred_glob, pred_cam_wp = pose_shape_model(proxy_rep_input)
+                        pred_shape_dist, pred_style_dist, pred_glob, pred_cam_wp = pose_shape_model(proxy_rep_input)
                     # Pose F, U, V and rotmats_mode are (bs, 23, 3, 3) and Pose S is (bs, 23, 3)
 
                     pred_glob_rotmats = rot6d_to_rotmat(pred_glob)  # (bs, 3, 3)
@@ -214,16 +216,17 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                           'pose_params_S': pred_pose_S,
                                           'pose_params_V': pred_pose_V,
                                           'shape_params': pred_shape_dist,
+                                          'style_params': pred_style_dist.loc,
                                           'verts': pred_vertices_mode,
-                                          #'style_params': pred_style_dist,
                                           'joints3D': pred_joints_h36mlsp_mode,
                                           'joints2D': pred_joints2d_coco_samples,
                                           'glob_rotmats': pred_glob_rotmats}
 
                     target_dict_for_loss = {'pose_params_rotmats': target_pose_rotmats,
                                             'shape_params': target_shape,
-                                            'verts': target_vertices,
                                             'style_params': target_style_vector,
+                                            'garment_labels': garment_labels,
+                                            'verts': target_vertices,
                                             'joints3D': target_joints_h36mlsp,
                                             'joints2D': target_joints2d_coco,
                                             'joints2D_vis': target_joints2d_visib_coco,

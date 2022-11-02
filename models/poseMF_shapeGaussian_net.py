@@ -41,6 +41,7 @@ class PoseMFShapeGaussianNet(nn.Module):
 
         # Number of shape, glob and cam parameters + sensible initial estimates for weak-perspective camera and global rotation
         self.num_shape_params = self.config.MODEL.NUM_SMPL_BETAS
+        self.num_style_params = self.config.MODEL.NUM_STYLE_PARAMS
         self.num_glob_params = 6
         init_glob = rotmat_to_rot6d(torch.eye(3)[None, :].float())
 
@@ -66,13 +67,19 @@ class PoseMFShapeGaussianNet(nn.Module):
 
         self.fc1 = nn.Linear(num_image_features, fc1_dim)
 
-        # TODO (kbartol): Add fc_style.
         self.fc_shape = nn.Linear(fc1_dim, self.num_shape_params * 2)  # Means and variances for SMPL betas and/or measurements
+        self.fc_style = nn.Linear(fc1_dim, self.num_style_params * 2)
         self.fc_glob = nn.Linear(fc1_dim, self.num_glob_params)
         self.fc_cam = nn.Linear(fc1_dim, self.num_cam_params)
 
-        self.fc_embed = nn.Linear(num_image_features + self.num_shape_params * 2 + self.num_glob_params + self.num_cam_params,
-                                  self.config.MODEL.EMBED_DIM)
+        self.fc_embed = nn.Linear(
+            num_image_features +        \
+            self.num_shape_params * 2 + \
+            self.num_style_params * 2 + \
+            self.num_glob_params +      \
+            self.num_cam_params,
+            self.config.MODEL.EMBED_DIM
+        )
 
         # FC Pose networks for each joint
         self.fc_pose = nn.ModuleList()
@@ -96,10 +103,16 @@ class PoseMFShapeGaussianNet(nn.Module):
         x = self.activation(self.fc1(input_feats))
 
         # Shape
-        shape_params = self.fc_shape(x)  # (bsize, num_smpl_betas * 2)
+        shape_params = self.fc_shape(x)  # (bsize, num_shape_params * 2)
         shape_mean = shape_params[:, :self.num_shape_params]
         shape_log_std = shape_params[:, self.num_shape_params:]
         shape_dist = Normal(loc=shape_mean, scale=torch.exp(shape_log_std))
+        
+        # Style
+        style_params = self.fc_style(x)  # (bsize, num_style_params * 2)
+        style_mean = style_params[:, :self.num_style_params]
+        style_log_std = style_params[:, self.num_style_params:]
+        style_dist = Normal(loc=style_mean, scale=torch.exp(style_log_std))
 
         # Glob rot and WP Cam
         delta_cam = self.fc_cam(x)
@@ -108,8 +121,13 @@ class PoseMFShapeGaussianNet(nn.Module):
         cam = delta_cam + self.init_cam  # (bsize, 3)
 
         # Input Feats/Shape/Glob/Cam embed
-        # TODO (kbartol): Add style parameters to the embedded representation.
-        embed = self.activation(self.fc_embed(torch.cat([input_feats, shape_params, glob, cam], dim=1)))  # (bsize, embed dim)
+        embed = self.activation(self.fc_embed(torch.cat([
+            input_feats, 
+            shape_params, 
+            style_params, 
+            glob, 
+            cam
+        ], dim=1)))  # (bsize, embed dim)
 
         # Pose
         pose_F = torch.zeros(batch_size, self.num_joints, 3, 3, device=device)  # (bsize, 23, 3, 3)
@@ -161,5 +179,5 @@ class PoseMFShapeGaussianNet(nn.Module):
             pose_S_proper[:, joint, :] = joint_S_proper
             pose_rotmats_mode[:, joint, :, :] = joint_rotmat_mode
 
-        return pose_F, pose_U, pose_S, pose_V, pose_rotmats_mode, shape_dist, glob, cam
+        return pose_F, pose_U, pose_S, pose_V, pose_rotmats_mode, shape_dist, style_dist, glob, cam
 
