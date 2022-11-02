@@ -133,3 +133,12 @@ dmypy.json
 
 # Generated
 experiments/
+data/output/
+data/*.obj
+data/*.mtl
+data/*.jpg
+data/textures/
+
+# Dependencies
+smplx/
+torch-trust-ncg/

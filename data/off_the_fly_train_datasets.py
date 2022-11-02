@@ -116,17 +116,17 @@ class SurrealTrainDataset(TrainDataset):
             garment_dirpaths,
             slice_list=data_split_slices_list
         )
-        self.seg_mapss = self._load_seg_maps(
+        self.seg_maps_paths = self._get_seg_maps_paths(
             garment_dirpaths=garment_dirpaths, 
-            seg_maps_dir=self.SEG_MAPS_DIRNAME,
+            seg_maps_dirname=self.SEG_MAPS_DIRNAME,
             slice_list=data_split_slices_list
         )
-        self.rgb_imgs = self._load_rgb_imgs(
+        self.rgb_img_paths = self._get_rgb_img_paths(
             garment_dirpaths=garment_dirpaths,
-            rgb_imgs_dir=self.IMG_DIRNAME,
+            rgb_imgs_dirname=self.IMG_DIRNAME,
             slice_list=data_split_slices_list
         )
-        self.backgrounds_paths = self._load_backgrounds(
+        self.backgrounds_paths = self._get_background_paths(
             backgrounds_dir_path=backgrounds_dir_path,
             num_backgrounds=10000
         )
@@ -142,6 +142,7 @@ class SurrealTrainDataset(TrainDataset):
                 upper_class=garment_class_pair[0],
                 lower_class=garment_class_pair[1]
             ))
+        print(f'Found dirnames: {garment_dirnames}')
         return garment_class_list, garment_dirnames
     
     @staticmethod
@@ -160,7 +161,7 @@ class SurrealTrainDataset(TrainDataset):
             if data_split == TRAIN:
                 _slice = slice(0, floor(num_samples * train_val_ratio))
             elif data_split == VALID:
-                _slice = slice(ceil(num_samples * train_val_ratio), -1)
+                _slice = slice(ceil(num_samples * train_val_ratio), num_samples)
             else:
                 raise Exception('Data split should be either train or val!')
             slices_per_garment.append(_slice)
@@ -169,49 +170,49 @@ class SurrealTrainDataset(TrainDataset):
     @staticmethod
     def _load_values(garment_dirpaths: List[str],
                      slice_list: List[slice]) -> Values:
-        print('Loading values...')
         values = Values()
         for garment_idx, garment_dirpath in enumerate(garment_dirpaths):
+            print(f'Loading values ({garment_dirpath})...')
             values_fpath = os.path.join(garment_dirpath, 'values.npy')
             values.load(values_fpath, slice_list[garment_idx])
         values.numpy()
         return values
 
     @staticmethod
-    def _load_seg_maps(garment_dirpaths: List[str], 
-                       seg_maps_dir: str,
+    def _get_seg_maps_paths(garment_dirpaths: List[str], 
+                       seg_maps_dirname: str,
                        slice_list: List[slice]
-                       ) -> np.ndarray:
+                       ) -> List[str]:
         '''Load all segmentation maps in proper order.'''
 
-        print('Loading segmaps...')
-        seg_mapss = []
+        seg_maps_paths = []
         for garment_idx, garment_dirpath in enumerate(garment_dirpaths):
-            seg_maps_dir = os.path.join(garment_dirpath, seg_maps_dir)
+            print(f'Loading segmaps paths ({garment_dirpath})...')
+            seg_maps_dir = os.path.join(garment_dirpath, seg_maps_dirname)
             seg_files = sorted(
                 os.listdir(seg_maps_dir))[slice_list[garment_idx]]
             for f in tqdm(seg_files):
                 seg_maps_path = os.path.join(seg_maps_dir, f)
-                seg_mapss.append(np.load(seg_maps_path)['seg_maps'])
-        return np.stack(seg_mapss, axis=0).astype(bool)
+                seg_maps_paths.append(seg_maps_path)
+        return seg_maps_paths
     
     @staticmethod
-    def _load_rgb_imgs(garment_dirpaths: List[str],
-                       rgb_imgs_dir: str,
+    def _get_rgb_img_paths(garment_dirpaths: List[str],
+                       rgb_imgs_dirname: str,
                        slice_list: List[slice]
-                       ) -> np.ndarray:
-        print('Loading RGB images...')
-        rgb_imgs = []
+                       ) -> List[str]:
+        rgb_img_paths = []
         for garment_idx, garment_dirpath in enumerate(garment_dirpaths):
-            rgb_imgs_dir = os.path.join(garment_dirpath, rgb_imgs_dir)
+            print(f'Loading RGB image paths ({garment_dirpath})...')
+            rgb_imgs_dir = os.path.join(garment_dirpath, rgb_imgs_dirname)
             rgb_files = sorted(os.listdir(rgb_imgs_dir))[slice_list[garment_idx]]
             for f in tqdm(rgb_files):
                 rgb_img_path = os.path.join(rgb_imgs_dir, f)
-                rgb_imgs.append(imageio.imread(rgb_img_path).transpose(2, 0, 1))
-        return np.stack(rgb_imgs, axis=0)
+                rgb_img_paths.append(rgb_img_path)
+        return rgb_img_paths
     
     @staticmethod
-    def _load_backgrounds(backgrounds_dir_path: str, 
+    def _get_background_paths(backgrounds_dir_path: str, 
                           num_backgrounds: int = -1) -> List[str]:
         print('Loading background paths...')
         backgrounds_paths = []
@@ -227,7 +228,7 @@ class SurrealTrainDataset(TrainDataset):
 
         return len(self.values)
 
-    def _load_background(self, num_samples: int) -> np.ndarray:
+    def _load_background(self, num_samples: int = 1) -> np.ndarray:
         '''Load random backgrounds. Adapted from the original HierProb3D code.'''
 
         bg_samples = []
@@ -249,24 +250,20 @@ class SurrealTrainDataset(TrainDataset):
         '''To torch Tensor from NumPy, given the type.'''
         return torch.from_numpy(value.astype(type))
 
-    def __getitem__(self, index: Union[torch.Tensor, List]) -> Dict:
+    def __getitem__(self, idx: int) -> Dict:
         '''Get the sample based on index, which can be a list of indices.'''
-        
-        if torch.is_tensor(index):
-            index = index.tolist()
-        if isinstance(index, list):
-            num_samples = len(index)
-        else:
-            num_samples = 1
+            
+        seg_maps = np.load(self.seg_maps_paths[idx])['seg_maps']
+        rgb_img = imageio.imread(self.rgb_img_paths[idx]).transpose(2, 0, 1)
 
         return {
-            'pose': self._to_tensor(self.values.poses[index]),
-            'shape': self._to_tensor(self.values.shapes[index]),
-            'style_vector': self._to_tensor(self.values.style_vectors[index]),
-            'cam_t': self._to_tensor(self.values.cam_ts[index]),
-            'joints': self._to_tensor(self.values.jointss[index]),
-            'garment_labels': self._to_tensor(self.values.garment_labelss[index]),
-            'seg_maps': self._to_tensor(self.seg_mapss[index], np.bool),
-            'rgb_img': self._to_tensor(self.rgb_imgs[index], np.uint8),
-            'background': self._load_background(num_samples)
+            'pose': self._to_tensor(self.values.poses[idx]),
+            'shape': self._to_tensor(self.values.shapes[idx]),
+            'style_vector': self._to_tensor(self.values.style_vectors[idx]),
+            'cam_t': self._to_tensor(self.values.cam_ts[idx]),
+            'joints': self._to_tensor(self.values.jointss[idx]),
+            'garment_labels': self._to_tensor(self.values.garment_labelss[idx]),
+            'seg_maps': self._to_tensor(seg_maps, type=bool),
+            'rgb_img': self._to_tensor(rgb_img, type=np.uint8),
+            'background': self._load_background()
         }

@@ -12,7 +12,7 @@ from metrics.train_loss_and_metrics_tracker import TrainingLossesAndMetricsTrack
 from utils.checkpoint_utils import load_training_info_from_checkpoint
 from utils.cam_utils import perspective_project_torch, orthographic_project_torch
 from utils.rigid_transform_utils import rot6d_to_rotmat, aa_rotate_translate_points_pytorch3d, aa_rotate_rotmats_pytorch3d
-from utils.label_conversions import convert_2Djoints_to_gaussian_heatmaps_torch, \
+from utils.label_conversions import ALL_JOINTS_TO_H36M_MAP, convert_2Djoints_to_gaussian_heatmaps_torch, \
     H36M_TO_J14, BASE_JOINTS_TO_COCO_MAP, BASE_JOINTS_TO_H36M_MAP
 from utils.joints2d_utils import check_joints2d_visibility_torch
 from utils.image_utils import batch_add_rgb_background
@@ -109,12 +109,6 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     target_pose_rotmats = batch_rodrigues(target_pose.contiguous().view(-1, 3)).view(-1, 24, 3, 3)
                     target_glob_rotmats = target_pose_rotmats[:, 0, :, :]
                     target_pose_rotmats = target_pose_rotmats[:, 1:, :, :]
-                    # Flipping pose targets such that they are right way up in 3D space - i.e. wrong way up when projected
-                    # Then pose predictions will also be right way up in 3D space - network doesn't need to learn to flip.
-                    _, target_glob_rotmats = aa_rotate_rotmats_pytorch3d(rotmats=target_glob_rotmats,
-                                                                         angles=np.pi,
-                                                                         axes=x_axis,
-                                                                         rot_mult_order='post')
 
                     target_shape = sample_batch['shape'].to(device)    # (bs, 10)
 
@@ -128,8 +122,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                     pose2rot=False)
 
                     target_vertices = target_smpl_output.vertices
-                    target_joints = sample_batch['joints'].to(device)
-                    target_joints_h36m = target_joints[:, BASE_JOINTS_TO_H36M_MAP]
+                    target_joints_h36m = target_smpl_output.joints[:, ALL_JOINTS_TO_H36M_MAP]
                     target_joints_h36mlsp = target_joints_h36m[:, H36M_TO_J14, :]
                     
                     target_reposed_vertices = smpl_model(body_pose=torch.zeros_like(target_pose)[:, 3:],
@@ -137,14 +130,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                          betas=target_shape).vertices
 
                     # ------------ INPUT PROXY REPRESENTATION GENERATION + 2D TARGET JOINTS ------------
-                    # Pose targets were flipped such that they are right way up in 3D space - i.e. wrong way up when projected
-                    # Need to flip target_vertices_for_rendering 180° about x-axis so they are right way up when projected
-                    # Need to flip target_joints_coco 180° about x-axis so they are right way up when projected
-                    target_joints_coco = aa_rotate_translate_points_pytorch3d(points=target_joints[:, BASE_JOINTS_TO_COCO_MAP],
-                                                                              axes=x_axis,
-                                                                              angles=np.pi,
-                                                                              translations=torch.zeros(3, device=device).float())
-                    target_joints2d_coco = perspective_project_torch(target_joints_coco,
+                    target_joints2d_coco = perspective_project_torch(target_joints_h36m,
                                                                      None,
                                                                      target_cam_t,
                                                                      focal_length=pose_shape_cfg.TRAIN.SYNTH_DATA.FOCAL_LENGTH,
@@ -206,17 +192,10 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                        pose2rot=False)
 
                     pred_vertices_mode = pred_smpl_output_mode.vertices
-                    pred_joints_mode = pred_smpl_output_mode.joints
-                    pred_joints_h36m_mode = pred_joints_mode[:, BASE_JOINTS_TO_H36M_MAP, :]
+                    pred_joints_h36m_mode = pred_smpl_output_mode.joints[:, ALL_JOINTS_TO_H36M_MAP]
                     pred_joints_h36mlsp_mode = pred_joints_h36m_mode[:, H36M_TO_J14, :]  # (bs, 14, 3)
-                    # Pose targets were flipped such that they are right way up in 3D space - i.e. wrong way up when projected
-                    # Need to flip pred_joints_coco 180° about x-axis so they are right way up when projected
-                    pred_joints_coco_mode = aa_rotate_translate_points_pytorch3d(
-                        points=pred_joints_mode[:, BASE_JOINTS_TO_COCO_MAP],
-                        axes=x_axis,
-                        angles=np.pi,
-                        translations=torch.zeros(3, device=device).float())
-                    pred_joints2d_coco_mode = orthographic_project_torch(pred_joints_coco_mode,
+                    
+                    pred_joints2d_coco_mode = orthographic_project_torch(pred_joints_h36m_mode,
                                                                          pred_cam_wp)  # (bs, 17, 2)
                     
                     with torch.no_grad():
