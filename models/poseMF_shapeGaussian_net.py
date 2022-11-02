@@ -7,6 +7,7 @@ from torch import nn as nn
 from torch.distributions import Normal
 
 from models.resnet import resnet18, resnet50
+from utils.garment_classes import GarmentClasses
 
 from utils.rigid_transform_utils import rotmat_to_rot6d
 
@@ -42,6 +43,7 @@ class PoseMFShapeGaussianNet(nn.Module):
         # Number of shape, glob and cam parameters + sensible initial estimates for weak-perspective camera and global rotation
         self.num_shape_params = self.config.MODEL.NUM_SMPL_BETAS
         self.num_style_params = self.config.MODEL.NUM_STYLE_PARAMS
+        self.num_garment_classes = GarmentClasses.NUM_CLASSES
         self.num_glob_params = 6
         init_glob = rotmat_to_rot6d(torch.eye(3)[None, :].float())
 
@@ -67,16 +69,19 @@ class PoseMFShapeGaussianNet(nn.Module):
 
         self.fc1 = nn.Linear(num_image_features, fc1_dim)
 
-        self.fc_shape = nn.Linear(fc1_dim, self.num_shape_params * 2)  # Means and variances for SMPL betas and/or measurements
-        self.fc_style = nn.Linear(fc1_dim, self.num_style_params * 2)
+        self.fc_shape = nn.Linear(fc1_dim, self.num_shape_params * 2) # x2 because of (means, variances)
+        self.fc_style = nn.Linear(
+            fc1_dim, 
+            self.num_style_params * self.num_garment_classes * 2      # x2 for (means, variances)
+        )                                                             # xN for garment classes
         self.fc_glob = nn.Linear(fc1_dim, self.num_glob_params)
         self.fc_cam = nn.Linear(fc1_dim, self.num_cam_params)
 
         self.fc_embed = nn.Linear(
-            num_image_features +        \
-            self.num_shape_params * 2 + \
-            self.num_style_params * 2 + \
-            self.num_glob_params +      \
+            num_image_features +                                   \
+            self.num_shape_params * 2 +                            \
+            self.num_style_params * self.num_garment_classes * 2 + \
+            self.num_glob_params +                                 \
             self.num_cam_params,
             self.config.MODEL.EMBED_DIM
         )
@@ -109,9 +114,11 @@ class PoseMFShapeGaussianNet(nn.Module):
         shape_dist = Normal(loc=shape_mean, scale=torch.exp(shape_log_std))
         
         # Style
-        style_params = self.fc_style(x)  # (bsize, num_style_params * 2)
-        style_mean = style_params[:, :self.num_style_params]
-        style_log_std = style_params[:, self.num_style_params:]
+        style_params = self.fc_style(x)  # (bsize, num_style_params * num_garment_classes * 2)
+        style_params_reshaped = torch.reshape(style_params, (-1, self.num_garment_classes, self.num_style_params, 2))
+        style_mean, style_log_std = style_params_reshaped[:, :, :, 0], style_params_reshaped[:, :, :, 1]
+        #style_mean = style_params[:, :self.num_style_params*self.num_garment_classes]
+        #style_log_std = style_params[:, self.num_style_params*self.num_garment_classes:]
         style_dist = Normal(loc=style_mean, scale=torch.exp(style_log_std))
 
         # Glob rot and WP Cam

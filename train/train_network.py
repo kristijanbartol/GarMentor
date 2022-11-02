@@ -216,7 +216,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                           'pose_params_S': pred_pose_S,
                                           'pose_params_V': pred_pose_V,
                                           'shape_params': pred_shape_dist,
-                                          'style_params': pred_style_dist.loc,
+                                          'style_params': pred_style_dist,
                                           'verts': pred_vertices_mode,
                                           'joints3D': pred_joints_h36mlsp_mode,
                                           'joints2D': pred_joints2d_coco_samples,
@@ -251,6 +251,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                 del pred_dict_for_loss['pose_params_S']
                 del pred_dict_for_loss['pose_params_V']
                 del pred_dict_for_loss['shape_params']
+                del pred_dict_for_loss['style_params']
                 metrics_tracker.update_per_batch(split=split,
                                                  loss=loss,
                                                  pred_dict=pred_dict_for_loss,
