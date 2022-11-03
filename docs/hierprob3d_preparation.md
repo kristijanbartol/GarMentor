@@ -2,7 +2,8 @@
 ## Setup Data for Inference
 1) Create a directory that should contain the data for HierProb3D (from now on referred to as `<hierprob3d_data_root>`)
 2) Extract the downloaded SMPL male, female and neutral model `*.pkl` files to `<hierprob3d_data_root>`
-3) Run
+3) Download the [SMPL-X model](https://smpl-x.is.tue.mpg.de/) and extract the `smplx` folder into `<hierprob3d_data_root>`
+4) Run
     ```bash
     garmentor/setup_scripts/setup_hierprob3d_inference.sh /path/to/garmentor/directory <hierprob3d_data_root>
     ```
@@ -24,6 +25,15 @@ Your `<hierprob3d_data_root>` should now look like this:
 │   ├── SMPL_FEMALE.pkl
 │   ├── SMPL_MALE.pkl
 │   └── SMPL_NEUTRAL.pkl
+└── smplx
+│   ├── SMPLX_FEMALE.npz
+│   ├── SMPLX_FEMALE.pkl
+|   ├── SMPLX_MALE.npz
+|   ├── SMPLX_MALE.pkl
+|   ├── SMPLX_NEUTRAL.npz
+│   ├── SMPLX_NEUTRAL.pkl
+|   ├── smplx_npz.zip
+|   ├── version.txt
 └── UV_Processed.mat
 ```
 ## Setup Data for Training
