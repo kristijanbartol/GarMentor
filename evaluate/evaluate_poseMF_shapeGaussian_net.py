@@ -89,6 +89,8 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
                                                     rot_mult_order='pre')
             target_pose[:, :3] = target_glob_vecs
 
+            # TODO: Here I should add a logic to create ground truth meshes following ClothWild.
+            # NOTE: I can also keep the unclothed ones for additional evaluation.
             if target_gender == 'm':
                 target_smpl_output = smpl_model_male(body_pose=target_pose[:, 3:],
                                                      global_orient=target_pose[:, :3],
@@ -119,6 +121,8 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
             elif pred_glob.shape[-1] == 6:
                 pred_glob_rotmats = rot6d_to_rotmat(pred_glob)  # (1, 3, 3)
 
+            # TODO: Here I should run the parametric model to create clothed meshes and body and merge them.
+            # TODO: Also measure the execution time.
             pred_smpl_output_mode = smpl_model(body_pose=pred_pose_rotmats_mode,
                                                global_orient=pred_glob_rotmats.unsqueeze(1),
                                                betas=pred_shape_dist.loc,
