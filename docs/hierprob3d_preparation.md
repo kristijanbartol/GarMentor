@@ -3,13 +3,14 @@
 1) Create a directory that should contain the data for HierProb3D (from now on referred to as `<hierprob3d_data_root>`)
 2) Extract the downloaded SMPL male, female and neutral model `*.pkl` files to `<hierprob3d_data_root>`
 3) Download the [SMPL-X model](https://smpl-x.is.tue.mpg.de/) and extract the `smplx` folder into `<hierprob3d_data_root>`
-4) Run
+4) Download the SMPL <-> SMPL-X [model correspondences](https://smpl-x.is.tue.mpg.de/) and extract them to `<hierprob3d_data_root>/transfer`
+5) Run
     ```bash
     garmentor/setup_scripts/setup_hierprob3d_inference.sh /path/to/garmentor/directory <hierprob3d_data_root>
     ```
     * This converts chumpy objects in these models to numpy arrays and copies necessary files to your `<hierprob3d_data_root>` directory
-4) Remove the original SMPL model `*.pkl` files from `<hierprob3d_data_root>`
-5) Download pre-trained checkpoints from [here](https://drive.google.com/drive/folders/1WHdbAaPM8-FpnwMuCdVEchskgKab3gel) and extract them to `<hierprob3d_data_root>`
+6) Remove the original SMPL model `*.pkl` files from `<hierprob3d_data_root>`
+7) Download pre-trained checkpoints from [here](https://drive.google.com/drive/folders/1WHdbAaPM8-FpnwMuCdVEchskgKab3gel) and extract them to `<hierprob3d_data_root>`
 
 Your `<hierprob3d_data_root>` should now look like this:
 ```
@@ -25,15 +26,24 @@ Your `<hierprob3d_data_root>` should now look like this:
 │   ├── SMPL_FEMALE.pkl
 │   ├── SMPL_MALE.pkl
 │   └── SMPL_NEUTRAL.pkl
-└── smplx
+├── smplx
 │   ├── SMPLX_FEMALE.npz
 │   ├── SMPLX_FEMALE.pkl
-|   ├── SMPLX_MALE.npz
-|   ├── SMPLX_MALE.pkl
-|   ├── SMPLX_NEUTRAL.npz
+│   ├── SMPLX_MALE.npz
+│   ├── SMPLX_MALE.pkl
+│   ├── SMPLX_NEUTRAL.npz
 │   ├── SMPLX_NEUTRAL.pkl
-|   ├── smplx_npz.zip
-|   ├── version.txt
+│   ├── smplx_npz.zip
+│   └── version.txt
+├── transfer
+│   ├── smpl2smplh_def_transfer.pkl
+│   ├── smpl2smplx_deftrafo_setup.pkl
+│   ├── smplh2smpl_def_transfer.pkl
+│   ├── smplh2smplx_deftrafo_setup.pkl
+│   ├── smplx_mask_ids.npy
+│   ├── smplx_to_smpl.pkl
+│   ├── smplx2smpl_deftrafo_setup.pkl
+│   └── smplx2smplh_deftrafo_setup.pkl
 └── UV_Processed.mat
 ```
 ## Setup Data for Training

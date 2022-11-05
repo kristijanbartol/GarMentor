@@ -3,6 +3,9 @@ import sys
 import pickle
 import random
 import numpy as np
+from typing import Set
+from os import path as osp
+import pandas as pd
 
 from psbody.mesh import Mesh
 
@@ -19,6 +22,8 @@ from data.const import (
     SUBJECT_OBJ_SAVEDIR,
     UV_MAPS_PATH,
     MGN_DATASET,
+    AGORA_DIR,
+    CAM_DIR,
     SCANS_DIR
 )
 
@@ -76,26 +81,62 @@ def texture_meshes(meshes: list, texture_paths: list, garment_tag: list, uv_maps
     return [body_mesh, ug_mesh, lg_mesh]
 
 
+def __infer_subjects_for_scene(cam_file_directory: str, scene_name: str, verbosity: int = 0) -> Set[str]:
+    """For the given scene, returns a list that contains the (relative) paths to all non-kid subjects that appear in this scene.
+    Currently unused.
+    """
+    cam_files = [file for file in os.listdir(cam_file_directory)  if osp.splitext(file)[1] == '.pkl']
+    data = []
+    for cam_file in cam_files:
+        df = pd.read_pickle(cam_file).reset_index()
+        for idx, row in df.iterrows():
+            if scene_name in row.imgPath:
+                data.append(row)
+    if verbosity > 0:
+        print(f"Found {len(data)} images for scene {scene_name}")
+    unique_smplx_subjects = set()
+    for entry in data:
+        unique_smplx_subjects.update([entry.gt_smplx_path[i] for i in range(len(entry.gt_smplx_path)) if not entry.kid[i]])
+    if verbosity > 0:
+        print(f"Found {len(unique_smplx_subjects)} unique subjects for scene {scene_name}")
+    return unique_smplx_subjects
+
+
+def _is_already_processed(output_dir: str, pickle_fpath: str) -> bool:
+    """Checks whether the given pickle file has already been processed by looking for the corresponding output files in the provided folder"""
+    filename = osp.basename(osp.splitext(pickle_fpath)[0])  # e.g. 10004_w_Amaya_0_0
+    # These files must be present if the subject has already been processed
+    required_extensions = ['-body.jpg', '-body.mtl', '-body.obj', '-upper.jpg', '-upper.mtl', '-upper.obj', '-lower.jpg', '-lower.mtl', '-lower.obj']
+    required_files = [filename+extension for extension in required_extensions]  # e.g. 10004_w_Amaya_0_0-body.jpg
+    for file in required_files:
+        if not osp.isfile(osp.join(output_dir, file)):    # e.g. /data/garmentor/agora/subjects/shirt-pant/trainset_3dpeople_adults_bfh/10004_w_Amaya_0_0-body.jpg
+            return False
+    return True
+
 
 if __name__ == '__main__':
+
     cfg = get_cfg_defaults()
 
     mean_style = np.zeros(cfg.MODEL.NUM_STYLE_PARAMS, 
                         dtype=np.float32)
     delta_style_std_vector = np.ones(cfg.MODEL.NUM_STYLE_PARAMS, 
                                     dtype=np.float32) * cfg.TRAIN.SYNTH_DATA.AUGMENT.GARMENTOR.STYLE_STD
-    
+
+    UPPER_GARMENT_TYPE = "t-shirt"
+    LOWER_GARMENT_TYPE = "pant"
+
     parametric_models = {
         'male': ParametricModel(gender='male', 
                                 garment_classes=GarmentClasses(
-                                upper_class='t-shirt',
-                                lower_class='pant')
+                                upper_class=UPPER_GARMENT_TYPE,
+                                lower_class=LOWER_GARMENT_TYPE)
                                 ),
         'female': ParametricModel(gender='female',
-                                  garment_classes=GarmentClasses(
-                                  upper_class='t-shirt',
-                                  lower_class='pant')
-                                 )   
+                                garment_classes=GarmentClasses(
+                                upper_class=UPPER_GARMENT_TYPE,
+                                lower_class=LOWER_GARMENT_TYPE)
+                                )   
     }
     
     texture_dirpaths = [os.path.join(MGN_DATASET, x) for x in os.listdir(MGN_DATASET)]
@@ -103,10 +144,22 @@ if __name__ == '__main__':
     if not os.path.exists(GARMENTOR_DIR):
         os.makedirs(GARMENTOR_DIR)
     
+    
     for scan_dir in [x for x in os.listdir(SCANS_DIR) if 'kids' not in x]:
         scan_dirpath = os.path.join(SCANS_DIR, scan_dir)
-        for pkl_fname in [x for x in os.listdir(scan_dirpath) if x.split('.')[1] == 'pkl']:
-            pkl_fpath = os.path.join(scan_dirpath, pkl_fname)
+        for pkl_fname in [x for x in os.listdir(scan_dirpath) if osp.splitext(x)[1] == '.pkl']:
+            pkl_fpath = os.path.join(scan_dirpath, pkl_fname)   # e.g. /data/agora/smplx_gt/trainset_3dpeople_adults_bfh/10004_w_Amaya_0_0.pkl
+
+            mesh_dir = os.path.join(SUBJECT_OBJ_SAVEDIR, f"{UPPER_GARMENT_TYPE}-{LOWER_GARMENT_TYPE}", scan_dir)
+            os.makedirs(mesh_dir, exist_ok=True)
+            mesh_basename = osp.splitext(pkl_fname)[0]
+            mesh_basepath = os.path.join(mesh_dir, mesh_basename)          
+
+            # Check if this subject (with the current garment combination) is already present in the output directory
+            if _is_already_processed(mesh_dir, pkl_fpath):
+                print(f"Subject {osp.join(scan_dir, mesh_basename)} already processed, skipping...")
+                continue
+
             with open(pkl_fpath, 'rb') as pkl_f:
                 metadata = pickle.load(pkl_f)
                 
@@ -116,9 +169,10 @@ if __name__ == '__main__':
                 
             beta, theta = smplx2smpl(
                 '/data/hierprob3d/',
-                '/garmentor/data/output/',
+                '/data/garmentor/conversion_output/',
                 beta,
                 theta,
+                gender=gender,
                 overwrite_previous_output=True
             )
             
@@ -165,13 +219,7 @@ if __name__ == '__main__':
                 garment_tag=['t-shirt', 'pant'], 
                 uv_maps_pth=UV_MAPS_PATH
             )
-            
-            mesh_basename = pkl_fname.split(".")[0]
-            mesh_dir = os.path.join(SUBJECT_OBJ_SAVEDIR, scan_dir)
-            mesh_basepath = os.path.join(SUBJECT_OBJ_SAVEDIR, scan_dir, mesh_basename)
-            
-            os.makedirs(mesh_dir, exist_ok=True)
-            
+ 
             textured_meshes[0].write_obj(f'{mesh_basepath}-body.obj')
             textured_meshes[1].write_obj(f'{mesh_basepath}-upper.obj')
             textured_meshes[2].write_obj(f'{mesh_basepath}-lower.obj')

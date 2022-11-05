@@ -140,5 +140,4 @@ data/*.jpg
 data/textures/
 
 # Dependencies
-smplx/
 torch-trust-ncg/

@@ -98,6 +98,7 @@ def smpl2smplx(
             smpl_thetas,
             smplx_betas,
             smplx_thetas,
+            gender,
             conversion_results_filename
         )
     return smplx_betas, smplx_thetas
@@ -152,7 +153,7 @@ def smplx2smpl(
     Returns:
         np.ndarray: SMPL body shape parameters (betas) of shape (B, 10)
         np.ndarray: SMPL body pose parameters (thetas) of shape (B, 72)
-    """           
+    """       
     # Parameters for creating the SMPL-X model
     smplx_params = dict(
         model_path=path_models,
@@ -190,6 +191,7 @@ def smplx2smpl(
             smpl_thetas,
             smplx_betas,
             smplx_thetas,
+            gender,
             conversion_results_filename
         )
     return smpl_betas, smpl_thetas
@@ -355,22 +357,27 @@ def load_conversion_results(
         file_path (str): Path to the file that contains the results which
             should be loaded.
     Returns:
-        np.ndarray: SMPL beta parameters of shape (B, 10)
-        np.ndarray: SMPL theta parameters of shape (B, 72)
-        np.ndarray: Corresponding SMPL-X beta parameters of shape (B, 10)
-        np.ndarray: Corresponding SMPL-X theta parameters of shape (B, 165)
+        A dict with keys 'smpl_betas_<gender>', 'smpl_thetas_<gender>', 'smplx_betas_<gender>', and 'smplx_thetas_<gender>' with genders
+            male, female, and neutral. The value to each key is either None or a numpy array of following shapes:
+            smpl_betas and smplx_betas (B, 10), smpl_thetas (B, 72), smplx_thetas (B, 165).
+            Elements in the same row for the same gender correspond to each other.
     """
-    smpl_betas = []
-    smpl_thetas = []
-    smplx_betas = []
-    smplx_thetas = []
     if osp.isfile(file_path):
-        content = np.load(file_path)
-        smpl_betas = content['smpl_betas']
-        smpl_thetas = content['smpl_thetas']
-        smplx_betas = content['smplx_betas']
-        smplx_thetas = content['smplx_thetas']
-    return smpl_betas, smpl_thetas, smplx_betas, smplx_thetas
+        content = np.load(file_path, allow_pickle=True)
+        # We want to always return smplx thetas with 165 values, so we have to extend 
+        for key in ['smplx_thetas_male', 'smplx_thetas_female', 'smplx_thetas_neutral']:
+            if content[key].dtype == 'O' and content[key] == None:
+                continue
+            thetas_shape = content[key].shape
+            if thetas_shape[1] != 165:
+                content[key] = np.append(
+                    content[key],
+                    np.zeros((thetas_shape[0], 165-thetas_shape[1])),
+                    axis=1
+                )
+        return content
+    else:
+        raise ValueError(f"No such file: {file_path}")
 
 
 def split_smplx_full_body_pose(
@@ -412,6 +419,7 @@ def _save_conversion_results(
     smpl_thetas: np.ndarray,
     smplx_betas: np.ndarray,
     smplx_thetas: np.ndarray,
+    gender: str,
     filename: str = "conv_results"
     ) -> None:
     """Writes the given SMPL / SMPL-X parameters into the specified file. If
@@ -424,6 +432,7 @@ def _save_conversion_results(
         smpl_thetas (np.ndarray): SMPL pose parameters of shape (B, 72)
         smplx_betas (np.ndarray): SMPL-X shape parameters of shape (B, 10)
         smplx_thetas (np.ndarray): SMPL-X pose parameters of shape (B, 165)
+        gender (str): Gender of the body model. Supported are male, female, and neutral
         filename (str): Name of the file into which the results should be
             written.
     """
@@ -442,23 +451,72 @@ def _save_conversion_results(
     if len(smplx_thetas.shape) == 3:
         smplx_thetas = _remove_pose_joint_dimension(smplx_thetas)
 
+    # Always store full-length smplx thetas
+    if smplx_thetas.shape[1] != 165:
+        smplx_thetas = np.append(
+            smplx_thetas,
+            np.zeros((smplx_thetas.shape[0], 165-smplx_thetas.shape[1])),
+            axis=1
+        )
+
     os.makedirs(output_dir, exist_ok=True)
     if filename[-4:] != '.npz':
         filename += ".npz"
     file_path = osp.join(output_dir, filename)
 
     if osp.isfile(file_path):
-        content = np.load(file_path)
-        smpl_betas = np.append(content['smpl_betas'], smpl_betas, axis=0)
-        smpl_thetas = np.append(content['smpl_thetas'], smpl_thetas, axis=0)
-        smplx_betas = np.append(content['smplx_betas'], smplx_betas, axis=0)
-        smplx_thetas = np.append(content['smplx_thetas'], smplx_thetas, axis=0)
+        content = np.load(file_path, allow_pickle=True)
+        smpl_betas_male = content['smpl_betas_male']
+        smpl_betas_female = content['smpl_betas_female']
+        smpl_betas_neutral = content['smpl_betas_neutral']
+
+        smpl_thetas_male = content['smpl_thetas_male']
+        smpl_thetas_female = content['smpl_thetas_female']
+        smpl_thetas_neutral = content['smpl_thetas_neutral']
+
+        smplx_betas_male = content['smplx_betas_male']
+        smplx_betas_female = content['smplx_betas_female']
+        smplx_betas_neutral = content['smplx_betas_neutral']
+
+        smplx_thetas_male = content['smplx_thetas_male']
+        smplx_thetas_female = content['smplx_thetas_female']
+        smplx_thetas_neutral = content['smplx_thetas_neutral']
+    else:
+        smpl_betas_male = smpl_betas_female = smpl_betas_neutral = \
+            smpl_thetas_male = smpl_thetas_female = smpl_thetas_neutral = \
+                smplx_betas_male = smplx_betas_female = smplx_betas_neutral = \
+                    smplx_thetas_male = smplx_thetas_female = smplx_thetas_neutral = np.asarray(None)
+
+    if gender == "male":
+        smpl_betas_male = smpl_betas if smpl_betas_male.dtype == 'O' and smpl_betas_male == None else np.append(smpl_betas_male, smpl_betas, axis=0)
+        smpl_thetas_male = smpl_thetas if smpl_thetas_male.dtype == 'O' and smpl_thetas_male == None else np.append(smpl_thetas_male, smpl_thetas, axis=0)
+        smplx_betas_male = smplx_betas if smplx_betas_male.dtype == 'O' and smplx_betas_male == None else np.append(smplx_betas_male, smplx_betas, axis=0)
+        smplx_thetas_male = smplx_thetas if smplx_thetas_male.dtype == 'O' and smplx_thetas_male == None else np.append(smplx_thetas_male, smplx_thetas, axis=0)
+    elif gender == "female":
+        smpl_betas_female = smpl_betas if smpl_betas_female.dtype == 'O' and smpl_betas_female == None else np.append(smpl_betas_female, smpl_betas, axis=0)
+        smpl_thetas_female = smpl_thetas if smpl_thetas_female.dtype == 'O' and smpl_thetas_female == None else np.append(smpl_thetas_female, smpl_thetas, axis=0)
+        smplx_betas_female = smplx_betas if smplx_betas_female.dtype == 'O' and smplx_betas_female == None else np.append(smplx_betas_female, smplx_betas, axis=0)
+        smplx_thetas_female = smplx_thetas if smplx_thetas_female.dtype == 'O' and smplx_thetas_female == None else np.append(smplx_thetas_female, smplx_thetas, axis=0)
+    elif gender == "neutral":
+        smpl_betas_neutral = smpl_betas if smpl_betas_neutral.dtype == 'O' and smpl_betas_neutral == None else np.append(smpl_betas_neutral, smpl_betas, axis=0)
+        smpl_thetas_neutral = smpl_thetas if smpl_thetas_neutral.dtype == 'O' and smpl_thetas_neutral == None else np.append(smpl_thetas_neutral, smpl_thetas, axis=0)
+        smplx_betas_neutral = smplx_betas if smplx_betas_neutral.dtype == 'O' and smplx_betas_neutral == None else np.append(smplx_betas_neutral, smplx_betas, axis=0)
+        smplx_thetas_neutral = smplx_thetas if smplx_thetas_neutral.dtype == 'O' and smplx_thetas_neutral == None else np.append(smplx_thetas_neutral, smplx_thetas, axis=0)
+
     np.savez(
         file_path,
-        smpl_betas=smpl_betas,
-        smpl_thetas=smpl_thetas,
-        smplx_betas=smplx_betas,
-        smplx_thetas=smplx_thetas
+        smpl_betas_male=smpl_betas_male,
+        smpl_betas_female=smpl_betas_female,
+        smpl_betas_neutral=smpl_betas_neutral,
+        smpl_thetas_male=smpl_thetas_male,
+        smpl_thetas_female=smpl_thetas_female,
+        smpl_thetas_neutral=smpl_thetas_neutral,
+        smplx_betas_male=smplx_betas_male,
+        smplx_betas_female=smplx_betas_female,
+        smplx_betas_neutral=smplx_betas_neutral,
+        smplx_thetas_male=smplx_thetas_male,
+        smplx_thetas_female=smplx_thetas_female,
+        smplx_thetas_neutral=smplx_thetas_neutral
     )
     return
 

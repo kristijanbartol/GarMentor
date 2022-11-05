@@ -7,3 +7,6 @@
 [submodule "lsun_for_garmentor"]
 	path = lsun_for_garmentor
 	url = https://github.com/jufi2112/lsun_for_garmentor
+[submodule "smplx"]
+	path = smplx
+	url = https://github.com/vchoutas/smplx
