@@ -23,6 +23,7 @@ def smpl2smplx(
     overwrite_previous_output: bool = False,
     save_conversion_results: bool = True,
     conversion_results_filename: str = 'conv_results.npz',
+    check_already_converted: bool = True,
     explicit_result_file: str = None,
     verbosity: int = 1
 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -53,6 +54,11 @@ def smpl2smplx(
         conversion_results_filename (str, optional): Filename of the file where
             the converted parameters will be saved to. Defaults to
             'conv_results.npz'
+        check_already_converted (bool, optional): Enables a check to see
+            whether the given parameters have already been converted before.
+            If so, they are not converted again. Instead, their previous
+            conversion result is loaded and returned. Checking is done by
+            searching through the conversion results file.
         explicit_result_file (str, optional): When specified, the conversion
             results will be saved into this file instead of the file at the
             default location.
@@ -62,7 +68,43 @@ def smpl2smplx(
         np.ndarray: SMPL-X full-body pose parameters (thetas) of shape
             (B, 165). Use split_smplx_full_body_pose to get the sub-poses for
             different body parts
-    """    
+    """
+    if check_already_converted:
+        previous_results = _check_already_converted(
+            smpl_betas,
+            smpl_thetas,
+            gender,
+            "smpl",
+            "smplx",
+            osp.join(output_dir, conversion_results_filename)
+        )
+        indices_unmatched = [
+            idx for idx, entry in enumerate(previous_results) if entry is None
+        ]
+        if verbosity > 0:
+                print(
+                    f"{smpl_betas.shape[0] - len(indices_unmatched)} / "
+                    f"{smpl_betas.shape[0]} parameter pairs have already been "
+                    "converted."
+                )
+                if len(indices_unmatched) != 0:
+                    print(
+                        f"Converting the remaining {len(indices_unmatched)} "
+                        "SMPL parameters..."
+                    )
+        if len(indices_unmatched) == 0:
+            # all SMPL parameters have corresponding SMPL-X parameters
+            smplx_betas = np.asarray(
+                [entry['betas'] for entry in previous_results]
+            )
+            smplx_thetas = np.asarray(
+                [entry['thetas'] for entry in previous_results]
+            )
+            return smplx_betas, smplx_thetas
+        # we need to convert some SMPL parameters
+        smpl_betas = smpl_betas[indices_unmatched]
+        smpl_thetas = smpl_thetas[indices_unmatched]
+
     # Parameters for creating the SMPL model
     smpl_params = dict(
         model_path=path_models,
@@ -101,6 +143,22 @@ def smpl2smplx(
             gender,
             conversion_results_filename
         )
+    if check_already_converted:
+        # Combine with the already converted parameters we obtained earlier
+        for idx, entry in previous_results:
+            if entry is not None:
+                smplx_betas = np.insert(
+                    smplx_betas,
+                    idx,
+                    entry['betas'],
+                    axis=0
+                )
+                smplx_thetas = np.insert(
+                    smplx_thetas,
+                    idx,
+                    entry['thetas'],
+                    axis=0
+                )
     return smplx_betas, smplx_thetas
 
 
@@ -114,6 +172,7 @@ def smplx2smpl(
     overwrite_previous_output: bool = False,
     save_conversion_results: bool = True,
     conversion_results_filename: str = 'conv_results.npz',
+    check_already_converted: bool = True,
     explicit_result_file: str = None,
     verbosity: int = 1
 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -146,6 +205,11 @@ def smplx2smpl(
         conversion_results_filename (str, optional): Filename of the file where
             the converted parameters will be saved to. Defaults to
             'conv_results.npz'
+        check_already_converted (bool, optional): Enables a check to see
+            whether the given parameters have already been converted before.
+            If so, they are not converted again. Instead, their previous
+            conversion result is loaded and returned. Checking is done by
+            searching through the conversion results file.
         explicit_result_file (str, optional): When specified, the conversion
             results will be saved into this file instead of the file at the
             default location.
@@ -153,7 +217,42 @@ def smplx2smpl(
     Returns:
         np.ndarray: SMPL body shape parameters (betas) of shape (B, 10)
         np.ndarray: SMPL body pose parameters (thetas) of shape (B, 72)
-    """       
+    """
+    if check_already_converted:
+        previous_results = _check_already_converted(
+            smplx_betas,
+            smplx_thetas,
+            gender,
+            "smplx",
+            "smpl",
+            osp.join(output_dir, conversion_results_filename)
+        )
+        indices_unmatched = [
+            idx for idx, entry in enumerate(previous_results) if entry is None
+        ]
+        if verbosity > 0:
+                print(
+                    f"{smplx_betas.shape[0] - len(indices_unmatched)} / "
+                    f"{smplx_betas.shape[0]} parameter pairs have already been"
+                    " converted."
+                )
+                if len(indices_unmatched) != 0:
+                    print(
+                        f"Converting the remaining {len(indices_unmatched)} "
+                        "SMPL-X parameters..."
+                    )
+        if len(indices_unmatched) == 0:
+            # all SMPL-X parameters have corresponding SMPL parameters
+            smpl_betas = np.asarray(
+                [entry['betas'] for entry in previous_results]
+            )
+            smpl_thetas = np.asarray(
+                [entry['thetas'] for entry in previous_results]
+            )
+            return smpl_betas, smpl_thetas
+        # we need to convert some SMPL-X parameters
+        smplx_betas = smplx_betas[indices_unmatched]
+        smplx_thetas = smplx_thetas[indices_unmatched]
     # Parameters for creating the SMPL-X model
     smplx_params = dict(
         model_path=path_models,
@@ -194,6 +293,22 @@ def smplx2smpl(
             gender,
             conversion_results_filename
         )
+    if check_already_converted:
+        # Combine with the already converted parameters we obtained earlier
+        for idx, entry in previous_results:
+            if entry is not None:
+                smpl_betas = np.insert(
+                    smpl_betas,
+                    idx,
+                    entry['betas'],
+                    axis=0
+                )
+                smpl_thetas = np.insert(
+                    smpl_thetas,
+                    idx,
+                    entry['thetas'],
+                    axis=0
+                )
     return smpl_betas, smpl_thetas
 
 
@@ -346,12 +461,90 @@ def _perform_conversion(
 
     output_betas = np.asarray(output_betas)
     output_thetas = np.asarray(output_thetas)
-    return output_betas, output_thetas        
+    return output_betas, output_thetas
+
+
+def _check_already_converted(
+    betas: np.ndarray,
+    thetas: np.ndarray,
+    gender: str,
+    provided_parameter_type: str,
+    result_parameter_type: str,
+    file_path: str
+    ):
+    """Checks whether the provided parameters are present in the provided
+    conversion results file. If so, their counterparts are returned. Otherwise,
+    None is returned.
+    Args:
+        betas (np.ndarray): Beta parameters of shape (B, 10)
+        thetas (np.ndarray): Theta parameters of shape (B, 72) for SMPL pose
+            parameters and (B, 165) for SMPL-X pose parameters.
+        gender (str): Gender of the bodies. Can be "male", "female" or
+            "neutral".
+        provided_parameter_type (str): Type of the provided parameters, e.g.
+            smpl for SMPL parameters and smplx for SMPL-X parameters.
+        result_parameter_type (str): Type of parameters for which a conversion
+            result should be searched.
+        file_path (str): Path to the conversion result file where the
+            parameters should be searched in
+    Returns:
+        A list that, for each element in B, contains one of the following:
+            None: If the parameters are not present in the conversion result
+                file
+            dict: If the parameters are present in the conversion result file,
+                the key "betas" will contain the converted beta parameters and
+                the key "thetas" will contain the converted theta parameters
+        If the provided conversion result file could not be opened, a list with
+            all None values is returned.
+    """
+    error_return_value = [None for _ in range(betas.shape[0])]
+    content = load_conversion_results(file_path)
+    if content is None:
+        return error_return_value
+    for key in [
+        f"{provided_parameter_type}_betas_{gender}",
+        f"{provided_parameter_type}_thetas_{gender}",
+        f"{result_parameter_type}_betas_{gender}",
+        f"{result_parameter_type}_betas_{gender}"
+    ]:
+        if not key in content.keys():
+            return error_return_value
+        if content[key].dtype == 'O' and content[key] == None:
+            return error_return_value
+
+    results = []
+    for idx in range(betas.shape[0]):
+        from_key_betas = f"{provided_parameter_type}_betas_{gender}"
+        from_key_thetas = f"{provided_parameter_type}_thetas_{gender}"
+        to_key_betas = f"{result_parameter_type}_betas_{gender}"
+        to_key_thetas = f"{result_parameter_type}_thetas_{gender}"
+        conversion_result_betas = None
+        conversion_result_thetas = None
+
+        search_results = np.where(
+            (content[from_key_betas] == betas[idx]).all(axis=1)
+        )
+        # Index of all converted beta parameters that match the provided beta
+        # parameter
+        matching_beta_indices = search_results[0].tolist()
+        for beta_index in matching_beta_indices:
+            if (content[from_key_thetas][beta_index] == thetas[idx]).all():
+                conversion_result_betas = content[to_key_betas][beta_index]
+                conversion_result_thetas = content[to_key_thetas][beta_index]
+                break
+        if conversion_result_betas is None:
+            results.append(None)
+        else:
+            results.append(dict(
+                betas=conversion_result_betas,
+                thetas=conversion_result_thetas
+            ))
+    return results
 
 
 def load_conversion_results(
     file_path: str
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    ) -> dict:
     """Loads the results of previously done conversions.
     Args:
         file_path (str): Path to the file that contains the results which
@@ -362,6 +555,8 @@ def load_conversion_results(
             smpl_betas and smplx_betas (B, 10), smpl_thetas (B, 72), smplx_thetas (B, 165).
             Elements in the same row for the same gender correspond to each other.
     """
+    if file_path[-4:] != '.npz':
+        file_path += '.npz'
     if osp.isfile(file_path):
         content = np.load(file_path, allow_pickle=True)
         # We want to always return smplx thetas with 165 values, so we have to extend 
@@ -377,7 +572,7 @@ def load_conversion_results(
                 )
         return content
     else:
-        raise ValueError(f"No such file: {file_path}")
+        return None
 
 
 def split_smplx_full_body_pose(
