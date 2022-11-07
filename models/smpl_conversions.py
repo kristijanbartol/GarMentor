@@ -2,7 +2,7 @@ import sys
 import smplx
 import torch
 import numpy as np
-from typing import Union, Tuple
+from typing import Union, Tuple, List
 from tqdm import tqdm
 import os
 from os import path as osp
@@ -58,7 +58,7 @@ def smpl2smplx(
             whether the given parameters have already been converted before.
             If so, they are not converted again. Instead, their previous
             conversion result is loaded and returned. Checking is done by
-            searching through the conversion results file.
+            searching through the conversion results file. Defaults to True.
         explicit_result_file (str, optional): When specified, the conversion
             results will be saved into this file instead of the file at the
             default location.
@@ -145,7 +145,7 @@ def smpl2smplx(
         )
     if check_already_converted:
         # Combine with the already converted parameters we obtained earlier
-        for idx, entry in previous_results:
+        for idx, entry in enumerate(previous_results):
             if entry is not None:
                 smplx_betas = np.insert(
                     smplx_betas,
@@ -209,7 +209,7 @@ def smplx2smpl(
             whether the given parameters have already been converted before.
             If so, they are not converted again. Instead, their previous
             conversion result is loaded and returned. Checking is done by
-            searching through the conversion results file.
+            searching through the conversion results file. Defaults to True.
         explicit_result_file (str, optional): When specified, the conversion
             results will be saved into this file instead of the file at the
             default location.
@@ -218,6 +218,12 @@ def smplx2smpl(
         np.ndarray: SMPL body shape parameters (betas) of shape (B, 10)
         np.ndarray: SMPL body pose parameters (thetas) of shape (B, 72)
     """
+    if smplx_thetas.shape[1] != 165:
+        smplx_thetas = np.append(
+            smplx_thetas,
+            np.zeros((smplx_thetas.shape[0], 165 - smplx_thetas.shape[1])),
+            axis=1
+        )
     if check_already_converted:
         previous_results = _check_already_converted(
             smplx_betas,
@@ -295,7 +301,7 @@ def smplx2smpl(
         )
     if check_already_converted:
         # Combine with the already converted parameters we obtained earlier
-        for idx, entry in previous_results:
+        for idx, entry in enumerate(previous_results):
             if entry is not None:
                 smpl_betas = np.insert(
                     smpl_betas,
@@ -471,7 +477,7 @@ def _check_already_converted(
     provided_parameter_type: str,
     result_parameter_type: str,
     file_path: str
-    ):
+    ) -> List[Union[dict, None]]:
     """Checks whether the provided parameters are present in the provided
     conversion results file. If so, their counterparts are returned. Otherwise,
     None is returned.

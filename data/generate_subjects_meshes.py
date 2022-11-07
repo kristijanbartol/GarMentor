@@ -144,7 +144,7 @@ if __name__ == '__main__':
     if not os.path.exists(GARMENTOR_DIR):
         os.makedirs(GARMENTOR_DIR)
     
-    
+    invalid_subjects = []
     for scan_dir in [x for x in os.listdir(SCANS_DIR) if 'kids' not in x]:
         scan_dirpath = os.path.join(SCANS_DIR, scan_dir)
         for pkl_fname in [x for x in os.listdir(scan_dirpath) if osp.splitext(x)[1] == '.pkl']:
@@ -162,10 +162,16 @@ if __name__ == '__main__':
 
             with open(pkl_fpath, 'rb') as pkl_f:
                 metadata = pickle.load(pkl_f)
-                
-                theta = np.concatenate([metadata['global_orient'], metadata['body_pose']], axis=1)
-                beta = metadata['betas']
-                gender = metadata['gender']
+                try:
+                    theta = np.concatenate([metadata['global_orient'], metadata['body_pose']], axis=1)
+                    beta = metadata['betas']
+                    gender = metadata['gender']
+                except KeyError as e:
+                    print(
+                        f"Subject {osp.join(scan_dir, mesh_basename)} is missing a required attribute "
+                        f"({e}), skipping...")
+                    invalid_subjects.append(osp.join(scan_dir, mesh_basename))
+                    continue
                 
             beta, theta = smplx2smpl(
                 '/data/hierprob3d/',
@@ -219,7 +225,23 @@ if __name__ == '__main__':
                 garment_tag=['t-shirt', 'pant'], 
                 uv_maps_pth=UV_MAPS_PATH
             )
- 
+
             textured_meshes[0].write_obj(f'{mesh_basepath}-body.obj')
             textured_meshes[1].write_obj(f'{mesh_basepath}-upper.obj')
             textured_meshes[2].write_obj(f'{mesh_basepath}-lower.obj')
+
+    if len(invalid_subjects) > 0:
+        print(
+            "The following subjects were invalid and could not be processed, they "
+            "have been excluded from the dataset:")
+        with open(
+            os.path.join(
+                SUBJECT_OBJ_SAVEDIR,
+                f"{UPPER_GARMENT_TYPE}-{LOWER_GARMENT_TYPE}",
+                "invalid_subjects.txt"
+            ),
+            "w"
+        ) as file:
+            for sub in invalid_subjects:
+                print(sub)
+                file.write(f"{sub}\n")
