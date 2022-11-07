@@ -209,7 +209,8 @@ if __name__ == '__main__':
                 f=smpl_output_dict['lower'].garment_faces
             )
             
-            random_texture_dirpath = texture_dirpaths[random.randint(0, len(texture_dirpaths) - 1)]
+            random_texture_dirpath = \
+                texture_dirpaths[random.randint(0, len(texture_dirpaths) - 1)]
             
             textured_meshes = texture_meshes(
                 meshes=[
@@ -230,10 +231,34 @@ if __name__ == '__main__':
             textured_meshes[1].write_obj(f'{mesh_basepath}-upper.obj')
             textured_meshes[2].write_obj(f'{mesh_basepath}-lower.obj')
 
+            # modify obj files to support material in blender
+            # by default, psbody mesh's write_obj() function does not utilize
+            # the `usemtl` keyword, which results in blender not showing the
+            # material
+            for mesh_type in ["body", "upper", "lower"]:
+                obj_fpath = f"{mesh_basepath}-{mesh_type}.obj"
+                content = ""
+                with open(obj_fpath, "r") as obj_file:
+                    first_face = True
+                    usemtl_encountered = False
+                    for line in obj_file:
+                        if not usemtl_encountered and \
+                            line.strip().split(' ')[0] == 'usemtl':
+                            usemtl_encountered = True
+                        if first_face and line.strip().split(' ')[0] == 'f':
+                            first_face = False
+                            if not usemtl_encountered:
+                                content += \
+                                    f"usemtl {mesh_basename}-{mesh_type}\n"
+                                usemtl_encountered = True
+                        content += line
+                with open(obj_fpath, "w") as obj_file:
+                    obj_file.write(content)
+
     if len(invalid_subjects) > 0:
         print(
-            "The following subjects were invalid and could not be processed, they "
-            "have been excluded from the dataset:")
+            "The following subjects were invalid and could not be processed, "
+            "they have been excluded from the dataset:")
         with open(
             os.path.join(
                 SUBJECT_OBJ_SAVEDIR,
