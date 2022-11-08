@@ -3,7 +3,7 @@ import sys
 import pickle
 import random
 import numpy as np
-from typing import Set
+from typing import Set, List
 from os import path as osp
 import pandas as pd
 
@@ -103,15 +103,62 @@ def __infer_subjects_for_scene(cam_file_directory: str, scene_name: str, verbosi
 
 
 def _is_already_processed(output_dir: str, pickle_fpath: str) -> bool:
-    """Checks whether the given pickle file has already been processed by looking for the corresponding output files in the provided folder"""
+    """Checks whether the given pickle file has already been processed by 
+    looking for the corresponding output files in the provided folder
+    """
     filename = osp.basename(osp.splitext(pickle_fpath)[0])  # e.g. 10004_w_Amaya_0_0
     # These files must be present if the subject has already been processed
-    required_extensions = ['-body.jpg', '-body.mtl', '-body.obj', '-upper.jpg', '-upper.mtl', '-upper.obj', '-lower.jpg', '-lower.mtl', '-lower.obj']
+    required_extensions = [
+        '-body.jpg', '-body.mtl', '-body.obj',
+        '-upper.jpg', '-upper.mtl', '-upper.obj',
+        '-lower.jpg', '-lower.mtl', '-lower.obj'
+    ]
     required_files = [filename+extension for extension in required_extensions]  # e.g. 10004_w_Amaya_0_0-body.jpg
     for file in required_files:
         if not osp.isfile(osp.join(output_dir, file)):    # e.g. /data/garmentor/agora/subjects/shirt-pant/trainset_3dpeople_adults_bfh/10004_w_Amaya_0_0-body.jpg
             return False
     return True
+
+
+def _save_style_parameters(
+    style_upper: np.ndarray,
+    style_lower: np.ndarray,
+    output_dir: str,
+    #dir_hierarchy: List[str],
+    base_dir: str,
+    subject_fname: str
+    ) -> None:
+    """Saves the garment style parameters to a file where they can be retrieved
+    from later on. Currently hardcoded to work with 4 parameters (first 2 for
+    upper and last 2 for lower body garments)
+    Args:
+        style_upper (np.ndarray): Style parameters for the upper garment
+        style_lower (np.ndarray): Style parameters for the lower garment
+        output_dir (str): The directory where the style parameter file should
+            be saved to
+        dir_hierarchy (List[str]): Each element represents one directory in the
+            hierarchy that the subject, for which the style parameters are
+            saved, is contained in. The first entry represents the root of this
+            hierarchy. Example: ['trainset_3dpeople_adults_bfh'] will read as
+            'trainset_3dpeople_adults_bfh/subject.obj' hierarchy.
+        base_dir (str): Directory where the subject resides in. Currently only
+            supports exactly one directory.
+
+    """
+    pkl_fpath = osp.join(output_dir, 'style_parameters.pkl')
+    if osp.isfile(pkl_fpath):
+        with open(pkl_fpath, 'rb') as pkl_file:
+            param_file = pickle.load(pkl_file)
+    else:
+        param_file = {}
+    if not base_dir in param_file.keys():
+        param_file[base_dir] = {}
+    param_file[base_dir][subject_fname] = {
+        'upper': style_upper,
+        'lower': style_lower
+    }
+    with open(pkl_fpath, 'wb') as pkl_file:
+        pickle.dump(param_file, pkl_file)
 
 
 if __name__ == '__main__':
@@ -189,6 +236,23 @@ if __name__ == '__main__':
                 num_garment_classes=GarmentClasses.NUM_CLASSES,
                 mean_params=mean_style,
                 std_vector=delta_style_std_vector)
+
+            # decode style parameter for saving
+            style_upper = \
+                style_vector[parametric_models[gender].labels['upper']]
+            style_lower = \
+                style_vector[parametric_models[gender].labels['lower']]
+
+            _save_style_parameters(
+                style_upper,
+                style_lower,
+                osp.join(
+                    SUBJECT_OBJ_SAVEDIR,
+                    f"{UPPER_GARMENT_TYPE}-{LOWER_GARMENT_TYPE}"
+                ),
+                scan_dir,
+                mesh_basename
+            )
 
             smpl_output_dict = parametric_models[gender].run(
                 pose=theta,
