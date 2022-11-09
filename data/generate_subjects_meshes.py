@@ -170,8 +170,8 @@ if __name__ == '__main__':
     delta_style_std_vector = np.ones(cfg.MODEL.NUM_STYLE_PARAMS, 
                                     dtype=np.float32) * cfg.TRAIN.SYNTH_DATA.AUGMENT.GARMENTOR.STYLE_STD
 
-    UPPER_GARMENT_TYPE = "t-shirt"
-    LOWER_GARMENT_TYPE = "pant"
+    UPPER_GARMENT_TYPE = "shirt"
+    LOWER_GARMENT_TYPE = "short-pant"
 
     parametric_models = {
         'male': ParametricModel(gender='male', 
@@ -287,7 +287,7 @@ if __name__ == '__main__':
                     f'{random_texture_dirpath}/multi_tex.jpg',
                     f'{random_texture_dirpath}/multi_tex.jpg'
                 ], 
-                garment_tag=['t-shirt', 'pant'], 
+                garment_tag=[UPPER_GARMENT_TYPE, LOWER_GARMENT_TYPE],
                 uv_maps_pth=UV_MAPS_PATH
             )
 
