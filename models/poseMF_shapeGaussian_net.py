@@ -45,7 +45,7 @@ class PoseMFShapeGaussianNet(nn.Module):
         # Number of shape, glob and cam parameters + sensible initial estimates for weak-perspective camera and global rotation
         self.num_shape_params = self.config.MODEL.NUM_SMPL_BETAS
         self.num_style_params = self.config.MODEL.NUM_STYLE_PARAMS
-        self.num_garment_classes = GarmentClasses.NUM_CLASSES
+        self.num_garment_classes = self.config.MODEL.NUM_GARMENT_CLASSES
         self.num_glob_params = 6
         init_glob = rotmat_to_rot6d(torch.eye(3)[None, :].float())
 
