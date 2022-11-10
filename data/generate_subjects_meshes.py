@@ -6,6 +6,7 @@ import numpy as np
 from typing import Set, List
 from os import path as osp
 import pandas as pd
+from tqdm import tqdm
 
 from psbody.mesh import Mesh
 
@@ -157,8 +158,10 @@ def _save_style_parameters(
         'upper': style_upper,
         'lower': style_lower
     }
-    with open(pkl_fpath, 'wb') as pkl_file:
+    pkl_fpath_buffer = osp.splitext(pkl_fpath)[0] + "_buffer.pkl"
+    with open(pkl_fpath_buffer, 'wb') as pkl_file:
         pickle.dump(param_file, pkl_file)
+    os.replace(pkl_fpath_buffer, pkl_fpath)
 
 
 if __name__ == '__main__':
@@ -167,11 +170,14 @@ if __name__ == '__main__':
 
     mean_style = np.zeros(cfg.MODEL.NUM_STYLE_PARAMS, 
                         dtype=np.float32)
-    delta_style_std_vector = np.ones(cfg.MODEL.NUM_STYLE_PARAMS, 
-                                    dtype=np.float32) * cfg.TRAIN.SYNTH_DATA.AUGMENT.GARMENTOR.STYLE_STD
+    delta_style_std_vector = np.ones(
+        cfg.MODEL.NUM_STYLE_PARAMS,
+        dtype=np.float32
+    ) * cfg.TRAIN.SYNTH_DATA.AUGMENT.GARMENTOR.STYLE_STD
 
-    UPPER_GARMENT_TYPE = "shirt"
+    UPPER_GARMENT_TYPE = "t-shirt"
     LOWER_GARMENT_TYPE = "short-pant"
+    SUBJECT_GARMENT_SUBDIR = f"{UPPER_GARMENT_TYPE}_{LOWER_GARMENT_TYPE}"
 
     parametric_models = {
         'male': ParametricModel(gender='male', 
@@ -186,7 +192,9 @@ if __name__ == '__main__':
                                 )   
     }
     
-    texture_dirpaths = [os.path.join(MGN_DATASET, x) for x in os.listdir(MGN_DATASET)]
+    texture_dirpaths = [
+        os.path.join(MGN_DATASET, x) for x in os.listdir(MGN_DATASET)
+    ]
     
     if not os.path.exists(GARMENTOR_DIR):
         os.makedirs(GARMENTOR_DIR)
@@ -194,29 +202,44 @@ if __name__ == '__main__':
     invalid_subjects = []
     for scan_dir in [x for x in os.listdir(SCANS_DIR) if 'kids' not in x]:
         scan_dirpath = os.path.join(SCANS_DIR, scan_dir)
-        for pkl_fname in [x for x in os.listdir(scan_dirpath) if osp.splitext(x)[1] == '.pkl']:
+        for pkl_fname in tqdm(
+            [x for x in os.listdir(scan_dirpath) \
+                if osp.splitext(x)[1] == '.pkl'],
+            desc=f"Processing {scan_dir}"
+        ):
             pkl_fpath = os.path.join(scan_dirpath, pkl_fname)   # e.g. /data/agora/smplx_gt/trainset_3dpeople_adults_bfh/10004_w_Amaya_0_0.pkl
 
-            mesh_dir = os.path.join(SUBJECT_OBJ_SAVEDIR, f"{UPPER_GARMENT_TYPE}-{LOWER_GARMENT_TYPE}", scan_dir)
+            mesh_dir = os.path.join(
+                SUBJECT_OBJ_SAVEDIR,
+                SUBJECT_GARMENT_SUBDIR,
+                scan_dir
+            )
             os.makedirs(mesh_dir, exist_ok=True)
             mesh_basename = osp.splitext(pkl_fname)[0]
             mesh_basepath = os.path.join(mesh_dir, mesh_basename)          
 
-            # Check if this subject (with the current garment combination) is already present in the output directory
+            # Check if this subject (with the current garment combination) is
+            # already present in the output directory
             if _is_already_processed(mesh_dir, pkl_fpath):
-                print(f"Subject {osp.join(scan_dir, mesh_basename)} already processed, skipping...")
+                print(
+                    f"Subject {osp.join(scan_dir, mesh_basename)} already "
+                    "processed, skipping..."
+                )
                 continue
 
             with open(pkl_fpath, 'rb') as pkl_f:
                 metadata = pickle.load(pkl_f)
                 try:
-                    theta = np.concatenate([metadata['global_orient'], metadata['body_pose']], axis=1)
+                    theta = np.concatenate(
+                        [metadata['global_orient'],metadata['body_pose']],
+                        axis=1
+                    )
                     beta = metadata['betas']
                     gender = metadata['gender']
                 except KeyError as e:
                     print(
-                        f"Subject {osp.join(scan_dir, mesh_basename)} is missing a required attribute "
-                        f"({e}), skipping...")
+                        f"Subject {osp.join(scan_dir, mesh_basename)} is "
+                        f"missing a required attribute ({e}), skipping...")
                     invalid_subjects.append(osp.join(scan_dir, mesh_basename))
                     continue
                 
@@ -248,7 +271,7 @@ if __name__ == '__main__':
                 style_lower,
                 osp.join(
                     SUBJECT_OBJ_SAVEDIR,
-                    f"{UPPER_GARMENT_TYPE}-{LOWER_GARMENT_TYPE}"
+                    SUBJECT_GARMENT_SUBDIR
                 ),
                 scan_dir,
                 mesh_basename
@@ -291,16 +314,16 @@ if __name__ == '__main__':
                 uv_maps_pth=UV_MAPS_PATH
             )
 
-            textured_meshes[0].write_obj(f'{mesh_basepath}-body.obj')
-            textured_meshes[1].write_obj(f'{mesh_basepath}-upper.obj')
-            textured_meshes[2].write_obj(f'{mesh_basepath}-lower.obj')
+            textured_meshes[0].write_obj(f'{mesh_basepath}-body_buffer.obj')
+            textured_meshes[1].write_obj(f'{mesh_basepath}-upper_buffer.obj')
+            textured_meshes[2].write_obj(f'{mesh_basepath}-lower_buffer.obj')
 
             # modify obj files to support material in blender
             # by default, psbody mesh's write_obj() function does not utilize
             # the `usemtl` keyword, which results in blender not showing the
             # material
             for mesh_type in ["body", "upper", "lower"]:
-                obj_fpath = f"{mesh_basepath}-{mesh_type}.obj"
+                obj_fpath = f"{mesh_basepath}-{mesh_type}_buffer.obj"
                 content = ""
                 with open(obj_fpath, "r") as obj_file:
                     first_face = True
@@ -318,6 +341,10 @@ if __name__ == '__main__':
                         content += line
                 with open(obj_fpath, "w") as obj_file:
                     obj_file.write(content)
+                os.replace(
+                    f"{mesh_basepath}-{mesh_type}_buffer.obj",
+                    f"{mesh_basepath}-{mesh_type}.obj"
+                )
 
     if len(invalid_subjects) > 0:
         print(
@@ -326,7 +353,7 @@ if __name__ == '__main__':
         with open(
             os.path.join(
                 SUBJECT_OBJ_SAVEDIR,
-                f"{UPPER_GARMENT_TYPE}-{LOWER_GARMENT_TYPE}",
+                SUBJECT_GARMENT_SUBDIR,
                 "invalid_subjects.txt"
             ),
             "w"

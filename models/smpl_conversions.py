@@ -661,9 +661,15 @@ def _save_conversion_results(
         )
 
     os.makedirs(output_dir, exist_ok=True)
-    if filename[-4:] != '.npz':
+    # buffer filename to make file writing atomic
+    # this keeps the last valid file available if the program should get
+    # interrupted during the file write operation
+    if osp.splitext(filename)[1] != '.npz':
         filename += ".npz"
+
+    buffer_filename = osp.splitext(filename)[0] + '_buffer.npz'
     file_path = osp.join(output_dir, filename)
+    file_path_buffer = osp.join(output_dir, buffer_filename)
 
     if osp.isfile(file_path):
         content = np.load(file_path, allow_pickle=True)
@@ -705,7 +711,7 @@ def _save_conversion_results(
         smplx_thetas_neutral = smplx_thetas if smplx_thetas_neutral.dtype == 'O' and smplx_thetas_neutral == None else np.append(smplx_thetas_neutral, smplx_thetas, axis=0)
 
     np.savez(
-        file_path,
+        file_path_buffer,
         smpl_betas_male=smpl_betas_male,
         smpl_betas_female=smpl_betas_female,
         smpl_betas_neutral=smpl_betas_neutral,
@@ -719,6 +725,7 @@ def _save_conversion_results(
         smplx_thetas_female=smplx_thetas_female,
         smplx_thetas_neutral=smplx_thetas_neutral
     )
+    os.replace(file_path_buffer, file_path)
     return
 
 
