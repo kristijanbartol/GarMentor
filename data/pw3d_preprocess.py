@@ -5,6 +5,9 @@ import torch
 import pickle
 import argparse
 
+import sys
+
+sys.path.append('/garmentor/')
 
 from configs import paths
 from utils.cam_utils import perspective_project_torch

@@ -1,7 +1,7 @@
 import numpy as np
 import os
 
-from utils.eval_utils import procrustes_analysis_batch, scale_and_translation_transform_batch
+from utils.eval_utils import calc_chamfer_distance, pa_mpjpe, procrustes_analysis_batch, scale_and_translation_transform_batch
 
 
 class EvalMetricsTracker:
@@ -118,6 +118,46 @@ class EvalMetricsTracker:
                 transformed_points_return_dict['pred_vertices_pa'] = pred_vertices_pa
             if return_per_frame_metrics:
                 per_frame_metrics_return_dict['PVE-PA'] = np.mean(pve_pa_batch, axis=-1)
+
+        # Chamfer distance between clothed vertices
+        if 'Chamfer' in self.metrics_to_track:
+            pred_body_verts = pred_dict['verts'] * 1000.    # (bsize, 6890, 3)
+            pred_vertices_clothed = pred_dict['verts_clothed'] * 1000.  # (bsize, total_num_verts, 3)
+            target_vertices_clothed = target_dict['verts_clothed'] * 1000.  # (bsize, 6890, 3)
+            a, R, t = pa_mpjpe(pred_body_verts, target_vertices_clothed)
+            pred_vertices_clothed = (a * np.matmul(pred_vertices_clothed, R) + t)
+            
+            if len(pred_body_verts.shape) == 3:
+                pred_body_verts = pred_body_verts[0]
+            if len(pred_vertices_clothed.shape) == 3:
+                pred_vertices_clothed = pred_vertices_clothed[0]
+            if len(target_vertices_clothed.shape) == 3:
+                target_vertices_clothed = target_vertices_clothed[0]
+                
+            chamfer_dist = calc_chamfer_distance(pred_vertices_clothed, target_vertices_clothed)
+            self.metric_sums['Chamfer'] += chamfer_dist  # scalar
+            if return_per_frame_metrics:
+                per_frame_metrics_return_dict['Chamfer'] = chamfer_dist
+                
+        # Chamfer distance between clothed vertices
+        if 'Chamfer-T' in self.metrics_to_track:
+            pred_reposed_body_verts = pred_dict['reposed_verts'] * 1000.    # (bsize, 6890, 3)
+            pred_reposed_vertices = pred_dict['reposed_verts'] * 1000.  # (bsize, total_num_verts, 3)
+            target_reposed_vertices = target_dict['reposed_verts'] * 1000.  # (bsize, 6890, 3)
+            a, R, t = pa_mpjpe(pred_reposed_body_verts, target_reposed_vertices)
+            pred_reposed_vertices = (a * np.matmul(pred_reposed_vertices, R) + t)
+            
+            if len(pred_reposed_body_verts.shape) == 3:
+                pred_reposed_body_verts = pred_reposed_body_verts[0]
+            if len(pred_reposed_vertices.shape) == 3:
+                pred_reposed_vertices = pred_reposed_vertices[0]
+            if len(target_reposed_vertices.shape) == 3:
+                target_reposed_vertices = target_reposed_vertices[0]
+                
+            chamfer_dist = calc_chamfer_distance(pred_reposed_vertices, target_reposed_vertices)
+            self.metric_sums['Chamfer-T'] += chamfer_dist  # scalar
+            if return_per_frame_metrics:
+                per_frame_metrics_return_dict['Chamfer-T'] = chamfer_dist
 
         # Reposed
         if 'PVE-T' in self.metrics_to_track:

@@ -20,6 +20,7 @@ class PW3DEvalDataset(Dataset):
         self.frame_fnames = data['imgname']
         self.pose = data['pose']
         self.shape = data['shape']
+        self.shape_clothed = data['shape_clothed']
         self.gender = data['gender']
 
         self.keypoints = np.load(os.path.join(pw3d_dir_path, 'hrnet_results_centred.npy'))
@@ -62,16 +63,22 @@ class PW3DEvalDataset(Dataset):
         # ---------------------- Targets ----------------------
         pose = self.pose[index]
         shape = self.shape[index]
+        shape_clothed = self.shape_clothed[index]
         gender = self.gender[index]
 
         image = torch.from_numpy(image).float()
         heatmaps = torch.from_numpy(heatmaps).float()
         pose = torch.from_numpy(pose).float()
         shape = torch.from_numpy(shape).float()
+        shape_clothed = torch.from_numpy(shape_clothed).float()
 
-        return {'image': image,
-                'heatmaps': heatmaps,
-                'pose': pose,
-                'shape': shape,
-                'fname': fname,
-                'gender': gender}
+        return {
+            'image': image,
+            'heatmaps': heatmaps,
+            'keypoints': keypoints,     # NOTE: Not GT keypoints, but detected ones!!!
+            'pose': pose,
+            'shape': shape,
+            'shape_clothed': shape_clothed,
+            'fname': fname,
+            'gender': gender
+        }
