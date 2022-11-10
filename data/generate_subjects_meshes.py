@@ -314,9 +314,21 @@ if __name__ == '__main__':
                 uv_maps_pth=UV_MAPS_PATH
             )
 
-            textured_meshes[0].write_obj(f'{mesh_basepath}-body_buffer.obj')
-            textured_meshes[1].write_obj(f'{mesh_basepath}-upper_buffer.obj')
-            textured_meshes[2].write_obj(f'{mesh_basepath}-lower_buffer.obj')
+            textured_meshes[0].write_obj(f'{mesh_basepath}-body.obj')
+            os.replace(
+                f"{mesh_basepath}-body.obj",
+                f"{mesh_basepath}-body_buffer.obj"
+            )
+            textured_meshes[1].write_obj(f'{mesh_basepath}-upper.obj')
+            os.replace(
+                f"{mesh_basepath}-upper.obj",
+                f"{mesh_basepath}-upper_buffer.obj"
+            )
+            textured_meshes[2].write_obj(f'{mesh_basepath}-lower.obj')
+            os.replace(
+                f"{mesh_basepath}-lower.obj",
+                f"{mesh_basepath}-lower_buffer.obj"
+            )
 
             # modify obj files to support material in blender
             # by default, psbody mesh's write_obj() function does not utilize
