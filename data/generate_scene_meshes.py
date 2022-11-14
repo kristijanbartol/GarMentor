@@ -3,13 +3,15 @@ from os import path as osp
 import argparse
 import numpy as np
 from itertools import compress
-import pickle5
+import pickle
 import sys
 import pandas as pd
 import random
 from typing import Tuple
 from tqdm import tqdm
 from random import randrange
+import time
+import shutil
 
 sys.path.append('/garmentor/')
 
@@ -25,7 +27,7 @@ def _sample_scene_data(
     path_cam_files: str,
     scene_name: str,
     elements_to_sample: int = -1
-    ) -> Tuple[pd.Dataframe, int]:
+    ) -> Tuple[pd.DataFrame, int]:
     """Samples the given amount of scene descriptions from the provided files.
     If more elements are requested than exist, the maximum number of elements
     is returned.
@@ -45,7 +47,7 @@ def _sample_scene_data(
     df_scene = pd.DataFrame()
     for pkl_file in [file for file in os.listdir(path_cam_files) \
         if osp.splitext(file)[1] == '.pkl']:
-        pkl_fpath = osp.join(path_cam_files, 'pkl_file')
+        pkl_fpath = osp.join(path_cam_files, pkl_file)
         df = pd.read_pickle(pkl_fpath)
         # Unify indices among all cam files
         number_elements = len(df.index)
@@ -86,16 +88,139 @@ def _select_garment(garment_combination_occurences: np.ndarray):
         randrange(least_garment_occurences.shape[0])]
 
 
+def _read_subject_style_params(
+    garment_combination: str,
+    subject_base_dir: str,
+    subject_fname: str
+    ) -> dict:
+    """Returns the garment style parameters for the given subject.
+    Args:
+        garment_combinations (str): Garment combinations used for this subject.
+            Has to correspond to the folder name where the subject is located.
+            E.g. garmentor/agora/subjects/<garment_combination>/<base_dir>/
+        subject_base_dir (str): Base directory where the subject is located in.
+            E.g. garmentor/agora/subjects/shirt_pant/<base_dir>/
+        subject_fname (str): Filename of the subject without mesh-specific
+            suffix and file extension (e.g. -body.obj, -upper.obj, -lower.obj).
+    Returns:
+        dict: Key 'upper' contains np.ndarray with the style parameters for the
+            upper body garment type, 'lower' analog for the lower body garment.
+    """
+    style_fpath = osp.join(
+        SUBJECT_OBJ_SAVEDIR, garment_combination, 'style_parameters.pkl'
+    )
+    if not osp.isfile(style_fpath):
+        raise ValueError(f"No valid file: {style_fpath}")
+    style_info = {}
+    with open(style_fpath, 'rb') as style_file:
+        style_info = pickle.load(style_file)
+    if not isinstance(style_info, dict) or len(style_info.keys()) == 0:
+        raise ValueError(f"Invalid garment style file: {style_fpath}")
+    return style_info[subject_base_dir][subject_fname]
+
+
+def _subject_idx_formatting(subject_idx: int) -> str:
+    return f"{subject_idx:.3d}"
+
+
+def _process_mtl_files(
+    subject_idx: int,
+    subject_fname: str,
+    original_obj_location: str
+    ) -> str:
+    mtl_content = "# File automatically created by scene generation script\n"
+    for mesh_type in ['body', 'upper', 'lower']:
+        mtl_content += "\n"
+        with open(
+            osp.join(
+                original_obj_location,
+                f"{subject_fname}-{mesh_type}.mtl"
+            ),
+            'r'
+        ) as mtl_file:
+            for line in mtl_file:
+                to_process = line.split('#')[0]
+                if "newmtl" in to_process:
+                    mtl_content += f"newmtl {mesh_type}\n"
+                elif "map_Ka" in to_process:
+                    mtl_content += f"map_Ka {_subject_idx_formatting(subject_idx)}-{mesh_type}.jpg\n"
+                elif "map_Kd" in to_process:
+                    mtl_content += f"map_Kd {_subject_idx_formatting(subject_idx)}-{mesh_type}.jpg\n"
+                elif "map_Ks" in to_process:
+                    mtl_content += f"map_Ks {_subject_idx_formatting(subject_idx)}-{mesh_type}.jpg\n"
+                else:
+                    mtl_content += line
+    return mtl_content
+
+
+def _process_obj_files(
+    subject_idx: int,
+    subject_fname: str,
+    original_obj_location: str,
+    scene_output_dir: str
+    ) -> None:
+    """As the obj files produced by psbody mesh do not fully support the obj
+    standard, we have to process them to do so. After processing, the obj
+    files, including their assigned textures, can be imported in blender.
+    Args:
+        subject_idx (int): Current index of the subject, will determine the
+            file names.
+        subject_fname (str): Base name of the subject in AGORA, determines
+            which obj files will be used. Suffixes like '-body' and extensions
+            should be omitted.
+        original_obj_location (str): Path to the directory that contains the
+            original obj files.
+        scene_output_dir (str): Path to the directory where the processed obj
+            files should be saved to.
+    """
+    if not osp.isdir(original_obj_location):
+        raise ValueError("The provided source directory does not exist: "
+            f"{original_obj_location}")
+    os.makedirs(scene_output_dir, exist_ok=True)
+
+    for mesh_type in ['body', 'upper', 'lower']:
+        # Copy and rename texture files
+        shutil.copy(
+            osp.join(
+                original_obj_location,
+                f"{subject_fname}-{mesh_type}.jpg"
+            ),
+            osp.join(
+                scene_output_dir,
+                f"{_subject_idx_formatting(subject_idx)}-{mesh_type}.jpg"
+            )
+        )
+    # Modify and merge material files
+    mtl_content = _process_mtl_files(
+        subject_idx,
+        subject_fname,
+        original_obj_location
+    )
+    with open(
+        osp.join(
+            scene_output_dir,
+            f"{_subject_idx_formatting(subject_idx)}.mtl"
+        ),
+        'w'
+    ) as mtl_file:
+        mtl_file.write(mtl_content)
+    # Modify and merge obj files
+
+
+
 def generate_scene_samples(
-    subjects_base_dir: str,
+    cam_info_base_dir: str,
     scene_name: str,
     scenes_to_generate: int = -1
     ):
     df, number_samples = _sample_scene_data(
-        subjects_base_dir,
+        cam_info_base_dir,
         scene_name,
         scenes_to_generate
     )
+    # add columns for garments and style parameters
+    df['garment_combinations'] = None
+    df['garment_styles'] = None
 
     # make sure that each garment combination is represented evenly in the
     # dataset
@@ -106,9 +231,12 @@ def generate_scene_samples(
     num_garment_combinations = len(garment_combinations)
     gar_comb_occurences = np.zeros(num_garment_combinations, np.int32)
 
-    for idx in tqdm(range(number_samples), desc="Generating scenes"):
+    camera_information = {}
+
+    for idx in tqdm(range(number_samples), desc=f"Generating {scene_name} "
+    "scenes"):
         # Generate scene as given by the data
-        scene = df.iloc[idx]
+        scene = df.iloc[idx]    # this returns a copy, don't assign to it !!!
         kids = scene['kid']
         adults = [not kid for kid in kids]
 
@@ -128,25 +256,84 @@ def generate_scene_samples(
         camZ = scene['camZ']
         camYaw = scene['camYaw']
 
+        camera_information[osp.splitext(img_path)[0]] = {
+            'x': camX,
+            'y': camY,
+            'z': camZ,
+            'yaw': camYaw
+        }
+
         output_dirpath = osp.join(
             SCENE_OBJ_SAVEDIR,
             scene_name,
             osp.splitext(img_path)[0]
         )
-
+        os.makedirs(output_dirpath, exist_ok=True)
+        subject_garments = []   # Stores the garments of the respective subjets
+        subject_styles = []     # Stores the garment style parameters of the
+                                # respective subject
         for subject_idx, gt_path_smplx in enumerate(gt_paths_smplx):
             # Select garment combination
-            selected_garment_combination = _select_garment(gar_comb_occurences)
+            garment_combination_index = _select_garment(gar_comb_occurences)
             # this index can be e.g. used into garment_combinations to get the name
+            selected_garments = garment_combinations[garment_combination_index]
+            subject_garments.append({
+                'upper': selected_garments.split('_')[0],
+                'lower': selected_garments.split('_')[1]
+            })
+            # Load garment style vectors
+            subject_styles.append(
+                _read_subject_style_params(
+                    selected_garments,
+                    osp.dirname(osp.relpath(gt_path_smplx, 'smplx_gt')),
+                    osp.splitext(
+                        osp.basename(osp.relpath(gt_path_smplx, 'smplx_gt'))
+                    )[0]
+                )
+            )
 
+            mesh_basepath = osp.join(
+                SUBJECT_OBJ_SAVEDIR,
+                selected_garments,
+                osp.splitext(osp.relpath(gt_path_smplx, 'smplx_gt'))[0]
+            )
+
+            trans = np.array([
+                Xs[subject_idx],
+                Ys[subject_idx],
+                Zs[subject_idx]
+            ])
+
+            for mesh_type in ['body', 'upper', 'lower']:
+                mesh = Mesh(filename=f"{mesh_basepath}-{mesh_type}.obj")
+                mesh.translate_vertices(trans)
+                mesh.write_obj(osp.join(
+                    output_dirpath,
+                    f"{_subject_idx_formatting(subject_idx)}-{mesh_type}.obj"
+                ))
+                # TODO: make sure that obj files utilize usemtl
+                # TODO: merge body, upper, and lower mesh into one obj file
+        # Add garment information to dataframe
+        df.iat[
+            idx,
+            df.columns.get_loc('garment_combinations')
+        ] = subject_garments
+        df.iat[idx, df.columns.get_loc('garment_styles')] = subject_styles
+    # Save dataframe and camera info
+    output_dir = osp.join(SCENE_OBJ_SAVEDIR, scene_name)
+    with open(osp.join(output_dir, 'ground_truth.pkl'), 'wb') as file:
+        df.to_pickle(file)
+    with open(osp.join(output_dir, 'camera_info.pkl'), 'wb') as file:
+        pickle.dump(camera_information, file)
+    return
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--part-idx', '-I', type=int,
-        help='Part index specifying PKL file index for camera information.')
-    parser.add_argument('--scene-idx', '-S', type=int,
-        help='Scene index inside the specified part.')
+    #parser.add_argument('--part-idx', '-I', type=int,
+    #    help='Part index specifying PKL file index for camera information.')
+    #parser.add_argument('--scene-idx', '-S', type=int,
+    #    help='Scene index inside the specified part.')
 
     parser.add_argument('-i', '--input', type=str, help="Path to the directory"
         " that contains the .pkl files with scene informations.")
@@ -160,6 +347,9 @@ if __name__ == '__main__':
         "possible scenes.")
 
     args = parser.parse_args()
+
+    generate_scene_samples(args.input, args.scene_name, args.number_scenes)
+    sys.exit(0)
     
     pkl_fname = f'train_{args.part_idx}.pkl'
     pkl_fpath = os.path.join(TRAIN_CAM_DIR, pkl_fname)

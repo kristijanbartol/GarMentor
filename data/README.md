@@ -9,7 +9,7 @@
    - ii. Create `beta`, `theta`, and apply body rotation (`global_orient`).
    - iii. Convert SMPL-X to SMPL parameters.
    - iv. Randomly sample style.
-   - v. Run parametric model to obtain cloth meshes (currently fixed on using T-shirt+pant, because initializing all TailorNet models is memory-consuming).
+   - v. Run parametric model to obtain cloth meshes (set your garment combination in the `__main__` part of the script).
    - vi. Apply texture.
    - vii. Save meshes (body, upper, lower).
    - You do it only once for all original scan/SMPL-X model. We can later update to generate more subjects (different than AGORA's). The script can be updated so that different clothing class combinations are also genered (shirt, short-pant).
