@@ -7,7 +7,7 @@ import pickle
 import sys
 import pandas as pd
 import random
-from typing import Tuple
+from typing import Tuple, List
 from tqdm import tqdm
 from random import randrange
 import time
@@ -120,7 +120,41 @@ def _read_subject_style_params(
 
 
 def _subject_idx_formatting(subject_idx: int) -> str:
-    return f"{subject_idx:.3d}"
+    return f"{subject_idx:03d}"
+
+
+def _increase_vertex_ids(
+    line_split: List[str],
+    previous_vertices: int,
+    previous_normals: int,
+    previous_textures: int
+    ) -> str:
+    """Based on already added number of vertices, normals, and textures, the
+    current indices have to be increased to ensure uniqueness
+    """
+    line = "f"
+    for idx in range(1, len(line_split)):
+        entry = line_split[idx].strip()
+        if entry == "":
+            continue
+        entry_split = entry.split("/")
+        # Case 1: only vertex id: "f v1 v2 v3"
+        if len(entry_split) == 1:
+            line += f" {int(entry_split[0]) + previous_vertices}"
+        # Case 2: vertex id + texture id: "f v1/vt1 v2/vt2 v3/vt3"
+        elif len(entry_split) == 2:
+            line += f" {int(entry_split[0]) + previous_vertices}/{int(entry_split[1]) + previous_textures}"
+        elif len(entry_split) == 3:
+            # Case 3: vertex id + normal id: "f v1//vn1 v2//vn2 v3//vn3"
+            if entry_split[1] == '':
+                line += f" {int(entry_split[0]) + previous_vertices}//{int(entry_split[2]) + previous_normals}"
+            # Case 4: vertex id + texture id + normal id: "f v1/vt1/vn1 v2/vt2/vn2 v3/vt3/vn3"
+            else:
+                line += f" {int(entry_split[0]) + previous_vertices}/{int(entry_split[1]) + previous_textures}/{int(entry_split[2]) + previous_normals}"
+        else:
+            raise ValueError(f"Could not parse the given face definition {line_split}")
+    line += "\n"
+    return line
 
 
 def _process_mtl_files(
@@ -141,7 +175,7 @@ def _process_mtl_files(
             for line in mtl_file:
                 to_process = line.split('#')[0]
                 if "newmtl" in to_process:
-                    mtl_content += f"newmtl {mesh_type}\n"
+                    mtl_content += f"newmtl {_subject_idx_formatting(subject_idx)}-{mesh_type}\n"
                 elif "map_Ka" in to_process:
                     mtl_content += f"map_Ka {_subject_idx_formatting(subject_idx)}-{mesh_type}.jpg\n"
                 elif "map_Kd" in to_process:
@@ -154,6 +188,70 @@ def _process_mtl_files(
 
 
 def _process_obj_files(
+    subject_idx: int,
+    scene_output_dir: str,
+    mtl_fname: str
+    ) -> str:
+    """Assumes from obj files:
+        - no negative indices
+        - a single object per file (especially no object definition with "o")
+    """
+    obj_content = "# File automatically created by scene generation script\n\n"
+    obj_content += f"mtllib {mtl_fname}" # missing \n is intended
+    previous_vertices = 0
+    previous_normals = 0
+    previous_textures = 0
+    for mesh_type in ['body', 'upper', 'lower']:
+        loop_vertex_counter = 0
+        loop_normal_counter = 0
+        loop_texture_counter = 0
+        encountered_first_face = False
+        obj_content += "\n"
+        obj_fpath = osp.join(
+            scene_output_dir,
+            f"{_subject_idx_formatting(subject_idx)}-{mesh_type}.obj"
+        )
+        with open(obj_fpath, 'r') as obj_file:
+            for line in obj_file:
+                to_process = line.split('#')[0].strip()
+                line_split = to_process.split(' ')
+                # Check whether this line defines a vertex, normal, or texture
+                # and increase the respective counter
+                if line_split[0] == 'v':
+                    loop_vertex_counter += 1
+                elif line_split[0] == 'vn':
+                    loop_normal_counter += 1
+                elif line_split[0] == 'vt':
+                    loop_texture_counter += 1
+                # Remove any previous definition of material files
+                if "mtllib" in to_process:
+                    continue
+                # Remove any previous usemtl statements
+                if "usemtl" in to_process:
+                    continue
+                # Check whether we have to insert usemtl and object
+                # definition statements
+                if not encountered_first_face and line_split[0] == 'f':
+                    obj_content += f"o {_subject_idx_formatting(subject_idx)}-{mesh_type}\n"
+                    obj_content += f"usemtl {_subject_idx_formatting(subject_idx)}-{mesh_type}\n"
+                    encountered_first_face = True
+                # Need to modify vertex, normal, and texture indices if we have
+                # already added other meshes
+                if line_split[0] == 'f':
+                    line = _increase_vertex_ids(
+                        line_split,
+                        previous_vertices,
+                        previous_normals,
+                        previous_textures
+                    )
+                obj_content += line
+        previous_vertices += loop_vertex_counter
+        previous_normals += loop_normal_counter
+        previous_textures += loop_texture_counter
+    return obj_content
+
+
+def _process_mesh_files(
     subject_idx: int,
     subject_fname: str,
     original_obj_location: str,
@@ -205,7 +303,20 @@ def _process_obj_files(
     ) as mtl_file:
         mtl_file.write(mtl_content)
     # Modify and merge obj files
-
+    obj_content = _process_obj_files(
+        subject_idx,
+        scene_output_dir,
+        f"{_subject_idx_formatting(subject_idx)}.mtl"
+    )
+    with open(
+        osp.join(
+            scene_output_dir,
+            f"{_subject_idx_formatting(subject_idx)}.obj"
+        ),
+        'w'
+    ) as obj_file:
+        obj_file.write(obj_content)
+    return
 
 
 def generate_scene_samples(
@@ -311,20 +422,46 @@ def generate_scene_samples(
                     output_dirpath,
                     f"{_subject_idx_formatting(subject_idx)}-{mesh_type}.obj"
                 ))
-                # TODO: make sure that obj files utilize usemtl
-                # TODO: merge body, upper, and lower mesh into one obj file
+            _process_mesh_files(
+                subject_idx,
+                osp.splitext(
+                    osp.basename(osp.relpath(gt_path_smplx, 'smplx_gt'))
+                )[0],
+                osp.join(
+                    SUBJECT_OBJ_SAVEDIR,
+                    selected_garments,
+                    osp.dirname(osp.relpath(gt_path_smplx, 'smplx_gt'))
+                ),
+                output_dirpath
+            )
+            # Delete intermediate obj files
+            for mesh_type in ['body', 'upper', 'lower']:
+                os.remove(
+                    osp.join(
+                        output_dirpath,
+                        f"{_subject_idx_formatting(subject_idx)}-{mesh_type}.obj"
+                    )
+                )
         # Add garment information to dataframe
         df.iat[
             idx,
             df.columns.get_loc('garment_combinations')
         ] = subject_garments
         df.iat[idx, df.columns.get_loc('garment_styles')] = subject_styles
-    # Save dataframe and camera info
-    output_dir = osp.join(SCENE_OBJ_SAVEDIR, scene_name)
-    with open(osp.join(output_dir, 'ground_truth.pkl'), 'wb') as file:
-        df.to_pickle(file)
-    with open(osp.join(output_dir, 'camera_info.pkl'), 'wb') as file:
-        pickle.dump(camera_information, file)
+        # Save dataframe and camera info
+        output_dir = osp.join(SCENE_OBJ_SAVEDIR, scene_name)
+        with open(osp.join(output_dir, 'ground_truth_buffer.pkl'), 'wb') as file:
+            df.to_pickle(file)
+        with open(osp.join(output_dir, 'camera_info_buffer.pkl'), 'wb') as file:
+            pickle.dump(camera_information, file)
+        os.replace(
+            osp.join(output_dir, 'ground_truth_buffer.pkl'),
+            osp.join(output_dir, 'ground_truth.pkl')
+        )
+        os.replace(
+            osp.join(output_dir, 'camera_info_buffer.pkl'),
+            osp.join(output_dir, 'camera_info.pkl')
+        )
     return
 
 
