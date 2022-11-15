@@ -343,6 +343,7 @@ def generate_scene_samples(
     gar_comb_occurences = np.zeros(num_garment_combinations, np.int32)
 
     camera_information = {}
+    invalid_subjects = []
 
     for idx in tqdm(range(number_samples), desc=f"Generating {scene_name} "
     "scenes"):
@@ -415,13 +416,29 @@ def generate_scene_samples(
                 Zs[subject_idx]
             ])
 
-            for mesh_type in ['body', 'upper', 'lower']:
-                mesh = Mesh(filename=f"{mesh_basepath}-{mesh_type}.obj")
-                mesh.translate_vertices(trans)
-                mesh.write_obj(osp.join(
-                    output_dirpath,
-                    f"{_subject_idx_formatting(subject_idx)}-{mesh_type}.obj"
-                ))
+            try:
+                for mesh_type in ['body', 'upper', 'lower']:
+                    mesh = Mesh(filename=f"{mesh_basepath}-{mesh_type}.obj")
+                    mesh.translate_vertices(trans)
+                    mesh.write_obj(osp.join(
+                        output_dirpath,
+                        f"{_subject_idx_formatting(subject_idx)}-{mesh_type}.obj"
+                    ))
+            except Exception as e:
+                # Some error in our generated subject mesh, e.g. nan values
+                # We want to ignore the subject --> delete all files we created
+                # for it and continue with next subject iteration
+                print(f"Subject {mesh_basepath} invalid, skipping...")
+                invalid_subjects.append(f"Subject: {mesh_basepath}")
+                invalid_subjects.append(f"Error: {e}")
+                for element in os.listdir(output_dirpath):
+                    if _subject_idx_formatting(subject_idx) in element:
+                        os.remove(osp.join(output_dirpath, element))
+                # Also set last entries for garment information to None
+                subject_garments[-1] = None
+                subject_styles[-1] = None
+                continue
+
             _process_mesh_files(
                 subject_idx,
                 osp.splitext(
@@ -436,12 +453,17 @@ def generate_scene_samples(
             )
             # Delete intermediate obj files
             for mesh_type in ['body', 'upper', 'lower']:
-                os.remove(
-                    osp.join(
-                        output_dirpath,
-                        f"{_subject_idx_formatting(subject_idx)}-{mesh_type}.obj"
-                    )
+                intermediate_fpath = osp.join(
+                    output_dirpath,
+                    f"{_subject_idx_formatting(subject_idx)}-{mesh_type}.obj"
                 )
+                if osp.isfile(intermediate_fpath):
+                    os.remove(intermediate_fpath)
+        # Update garment information with None elements for kids
+        for element_in_row, adult in enumerate(adults):
+            if not adult:
+                subject_garments.insert(element_in_row, None)
+                subject_styles.insert(element_in_row, None)
         # Add garment information to dataframe
         df.iat[
             idx,
@@ -462,6 +484,9 @@ def generate_scene_samples(
             osp.join(output_dir, 'camera_info_buffer.pkl'),
             osp.join(output_dir, 'camera_info.pkl')
         )
+    with open(osp.join(SCENE_OBJ_SAVEDIR, 'invalid_subjects.txt'), 'w') as file:
+        for entry in invalid_subjects:
+            file.write(f"{entry}\n")
     return
 
 
