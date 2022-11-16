@@ -533,7 +533,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if len(args.number_scenes) == 1:
-        args.numer_scenes = [
+        args.number_scenes = [
             args.number_scenes[0] for _ in range(len(args.scene_names))
         ]
     else:
@@ -543,7 +543,7 @@ if __name__ == '__main__':
 
     for scene_idx in range(len(args.scene_names)):
         generate_scene_samples(
-            TRAIN_CAM_DIR if not args.validation else VAL_CAM_DIR,
+            VAL_CAM_DIR if args.validation else TRAIN_CAM_DIR,
             args.scene_names[scene_idx],
             args.number_scenes[scene_idx]
         )
