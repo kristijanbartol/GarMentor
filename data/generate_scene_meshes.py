@@ -20,7 +20,8 @@ from psbody.mesh import Mesh
 from data.const import (
     SCENE_OBJ_SAVEDIR,
     SUBJECT_OBJ_SAVEDIR,
-    TRAIN_CAM_DIR
+    TRAIN_CAM_DIR,
+    VAL_CAM_DIR
 )
 
 def _sample_scene_data(
@@ -60,6 +61,7 @@ def _sample_scene_data(
         ])
     # df_scene now contains all entries for the given scene
     number_rows = len(df_scene.index)
+    print(f"Found {number_rows} possible configurations for scene {scene_name}")
     elements_to_sample = min(elements_to_sample, number_rows) \
         if elements_to_sample > 0 else number_rows
     sample_indices = random.sample(
@@ -116,7 +118,11 @@ def _read_subject_style_params(
         style_info = pickle.load(style_file)
     if not isinstance(style_info, dict) or len(style_info.keys()) == 0:
         raise ValueError(f"Invalid garment style file: {style_fpath}")
-    return style_info[subject_base_dir][subject_fname]
+    try:
+        style_params = style_info[subject_base_dir][subject_fname]
+    except Exception as e:
+        return e
+    return style_params
 
 
 def _subject_idx_formatting(subject_idx: int) -> str:
@@ -276,8 +282,8 @@ def _process_mesh_files(
             f"{original_obj_location}")
     os.makedirs(scene_output_dir, exist_ok=True)
 
+    # Copy and rename texture files
     for mesh_type in ['body', 'upper', 'lower']:
-        # Copy and rename texture files
         shutil.copy(
             osp.join(
                 original_obj_location,
@@ -329,6 +335,9 @@ def generate_scene_samples(
         scene_name,
         scenes_to_generate
     )
+    if number_samples == 0:
+        print(f"Could not find information for scene {scene_name}, skipping...")
+        return
     # add columns for garments and style parameters
     df['garment_combinations'] = None
     df['garment_styles'] = None
@@ -389,26 +398,34 @@ def generate_scene_samples(
             garment_combination_index = _select_garment(gar_comb_occurences)
             # this index can be e.g. used into garment_combinations to get the name
             selected_garments = garment_combinations[garment_combination_index]
-            subject_garments.append({
-                'upper': selected_garments.split('_')[0],
-                'lower': selected_garments.split('_')[1]
-            })
-            # Load garment style vectors
-            subject_styles.append(
-                _read_subject_style_params(
-                    selected_garments,
-                    osp.dirname(osp.relpath(gt_path_smplx, 'smplx_gt')),
-                    osp.splitext(
-                        osp.basename(osp.relpath(gt_path_smplx, 'smplx_gt'))
-                    )[0]
-                )
-            )
-
             mesh_basepath = osp.join(
                 SUBJECT_OBJ_SAVEDIR,
                 selected_garments,
                 osp.splitext(osp.relpath(gt_path_smplx, 'smplx_gt'))[0]
             )
+            subject_garments.append({
+                'upper': selected_garments.split('_')[0],
+                'lower': selected_garments.split('_')[1]
+            })
+            # Load garment style vectors
+            style_params = _read_subject_style_params(
+                selected_garments,
+                osp.dirname(osp.relpath(gt_path_smplx, 'smplx_gt')),
+                osp.splitext(
+                    osp.basename(osp.relpath(gt_path_smplx, 'smplx_gt'))
+                )[0]
+            )
+            if isinstance(style_params, Exception):
+                # Error, most likely, the referenced subject is invalid
+                # e.g. the case for subject "rp_patrick_posed_003_0_0"
+                print(f"Subject {mesh_basepath} invalid, skipping")
+                invalid_subjects.append(f"Image: {img_path}")
+                invalid_subjects.append(f"Subject: {mesh_basepath}")
+                invalid_subjects.append(f"Error: {style_params}")
+                subject_garments[-1] = None
+                subject_styles.append(None)
+                continue
+            subject_styles.append(style_params)
 
             trans = np.array([
                 Xs[subject_idx],
@@ -429,6 +446,7 @@ def generate_scene_samples(
                 # We want to ignore the subject --> delete all files we created
                 # for it and continue with next subject iteration
                 print(f"Subject {mesh_basepath} invalid, skipping...")
+                invalid_subjects.append(f"Image: {img_path}")
                 invalid_subjects.append(f"Subject: {mesh_basepath}")
                 invalid_subjects.append(f"Error: {e}")
                 for element in os.listdir(output_dirpath):
@@ -484,7 +502,14 @@ def generate_scene_samples(
             osp.join(output_dir, 'camera_info_buffer.pkl'),
             osp.join(output_dir, 'camera_info.pkl')
         )
-    with open(osp.join(SCENE_OBJ_SAVEDIR, 'invalid_subjects.txt'), 'w') as file:
+    with open(
+        osp.join(
+            SCENE_OBJ_SAVEDIR,
+            scene_name,
+            'invalid_subjects.txt'
+        ),
+        'w'
+    ) as file:
         for entry in invalid_subjects:
             file.write(f"{entry}\n")
     return
@@ -492,89 +517,33 @@ def generate_scene_samples(
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    #parser.add_argument('--part-idx', '-I', type=int,
-    #    help='Part index specifying PKL file index for camera information.')
-    #parser.add_argument('--scene-idx', '-S', type=int,
-    #    help='Scene index inside the specified part.')
-
-    parser.add_argument('-i', '--input', type=str, help="Path to the directory"
-        " that contains the .pkl files with scene informations.")
-    parser.add_argument('-s', '--scene-name', type=str,
-        help="Name of the scene for which scenes should be generated. E.g. '"
-        "archivz' or 'brushifygrasslands'. Has to be part of the 'imgPath' "
+    parser.add_argument('-s', '--scene-names', type=str, nargs="+",
+        help="Name of the scenes for which subjects should be generated. E.g. "
+        "'archivz' or 'brushifygrasslands'. Has to be part of the 'imgPath' "
         "attribute inside of the provided cam .pkl files.")
-    parser.add_argument('-n', '--number-scenes', type=int,
+    parser.add_argument('-n', '--number-scenes', type=int, nargs="+",
         help="Maximum number of scenes that should be generated. If less data "
         "is available, fewer scenes are generated. Specify -1 to generate all "
-        "possible scenes.")
+        "possible scenes. If one value is provided, this counts for all scenes"
+        ". If more than one value is provided, each value is used for the "
+        "corresponding scene.")
+    parser.add_argument('--validation', action='store_true', help="Generate "
+        "data from the validation set.")
 
     args = parser.parse_args()
 
-    generate_scene_samples(args.input, args.scene_name, args.number_scenes)
-    sys.exit(0)
-    
-    pkl_fname = f'train_{args.part_idx}.pkl'
-    pkl_fpath = os.path.join(TRAIN_CAM_DIR, pkl_fname)
+    if len(args.number_scenes) == 1:
+        args.numer_scenes = [
+            args.number_scenes[0] for _ in range(len(args.scene_names))
+        ]
+    else:
+        assert len(args.number_scenes) == len(args.scene_names), "number-scene"
+        "s must have length 1 or same length as scene-name: "
+        f"{len(args.number_scenes)} vs {len(args.scene_name)}"
 
-    with open(pkl_fpath, 'rb') as pkl_f:
-        data = pickle5.load(pkl_f)
-        num_scenes = data['X'].shape[0]
-        
-        if args.scene_idx >= num_scenes:
-            print(f'ERROR: The selected part has only {num_scenes} scenes. '
-                  f'Adjust your scene index to be < {num_scenes}.')
-        
-        kids = data['kid'].iloc[args.scene_idx]
-        not_kids = [not kid for kid in kids]
-        
-        # Select only the non-kids.
-        Xs = list(compress(
-            data['X'].iloc[args.scene_idx],
-            not_kids)
+    for scene_idx in range(len(args.scene_names)):
+        generate_scene_samples(
+            TRAIN_CAM_DIR if not args.validation else VAL_CAM_DIR,
+            args.scene_names[scene_idx],
+            args.number_scenes[scene_idx]
         )
-        Ys = list(compress(
-            data['Y'].iloc[args.scene_idx],
-            not_kids)
-        )
-        Zs = list(compress(
-            data['Z'].iloc[args.scene_idx],
-            not_kids)
-        )
-        gt_paths_smplx = list(compress(
-            data['gt_path_smplx'].iloc[args.scene_idx],
-            not_kids)
-        )
-        
-        camX = data['camX'].iloc[args.scene_idx]
-        camY = data['camY'].iloc[args.scene_idx]
-        camZ = data['camZ'].iloc[args.scene_idx]
-        camYaw = data['camYaw'].iloc[args.scene_idx]
-        img_path = data['imgPath'].iloc[args.scene_idx]
-        
-        output_dirpath = os.path.join(
-            SCENE_OBJ_SAVEDIR,
-            img_path.split('.')[0]
-        )
-        
-        for subject_idx, gt_path_smplx in enumerate(gt_paths_smplx):
-            rel_gt_path_smplx = os.path.relpath(gt_path_smplx, 'smplx_gt')
-            rel_gt_path_smplx = rel_gt_path_smplx.split('.')[0]
-            mesh_basepath = os.path.join(SUBJECT_OBJ_SAVEDIR, rel_gt_path_smplx)
-            
-            body_mesh = Mesh(filename=f'{mesh_basepath}-body.obj')
-            upper_mesh = Mesh(filename=f'{mesh_basepath}-upper.obj')
-            lower_mesh = Mesh(filename=f'{mesh_basepath}-lower.obj')
-            
-            trans = np.array([
-                Xs[subject_idx],
-                Ys[subject_idx],
-                Zs[subject_idx]
-            ])
-
-            body_mesh.translate_vertices(trans)
-            upper_mesh.translate_vertices(trans)
-            lower_mesh.translate_vertices(trans)
-            
-            body_mesh.write_obj(output_dirpath, f'{subject_idx:02d}-body.obj')
-            upper_mesh.write_obj(output_dirpath, f'{subject_idx:02d}-upper.obj')
-            lower_mesh.write_obj(output_dirpath, f'{subject_idx:02d}-lower.obj')
