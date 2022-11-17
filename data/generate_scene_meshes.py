@@ -57,6 +57,7 @@ def _sample_scene_data(
         # Only get the rows which contain entries for the specified scene
         df_scene = pd.concat([
             df_scene,
+            #df[df['imgPath'] == "ag_trainset_3dpeople_bfh_archviz_5_10_cam00_00003.png"]
             df[df['imgPath'].str.contains(scene_name)]
         ])
     # df_scene now contains all entries for the given scene
@@ -212,6 +213,7 @@ def _process_obj_files(
         loop_normal_counter = 0
         loop_texture_counter = 0
         encountered_first_face = False
+        encountered_first_vertex = False
         obj_content += "\n"
         obj_fpath = osp.join(
             scene_output_dir,
@@ -223,6 +225,11 @@ def _process_obj_files(
                 line_split = to_process.split(' ')
                 # Check whether this line defines a vertex, normal, or texture
                 # and increase the respective counter
+                if not encountered_first_vertex and line_split[0] == 'v':
+                    if "nan" in to_process:
+                        raise ValueError(f"Ecountered nan in file {obj_fpath}")
+                    else:
+                        encountered_first_vertex = True
                 if line_split[0] == 'v':
                     loop_vertex_counter += 1
                 elif line_split[0] == 'vn':
@@ -351,7 +358,7 @@ def generate_scene_samples(
     num_garment_combinations = len(garment_combinations)
     gar_comb_occurences = np.zeros(num_garment_combinations, np.int32)
 
-    camera_information = {}
+    transformation_info = {}
     invalid_subjects = []
 
     for idx in tqdm(range(number_samples), desc=f"Generating {scene_name} "
@@ -368,6 +375,7 @@ def generate_scene_samples(
         Xs = list(compress(scene['X'], adults))
         Ys = list(compress(scene['Y'], adults))
         Zs = list(compress(scene['Z'], adults))
+        Yaws = list(compress(scene['Yaw'], adults))
 
         gt_paths_smplx = list(compress(scene['gt_path_smplx'], adults))
         img_path = scene['imgPath']
@@ -377,12 +385,15 @@ def generate_scene_samples(
         camZ = scene['camZ']
         camYaw = scene['camYaw']
 
-        camera_information[osp.splitext(img_path)[0]] = {
-            'x': camX,
-            'y': camY,
-            'z': camZ,
-            'yaw': camYaw
+        transformation_info[osp.splitext(img_path)[0]] = {
+            'camera': {'x': camX, 'y': camY, 'z': camZ, 'yaw': camYaw}
         }
+        #camera_information[osp.splitext(img_path)[0]] = {
+        #    'x': camX,
+        #    'y': camY,
+        #    'z': camZ,
+        #    'yaw': camYaw
+        #}
 
         output_dirpath = osp.join(
             SCENE_OBJ_SAVEDIR,
@@ -427,20 +438,36 @@ def generate_scene_samples(
                 continue
             subject_styles.append(style_params)
 
-            trans = np.array([
-                Xs[subject_idx],
-                Ys[subject_idx],
-                Zs[subject_idx]
-            ])
+            # Not relevant here, as translations are given in unreal coordinate
+            # space
+            #trans = np.array([
+            #    Xs[subject_idx],
+            #    Ys[subject_idx],
+            #    Zs[subject_idx]
+            #]) / 100.0 # translations are given in cm, while blender uses m
 
-            try:
-                for mesh_type in ['body', 'upper', 'lower']:
-                    mesh = Mesh(filename=f"{mesh_basepath}-{mesh_type}.obj")
-                    mesh.translate_vertices(trans)
-                    mesh.write_obj(osp.join(
+            for mesh_type in ['body', 'upper', 'lower']:
+                shutil.copy(
+                    f"{mesh_basepath}-{mesh_type}.obj",
+                    osp.join(
                         output_dirpath,
-                        f"{_subject_idx_formatting(subject_idx)}-{mesh_type}.obj"
-                    ))
+                        f"{_subject_idx_formatting(subject_idx)}-"
+                        f"{mesh_type}.obj"
+                    )
+                )
+            try:
+                _process_mesh_files(
+                    subject_idx,
+                    osp.splitext(
+                        osp.basename(osp.relpath(gt_path_smplx, 'smplx_gt'))
+                    )[0],
+                    osp.join(
+                        SUBJECT_OBJ_SAVEDIR,
+                        selected_garments,
+                        osp.dirname(osp.relpath(gt_path_smplx, 'smplx_gt'))
+                    ),
+                    output_dirpath
+                )
             except Exception as e:
                 # Some error in our generated subject mesh, e.g. nan values
                 # We want to ignore the subject --> delete all files we created
@@ -457,18 +484,15 @@ def generate_scene_samples(
                 subject_styles[-1] = None
                 continue
 
-            _process_mesh_files(
-                subject_idx,
-                osp.splitext(
-                    osp.basename(osp.relpath(gt_path_smplx, 'smplx_gt'))
-                )[0],
-                osp.join(
-                    SUBJECT_OBJ_SAVEDIR,
-                    selected_garments,
-                    osp.dirname(osp.relpath(gt_path_smplx, 'smplx_gt'))
-                ),
-                output_dirpath
-            )
+            transformation_info[osp.splitext(img_path)[0]][
+                _subject_idx_formatting(subject_idx)
+            ] = {
+                'x': Xs[subject_idx],
+                'y': Ys[subject_idx],
+                'z': Zs[subject_idx],
+                'yaw': Yaws[subject_idx]
+            }
+
             # Delete intermediate obj files
             for mesh_type in ['body', 'upper', 'lower']:
                 intermediate_fpath = osp.join(
@@ -492,15 +516,15 @@ def generate_scene_samples(
         output_dir = osp.join(SCENE_OBJ_SAVEDIR, scene_name)
         with open(osp.join(output_dir, 'ground_truth_buffer.pkl'), 'wb') as file:
             df.to_pickle(file)
-        with open(osp.join(output_dir, 'camera_info_buffer.pkl'), 'wb') as file:
-            pickle.dump(camera_information, file)
+        with open(osp.join(output_dir, 'transformation_info_buffer.pkl'), 'wb') as file:
+            pickle.dump(transformation_info, file, 4)   # protocol 4 important for compatibility with Unreal Engine
         os.replace(
             osp.join(output_dir, 'ground_truth_buffer.pkl'),
             osp.join(output_dir, 'ground_truth.pkl')
         )
         os.replace(
-            osp.join(output_dir, 'camera_info_buffer.pkl'),
-            osp.join(output_dir, 'camera_info.pkl')
+            osp.join(output_dir, 'transformation_info_buffer.pkl'),
+            osp.join(output_dir, 'transformation_info.pkl')
         )
     with open(
         osp.join(
