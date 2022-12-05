@@ -5,6 +5,9 @@ import torch
 import pickle
 import argparse
 
+import sys
+
+sys.path.append('/garmentor/')
 
 from configs import paths
 from utils.cam_utils import perspective_project_torch
@@ -107,7 +110,7 @@ def pw3d_eval_extract(dataset_path, out_path, crop_wh=512):
 
     # imgnames_, scales_, centers_, parts_ = [], [], [], []
     cropped_frame_fnames_, whs_, centers_, = [], [], []
-    poses_, shapes_, genders_ = [], [], []
+    poses_, shapes_, shapes_clothed_, genders_ = [], [], [], []
 
     sequence_files = sorted([os.path.join(dataset_path, 'sequenceFiles', 'test', f)
                              for f in os.listdir(os.path.join(dataset_path, 'sequenceFiles', 'test'))
@@ -119,6 +122,7 @@ def pw3d_eval_extract(dataset_path, out_path, crop_wh=512):
             data = pickle.load(f, encoding='latin1')
         smpl_poses = data['poses']  # list of (num frames, 72) pose params for each person
         smpl_betas = data['betas']  # list of (10,) or (300,) shape params for each person
+        smpl_betas_clothed = data['betas_clothed']
         poses2d = data['poses2d']  # list of (num frames, 3, 18) 2d kps for each person
         cam_extrinsics = data['cam_poses']  # array of (num frames, 4, 4) cam extrinsics
         cam_K = data['cam_intrinsics']  # array of (3, 3) cam intrinsics.
@@ -130,6 +134,7 @@ def pw3d_eval_extract(dataset_path, out_path, crop_wh=512):
         seq_name = str(data['sequence'])
         print('smpl poses', len(smpl_poses), smpl_poses[0].shape,
               'smpl betas', len(smpl_betas), smpl_betas[0].shape,
+              'smpl betas clothed', len(smpl_betas_clothed), smpl_betas_clothed[0].shape,
               'poses2d', len(poses2d), poses2d[0].shape,
               'global poses', cam_extrinsics.shape,
               'cam_K', cam_K.shape,
@@ -143,6 +148,7 @@ def pw3d_eval_extract(dataset_path, out_path, crop_wh=512):
             # Get valid frames flags, shape and gender
             valid_frames = valid[person_num].astype(np.bool)
             shape = smpl_betas[person_num][:10]
+            shape_clothed = smpl_betas_clothed[person_num][:10] 
             torch_shape = torch.from_numpy(shape[None, :]).float().to(device)
             gender = genders[person_num]
 
@@ -203,6 +209,7 @@ def pw3d_eval_extract(dataset_path, out_path, crop_wh=512):
                     whs_.append(wh)
                     poses_.append(pose)
                     shapes_.append(shape)
+                    shapes_clothed_.append(shape_clothed)
                     genders_.append(gender)
                     # print(cropped_image_fname, shape.shape, pose.shape, center, wh, gender)
 
@@ -213,6 +220,7 @@ def pw3d_eval_extract(dataset_path, out_path, crop_wh=512):
              wh=whs_,
              pose=poses_,
              shape=shapes_,
+             shape_clothed=shapes_clothed_,
              gender=genders_)
 
 

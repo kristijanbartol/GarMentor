@@ -7,6 +7,7 @@ from random import randint
 
 from pytorch3d.structures import Meshes
 from pytorch3d.renderer import (
+    FoVOrthographicCameras,
     PerspectiveCameras,
     OrthographicCameras,
     PointLights,
@@ -107,20 +108,14 @@ class SurrealRenderer(nn.Module):
         # Pytorch3D camera is rotated 180° about z-axis to match my perspective_project_torch/NMR's projection convention.
         # So, need to also rotate the given camera translation (implemented below as elementwise-mul).
         cam_t = cam_t * torch.tensor([-1., -1., 1.], device=cam_t.device).float()
-        if projection_type == 'perspective':
-            self.cameras = PerspectiveCameras(device=device,
-                                              R=cam_R,
-                                              T=cam_t,
-                                              focal_length=perspective_focal_length,
-                                              principal_point=((img_wh/2., img_wh/2.),),
-                                              image_size=((img_wh, img_wh),))
-        elif projection_type == 'orthographic':
-            self.cameras = OrthographicCameras(device=device,
-                                               R=cam_R,
-                                               T=cam_t,
-                                               focal_length=orthographic_scale*(img_wh/2.),
-                                               principal_point=((img_wh / 2., img_wh / 2.),),
-                                               image_size=((img_wh, img_wh),))
+        
+        self.cameras = FoVOrthographicCameras(device=device,
+                                            R=cam_R,
+                                            T=cam_t,
+                                            scale_xyz=((
+                                                orthographic_scale,
+                                                orthographic_scale,
+                                                1.0),))
 
         # Lights for textured RGB render - pre-defined here but can be specified in forward pass if lights will vary (e.g. random cameras)
         self.lights_rgb_render = PointLights(device=device,

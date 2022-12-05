@@ -8,12 +8,14 @@ from models.poseMF_shapeGaussian_net import PoseMFShapeGaussianNet
 from models.smpl_official import SMPL
 from models.pose2D_hrnet import PoseHighResolutionNet
 from models.canny_edge_detector import CannyEdgeDetector
+from models.parametric_model import ParametricModel
 
 from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
 from configs.pose2D_hrnet_config import get_pose2D_hrnet_cfg_defaults
 from configs import paths
 
 from predict.predict_poseMF_shapeGaussian_net import predict_poseMF_shapeGaussian_net
+from utils.garment_classes import GarmentClasses
 
 
 def run_predict(device,
@@ -59,10 +61,20 @@ def run_predict(device,
     # SMPL model
     print('\nUsing {} SMPL model with {} shape parameters.'.format(gender, str(pose_shape_cfg.MODEL.NUM_SMPL_BETAS)))
     smpl_model = SMPL(paths.SMPL,
-                      batch_size=1,
-                      gender=gender,
-                      num_betas=pose_shape_cfg.MODEL.NUM_SMPL_BETAS).to(device)
+                           batch_size=1,
+                           gender=gender,
+                           num_betas=pose_shape_cfg.MODEL.NUM_SMPL_BETAS).to(device)
     smpl_immediate_parents = smpl_model.parents.tolist()
+    
+    upper_class='t-shirt'
+    lower_class='pant'
+    parametric_model = ParametricModel(gender=gender, 
+                                       garment_classes=GarmentClasses(
+                                           upper_class=upper_class,
+                                           lower_class=lower_class
+                                       ),
+                                       eval=True)
+
 
     # 3D shape and pose distribution predictor
     pose_shape_dist_model = PoseMFShapeGaussianNet(smpl_parents=smpl_immediate_parents,
@@ -77,6 +89,7 @@ def run_predict(device,
     predict_poseMF_shapeGaussian_net(pose_shape_model=pose_shape_dist_model,
                                      pose_shape_cfg=pose_shape_cfg,
                                      smpl_model=smpl_model,
+                                     parametric_model=parametric_model,
                                      hrnet_model=hrnet_model,
                                      hrnet_cfg=pose2D_hrnet_cfg,
                                      edge_detect_model=edge_detect_model,
