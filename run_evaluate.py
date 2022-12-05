@@ -58,11 +58,15 @@ def run_evaluate(device,
                              batch_size=1,
                              gender='female').to(device)
     
+    upper_class = 't-shirt'
+    lower_class = 'pant'
+    
     parametric_model = ParametricModel(gender='male', 
-                                        garment_classes=GarmentClasses(
-                                            upper_class=upper_class,
-                                            lower_class=lower_class)
-                                        )
+                                       garment_classes=GarmentClasses(
+                                           upper_class=upper_class,
+                                           lower_class=lower_class
+                                       ),
+                                       eval=True)
 
     # 3D shape and pose distribution predictor 
     pose_shape_dist_model = PoseMFShapeGaussianNet(smpl_parents=smpl_immediate_parents,
@@ -73,9 +77,9 @@ def run_evaluate(device,
     print('\nLoaded Distribution Predictor weights from', pose_shape_weights_path)
 
     # ------------------ Dataset + Metrics ------------------
-    #metrics = ['PVE', 'PVE-SC', 'PVE-PA', 'PVE-T-SC', 'MPJPE', 'MPJPE-SC', 'MPJPE-PA', 'Chamfer', 'joints2D']
-    metrics = ['MPJPE', 'MPJPE-SC', 'MPJPE-PA', 'Chamfer', 'Chamfer-T', 'joints2D']
-    #metrics += [metric + '_samples_min' for metric in metrics]
+    metrics = ['PVE', 'PVE-SC', 'PVE-PA', 'PVE-T-SC', 'MPJPE', 'MPJPE-SC', 'MPJPE-PA', 'Chamfer', 'Chamfer-T', 'joints2D-L2E']
+    exec_time_components = ['edge-time', 'inference-time', 'tailornet-time', 'smpl-time', 'interpenetrations-time']
+
     save_path = './3dpw_eval'
     eval_dataset = PW3DEvalDataset(pw3d_dir_path=paths.PW3D_PATH,
                                    config=pose_shape_cfg,
@@ -126,6 +130,7 @@ def run_evaluate(device,
                                        device=device,
                                        eval_dataset=eval_dataset,
                                        metrics=metrics,
+                                       exec_time_components=exec_time_components,
                                        save_path=save_path,
                                        num_samples_for_metrics=num_samples_for_metrics,
                                        sample_on_cpu=True,

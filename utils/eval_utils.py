@@ -8,6 +8,9 @@ import numpy as np
 import torch
 from sklearn.neighbors import NearestNeighbors
 
+from renderers.clothwild_renderer import renderer, rasterize_mesh_given_cam_param
+from configs.clothwild_config import cfg
+
 
 def compute_similarity_transform(S1, S2):
     """
@@ -224,5 +227,108 @@ def make_xz_ground_plane(vertices):
     return vertices
 
 
+def pairwise_distances(a, b, p=2, inv=False, num_samples=500):
+    if not inv:
+        tmp = a; a = b; b= tmp
 
+    a = torch.tensor(a[None, :, :]).cuda()
+    b = torch.tensor(b[None, :, :]).cuda()
+    num_batches = a.shape[1] // num_samples
+
+    dists = []
+    for i in range(num_batches):
+        dist = torch.norm((a[:,i*num_samples : (i+1)*num_samples, None, :] - b[:, None, :, :]),p=2,dim=3)
+        dist, _ = torch.min(dist, 2)
+        dist = dist.reshape(-1)
+        dists.append(dist)
+
+    if a.shape[1] % num_samples > 0:
+        dist = torch.norm((a[:,-1 * (a.shape[1] % num_samples):, None, :] - b[:, None, :, :]),p=2,dim=3)
+        dist, _ = torch.min(dist, 2)
+        dist = dist.reshape(-1)
+        dists.append(dist)
+
+    dist= torch.cat(dists).mean().cpu()
+    return dist
+
+
+def merge_mesh(verts, faces):
+    vert_len = [0]
+    for vert in verts:
+        vert_len.append(len(vert))
+
+    vert_len = np.cumsum(vert_len)
+    for i, face in enumerate(faces):
+        face += vert_len[i]
+        
+    return np.concatenate(verts), np.concatenate(faces)
+
+
+def read_valid_point(verts, indexs, valid):
+    valid_verts = []
+    for i, val in enumerate(valid):
+        if val != 0:
+            idx1, idx2, idx3 = indexs[i]
+            v = (verts[idx1] + verts[idx2] + verts[idx3]) / 3
+            valid_verts.append(v)
+    valid_verts = np.stack(valid_verts)
+    return valid_verts
+
+
+def evaluate(self, pred_mesh, gt_mesh):
+    smpl_faces = np.load('/data/hierprob3d/smpl/smpl_faces.npy').astype(np.int32)
+
+    verts_out = []; faces_out = []
+    #verts = out['smpl_mesh']
+    #verts[:,:2] *= -1
+    #verts_out.append(verts)
+    #faces_out.append(smpl.face.astype(np.int32))
+    #faces_out.append(smpl_faces)
+
+    #for cloth_type in cfg.cloth_types:
+    #    if out[cloth_type + '_mesh'] is None: continue
+    #    verts = out[cloth_type + '_mesh'].vertices
+    #    verts[:,:2] *= -1
+    #    verts_out.append(verts)
+    #    faces_out.append(out[cloth_type + '_mesh'].faces.astype(np.int32))
+    
+    pred_verts[:, :2] *= -1
+    
+    # pred
+    #pred_verts, pred_faces = merge_mesh(verts_out, faces_out)
+    pred_faces = renderer.rasterize_mesh(torch.from_numpy(pred_verts).float(), torch.from_numpy(pred_faces))
+
+    # gt
+    #gt_verts = out['smpl_mesh_target']; 
+    #gt_faces = smpl_faces
+    #gt_faces = np.load('/data/hierprob3d/smpl/smpl_faces.npy').astype(np.int32)
+    gt_verts[:,:2] *= -1
+    gt_faces = rasterize_mesh_given_cam_param(torch.from_numpy(gt_verts).float(), torch.from_numpy(gt_faces), out['cam_param_target'][:2], out['cam_param_target'][2:])
+
+    # find valid pixels - exist silhouette
+    pred_faces, gt_faces = pred_faces.numpy().astype(np.int32).reshape(-1, 3), gt_faces.numpy().astype(np.int32).reshape(-1, 3)
+    valid = (pred_faces!=-1).sum(1) * (gt_faces!=-1).sum(1)
+    valid = valid.reshape(-1)
+
+    # if there are too few valid points, not evaluate
+    #if valid.sum() < self.cd_inlier_threshold:
+    #    continue
+
+    # set semantically matching pairs
+    paired_pred_verts = read_valid_point(pred_verts, pred_faces, valid)
+    paired_gt_verts = read_valid_point(gt_verts, gt_faces, valid)
+
+    # rigid alignment
+    a, R, t = pa_mpjpe(np.expand_dims(paired_pred_verts,0), np.expand_dims(paired_gt_verts,0))
+    pred_verts = (a*np.matmul(pred_verts, R) + t)[0]
+    pred_verts *= 1000; gt_verts *= 1000
+
+    # pcu.pairwise_distances is too slow, approximate distance between vertices.
+    dist1 = pairwise_distances(pred_verts, gt_verts)
+    dist2 = pairwise_distances(pred_verts, gt_verts, inv=True)
+
+    #if torch.isinf(dist1) or torch.isinf(dist2): continue
+
+    chamfer_dist = (dist1 + dist2) / 2
+    return chamfer_dist
 

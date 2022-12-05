@@ -3,6 +3,7 @@ from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
 import torch
 import numpy as np
 from utils.garment_classes import GarmentClasses
+import time
 
 from utils.mesh_utils import concatenate_meshes
 
@@ -18,7 +19,8 @@ class ParametricModel(object):
 
     def __init__(self, 
                  gender: str, 
-                 garment_classes: GarmentClasses):
+                 garment_classes: GarmentClasses,
+                 eval: bool = False):
         '''Initialize TailorNet and SMPL dictionaries for each garment and gender.'''
 
         self.garment_classes = garment_classes
@@ -38,6 +40,9 @@ class ParametricModel(object):
             'upper': get_tn_runner(gender=gender, garment_class=self.classes['upper']),
             'lower': get_tn_runner(gender=gender, garment_class=self.classes['lower'])
         }
+        self.eval = eval
+        if eval:
+            self.exec_times = {}
 
     def _run_tailornet(self, 
                        garment_part: str, 
@@ -138,20 +143,31 @@ class ParametricModel(object):
 
         smpl_output_dict = {}
         for garment_part in ['upper', 'lower']:
+            if self.eval:
+                start_time = time.time()
             garment_disp = self._run_tailornet(
                 garment_part=garment_part,
                 pose=pose,
                 shape=shape,
                 style_vector=style_vector
             )
+            if self.eval:
+                self.exec_times['tailornet-time'] = time.time() - start_time
+                start_time = time.time()
             smpl_output = self._run_smpl4garment(
                 garment_part=garment_part,
                 pose=pose,
                 shape=shape,
                 garment_disp=garment_disp
             )
+            if self.eval:
+                self.exec_times['smpl-time'] = time.time() - start_time
             smpl_output_dict[garment_part] = smpl_output
 
+        if self.eval:
+            start_time = time.time()
         smpl_output_dict = self._remove_interpenetrations(smpl_output_dict)
+        if self.eval:
+            self.exec_times['interpenetrations-time'] = time.time() - start_time
 
         return smpl_output_dict

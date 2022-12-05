@@ -31,11 +31,13 @@ class EvalMetricsTracker:
     """
     def __init__(self,
                  metrics_to_track,
+                 exec_time_components,
                  img_wh=None,
                  save_path=None,
                  save_per_frame_metrics=False):
 
         self.metrics_to_track = metrics_to_track
+        self.metrics_to_track += exec_time_components
         self.img_wh = img_wh
 
         self.metric_sums = None
@@ -71,6 +73,7 @@ class EvalMetricsTracker:
     def update_per_batch(self,
                          pred_dict,
                          target_dict,
+                         exec_times_dict,
                          num_input_samples,
                          return_transformed_points=False,
                          return_per_frame_metrics=False):
@@ -136,6 +139,7 @@ class EvalMetricsTracker:
                 
             chamfer_dist = calc_chamfer_distance(pred_vertices_clothed, target_vertices_clothed)
             self.metric_sums['Chamfer'] += chamfer_dist  # scalar
+            self.per_frame_metrics['Chamfer'].append([np.array(chamfer_dist, dtype=np.float32)])
             if return_per_frame_metrics:
                 per_frame_metrics_return_dict['Chamfer'] = chamfer_dist
                 
@@ -156,6 +160,7 @@ class EvalMetricsTracker:
                 
             chamfer_dist = calc_chamfer_distance(pred_reposed_vertices, target_reposed_vertices)
             self.metric_sums['Chamfer-T'] += chamfer_dist  # scalar
+            self.per_frame_metrics['Chamfer-T'].append([np.array(chamfer_dist, dtype=np.float32)])
             if return_per_frame_metrics:
                 per_frame_metrics_return_dict['Chamfer-T'] = chamfer_dist
 
@@ -366,6 +371,11 @@ class EvalMetricsTracker:
             self.metric_sums['num_samples_false_positives'] += np.sum(num_fp)
             self.metric_sums['num_samples_true_negatives'] += np.sum(num_tn)
             self.metric_sums['num_samples_false_negatives'] += np.sum(num_fn)
+            
+        for time_metric in [x for x in self.metrics_to_track if 'time' in x]:
+            exec_time = exec_times_dict[time_metric]
+            self.metric_sums[time_metric] += exec_time
+            self.per_frame_metrics[time_metric].append([np.array(exec_time, dtype=np.float32)])
 
         return transformed_points_return_dict, per_frame_metrics_return_dict
 
@@ -397,6 +407,8 @@ class EvalMetricsTracker:
                     mult = 1000.
                 elif 'joints2D' in metric_type:
                     num_per_sample = 17
+                elif 'time' in metric_type:
+                    num_per_sample = 1
                 final_metrics[metric_type] = self.metric_sums[metric_type] / (self.total_samples * num_per_sample)
 
             print(metric_type, '{:.2f}'.format(final_metrics[metric_type] * mult))

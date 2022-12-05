@@ -5,12 +5,15 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from smplx.lbs import batch_rodrigues
 from pytorch3d.transforms import matrix_to_axis_angle
+import time
+from trimesh import Trimesh
 
 from renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
 
 from metrics.eval_metrics_tracker import EvalMetricsTracker
 
 from utils.cam_utils import orthographic_project_torch
+from utils.mesh_utils import concatenate_meshes
 from utils.rigid_transform_utils import rot6d_to_rotmat, aa_rotate_translate_points_pytorch3d, aa_rotate_rotmats
 from utils.joints2d_utils import undo_keypoint_normalisation
 from utils.label_conversions import (
@@ -22,6 +25,7 @@ from utils.label_conversions import (
 )
 from utils.sampling_utils import pose_matrix_fisher_sampling_torch
 from utils.eval_utils import pa_mpjpe
+from utils.measurements.mesh_measurements import get_measurements
 
 
 GENDER_MAP = {
@@ -44,6 +48,7 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
                                        device,
                                        eval_dataset,
                                        metrics,
+                                       exec_time_components,
                                        save_path,
                                        num_workers=4,
                                        pin_memory=True,
@@ -51,6 +56,9 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
                                        num_samples_for_metrics=10,
                                        sample_on_cpu=False,
                                        vis_logger=None):
+    
+    smpl_faces = np.load('/data/hierprob3d/smpl/smpl_faces.npy').astype(np.int32)
+    measurements_errors = []
 
     eval_dataloader = DataLoader(eval_dataset,
                                  batch_size=1,
@@ -61,6 +69,7 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
 
     # Instantiate metrics tracker
     metrics_tracker = EvalMetricsTracker(metrics,
+                                         exec_time_components,
                                          save_path=save_path,
                                          save_per_frame_metrics=save_per_frame_metrics)
     metrics_tracker.initialise_metric_sums()
@@ -88,11 +97,16 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
             continue
         sample_count += 1
         
+        exec_times_dict = dict(zip(exec_time_components, [0.] * len(exec_time_components)))
         with torch.no_grad():
             # ------------------ INPUTS ------------------
             image = samples_batch['image'].to(device)
             heatmaps = samples_batch['heatmaps'].to(device)
+            
+            start_time = time.time()
             edge_detector_output = edge_detect_model(image)
+            exec_times_dict['edge-time'] = time.time() - start_time
+            
             proxy_rep_img = edge_detector_output['thresholded_thin_edges'] if pose_shape_cfg.DATA.EDGE_NMS else edge_detector_output['thresholded_grad_magnitude']
             proxy_rep_input = torch.cat([proxy_rep_img, heatmaps], dim=1)
 
@@ -148,8 +162,10 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
             target_joints_h36mlsp = target_smpl_output_unclothed.joints[:, ALL_JOINTS_TO_H36M_MAP, :][:, H36M_TO_J14, :]
 
             # ------------------------------- PREDICTIONS -------------------------------
+            start_time = time.time()
             pred_pose_F, pred_pose_U, pred_pose_S, pred_pose_V, pred_pose_rotmats_mode, \
-            pred_shape_dist, pred_style_dist, pred_glob, pred_cam_wp = pose_shape_model(proxy_rep_input)
+                pred_shape_dist, pred_style_dist, pred_glob, pred_cam_wp = pose_shape_model(proxy_rep_input)
+            exec_times_dict['inference-time'] = time.time() - start_time
             # Pose F, U, V and rotmats_mode are (bsize, 23, 3, 3) and Pose S is (bsize, 23, 3)
 
             orthographic_scale = pred_cam_wp[:, [0, 0]]
@@ -174,25 +190,37 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
 
             smpl_output_dict = parametric_model.run(
                 pose=pred_pose_axis_angle[0].cpu().numpy(),
-                #shape=np.zeros(target_shape.shape[1:]),
-                shape=pred_shape_dist.loc[0].cpu().numpy(),
+                shape=np.zeros(target_shape.shape[1:]),
+                #shape=pred_shape_dist.loc[0].cpu().numpy(),
                 style_vector=np.zeros((4, 4))
+                #style_vector=pred_style_dist.loc[0].cpu().numpy()
             )
+            
+            exec_times_dict['tailornet-time'] = parametric_model.exec_times['tailornet-time']
+            exec_times_dict['smpl-time'] = parametric_model.exec_times['smpl-time']
+            exec_times_dict['interpenetrations-time'] = parametric_model.exec_times['interpenetrations-time']
+            
             smpl_reposed_output_dict = parametric_model.run(
                 #pose=pred_pose_axis_angle[0].cpu().numpy(),
                 pose=np.zeros(pred_pose_axis_angle.shape[1:]),
                 #shape=np.zeros(target_shape.shape[1:]),
                 shape=pred_shape_dist.loc[0].cpu().numpy(),
+                #style_vector=pred_style_dist.loc[0].cpu().numpy()
                 style_vector=np.zeros((4, 4))
             )
             
             pred_vertices_body = smpl_output_dict['upper'].body_verts
             pred_reposed_vertices_body = smpl_reposed_output_dict['upper'].body_verts
-            #pred_vertices_merged = np.concatenate(
-            #    (smpl_output_dict['upper'].body_verts,
-            #     smpl_output_dict['upper'].garment_verts,
-            #     smpl_output_dict['lower'].garment_verts
-            #), axis=0)
+            pred_vertices_merged = np.concatenate(
+                (smpl_output_dict['upper'].body_verts,
+                 smpl_output_dict['upper'].garment_verts,
+                 smpl_output_dict['lower'].garment_verts
+            ), axis=0)
+            pred_reposed_vertices_merged = np.concatenate(
+                (smpl_reposed_output_dict['upper'].body_verts,
+                 smpl_reposed_output_dict['upper'].garment_verts,
+                 smpl_reposed_output_dict['lower'].garment_verts
+            ), axis=0)
             pred_joints_all_mode = pred_smpl_output_original.joints
             pred_joints_h36mlsp_mode = pred_joints_all_mode[:, ALL_JOINTS_TO_H36M_MAP, :][:, H36M_TO_J14, :]  # (1, 14, 3)
             pred_joints_coco_mode = pred_joints_all_mode[:, ALL_JOINTS_TO_COCO_MAP, :]
@@ -276,11 +304,11 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
             # ------------------------------- TRACKING METRICS -------------------------------
             pred_dict = {'verts': np.expand_dims(pred_vertices_body[:6890], 0),
                          #'verts': pred_vertices_original.cpu().detach().numpy(),
-                         #'verts_clothed': np.expand_dims(pred_vertices_merged, 0),
-                         'verts_clothed': np.expand_dims(pred_vertices_body[:6890], 0),
+                         'verts_clothed': np.expand_dims(pred_vertices_merged, 0),
+                         #'verts_clothed': np.expand_dims(pred_vertices_body[:6890], 0),
                          #'verts_clothed': pred_vertices_original.cpu().detach().numpy(),
                          'reposed_verts': np.expand_dims(pred_reposed_vertices_body[:6890], 0),
-                         'reposed_verts_clothed': np.expand_dims(pred_reposed_vertices_body[:6890], 0),
+                         'reposed_verts_clothed': np.expand_dims(pred_reposed_vertices_merged, 0),
                          'joints3D': pred_joints_h36mlsp_mode.cpu().detach().numpy()}
             target_dict = {#'verts': np.expand_dims(target_vertices_body, 0),
                            'verts': target_vertices_unclothed.cpu().detach().numpy(),
@@ -308,11 +336,62 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
 
             metrics_tracker.update_per_batch(pred_dict,
                                              target_dict,
+                                             exec_times_dict,
                                              1,
                                              return_transformed_points=False,
                                              return_per_frame_metrics=False)
             
-            print(metrics_tracker.metric_sums['Chamfer-T'] / sample_count)
+            target_body_measurements = np.array(get_measurements(
+                target_reposed_smpl_output_unclothed.vertices[0].cpu().detach().numpy(), smpl_faces))
+            pred_body_measurements = np.array(get_measurements(
+                pred_reposed_smpl_output_mean.vertices[0].cpu().detach().numpy(), smpl_faces))
+            
+            measurements_error = np.abs(target_body_measurements - pred_body_measurements)
+            measurements_errors.append(measurements_error)
+            
+            print(f"Chamfer-T: {np.array(metrics_tracker.per_frame_metrics['Chamfer-T']).mean()}")
+            print(f"Chamfer: {np.array(metrics_tracker.per_frame_metrics['Chamfer']).mean()}")
+            print(f"MPJPE-PA: {np.array(metrics_tracker.per_frame_metrics['MPJPE-PA']).mean() * 1000.}")
+            print(f"MPJPE-SC: {np.array(metrics_tracker.per_frame_metrics['MPJPE-SC']).mean() * 1000.}")
+            print(f"PVE-PA: {np.array(metrics_tracker.per_frame_metrics['PVE-PA']).mean() * 1000.}")
+            print(f"PVE-SC: {np.array(metrics_tracker.per_frame_metrics['PVE-SC']).mean() * 1000.}")
+            print(f"PVE-T-SC: {np.array(metrics_tracker.per_frame_metrics['PVE-T-SC']).mean() * 1000.}")
+            print(f'Measurements error: {np.mean(np.array(measurements_errors), axis=0) * 1000.}')
+            
+            pred_vertices_merged_trimesh, pred_faces_merged_trimesh = concatenate_meshes(
+                vertices_list = [
+                    smpl_output_dict['upper'].body_verts,
+                    smpl_output_dict['upper'].garment_verts,
+                    smpl_output_dict['lower'].garment_verts
+                ],
+                faces_list = [
+                    smpl_output_dict['upper'].body_faces,
+                    smpl_output_dict['upper'].garment_verts,
+                    smpl_output_dict['lower'].garment_verts
+                ]
+            )
+            pred_reposed_vertices_merged_trimesh, pred_reposed_faces_merged_trimesh = concatenate_meshes(
+                vertices_list=[
+                    smpl_reposed_output_dict['upper'].body_verts,
+                    smpl_reposed_output_dict['upper'].garment_verts,
+                    smpl_reposed_output_dict['lower'].garment_verts
+                ],
+                faces_list=[
+                    smpl_reposed_output_dict['upper'].body_faces,
+                    smpl_reposed_output_dict['upper'].garment_faces,
+                    smpl_reposed_output_dict['lower'].garment_faces
+                ]
+            )
+            
+            #Trimesh(vertices=pred_vertices_merged_trimesh, faces=pred_faces_merged_trimesh).export(
+            #    f'output/pred/{batch_num:05d}.obj')
+            Trimesh(vertices=pred_reposed_vertices_merged_trimesh * 1000., faces=pred_reposed_faces_merged_trimesh).export(
+                f'output/pred_reposed/{batch_num:05d}.obj')
+            #Trimesh(vertices=target_vertices_clothed[0].cpu().numpy(), faces=smpl_faces).export(
+            #    f'output/target/{batch_num:05d}.obj')
+            #Trimesh(vertices=target_reposed_vertices_clothed[0].cpu().numpy(), faces=smpl_faces).export(
+            #    f'output/target_reposed/{batch_num:05d}.obj'
+            #)
             
             if vis_logger is not None:
                 vis_logger.vis_rgb(image, label='input_image')

@@ -12,7 +12,13 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                //"--image_dir", "./demo/", "--save_dir", "./output/", "--visualise_samples", "--visualise_uncropped"     // predict
+                //"--gender", "male",
+                //"--image_dir", "./demo/", 
+                //"--save_dir", "./output/", 
+                //"--visualise_samples", 
+                //"--visualise_uncropped", 
+                //"--pose_shape_weights", "experiments/resnet50-style-params/saved_models/epoch_095.tar"     // predict
+                //"--pose_shape_weights", "experiments/second-experiment/epoch_115.tar"     // evaluate
                 "--pose_shape_weights", "experiments/resnet50-style-params/saved_models/epoch_095.tar"     // evaluate
                 //"--lsun_dir", "../lsun/", "--train_files_dir", "train_files/"     // copy LSUN
                 //"-E", "experiments/resnet50-coco-shape-only", "--gpu", "1"           // train
