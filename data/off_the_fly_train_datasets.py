@@ -1,7 +1,6 @@
-from typing import Dict, List, Optional, Union
+from typing import Dict, List
 import numpy as np
 from tqdm import tqdm
-from dataclasses import dataclass, fields
 import os
 import torch
 import cv2

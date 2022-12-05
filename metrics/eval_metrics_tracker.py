@@ -1,7 +1,7 @@
 import numpy as np
 import os
 
-from utils.eval_utils import procrustes_analysis_batch, scale_and_translation_transform_batch
+from utils.eval_utils import calc_chamfer_distance, pa_mpjpe, procrustes_analysis_batch, scale_and_translation_transform_batch
 
 
 class EvalMetricsTracker:
@@ -31,11 +31,13 @@ class EvalMetricsTracker:
     """
     def __init__(self,
                  metrics_to_track,
+                 exec_time_components,
                  img_wh=None,
                  save_path=None,
                  save_per_frame_metrics=False):
 
         self.metrics_to_track = metrics_to_track
+        self.metrics_to_track += exec_time_components
         self.img_wh = img_wh
 
         self.metric_sums = None
@@ -71,6 +73,7 @@ class EvalMetricsTracker:
     def update_per_batch(self,
                          pred_dict,
                          target_dict,
+                         exec_times_dict,
                          num_input_samples,
                          return_transformed_points=False,
                          return_per_frame_metrics=False):
@@ -118,6 +121,48 @@ class EvalMetricsTracker:
                 transformed_points_return_dict['pred_vertices_pa'] = pred_vertices_pa
             if return_per_frame_metrics:
                 per_frame_metrics_return_dict['PVE-PA'] = np.mean(pve_pa_batch, axis=-1)
+
+        # Chamfer distance between clothed vertices
+        if 'Chamfer' in self.metrics_to_track:
+            pred_body_verts = pred_dict['verts'] * 1000.    # (bsize, 6890, 3)
+            pred_vertices_clothed = pred_dict['verts_clothed'] * 1000.  # (bsize, total_num_verts, 3)
+            target_vertices_clothed = target_dict['verts_clothed'] * 1000.  # (bsize, 6890, 3)
+            a, R, t = pa_mpjpe(pred_body_verts, target_vertices_clothed)
+            pred_vertices_clothed = (a * np.matmul(pred_vertices_clothed, R) + t)
+            
+            if len(pred_body_verts.shape) == 3:
+                pred_body_verts = pred_body_verts[0]
+            if len(pred_vertices_clothed.shape) == 3:
+                pred_vertices_clothed = pred_vertices_clothed[0]
+            if len(target_vertices_clothed.shape) == 3:
+                target_vertices_clothed = target_vertices_clothed[0]
+                
+            chamfer_dist = calc_chamfer_distance(pred_vertices_clothed, target_vertices_clothed)
+            self.metric_sums['Chamfer'] += chamfer_dist  # scalar
+            self.per_frame_metrics['Chamfer'].append([np.array(chamfer_dist, dtype=np.float32)])
+            if return_per_frame_metrics:
+                per_frame_metrics_return_dict['Chamfer'] = chamfer_dist
+                
+        # Chamfer distance between clothed vertices
+        if 'Chamfer-T' in self.metrics_to_track:
+            pred_reposed_body_verts = pred_dict['reposed_verts'] * 1000.    # (bsize, 6890, 3)
+            pred_reposed_vertices = pred_dict['reposed_verts'] * 1000.  # (bsize, total_num_verts, 3)
+            target_reposed_vertices = target_dict['reposed_verts'] * 1000.  # (bsize, 6890, 3)
+            a, R, t = pa_mpjpe(pred_reposed_body_verts, target_reposed_vertices)
+            pred_reposed_vertices = (a * np.matmul(pred_reposed_vertices, R) + t)
+            
+            if len(pred_reposed_body_verts.shape) == 3:
+                pred_reposed_body_verts = pred_reposed_body_verts[0]
+            if len(pred_reposed_vertices.shape) == 3:
+                pred_reposed_vertices = pred_reposed_vertices[0]
+            if len(target_reposed_vertices.shape) == 3:
+                target_reposed_vertices = target_reposed_vertices[0]
+                
+            chamfer_dist = calc_chamfer_distance(pred_reposed_vertices, target_reposed_vertices)
+            self.metric_sums['Chamfer-T'] += chamfer_dist  # scalar
+            self.per_frame_metrics['Chamfer-T'].append([np.array(chamfer_dist, dtype=np.float32)])
+            if return_per_frame_metrics:
+                per_frame_metrics_return_dict['Chamfer-T'] = chamfer_dist
 
         # Reposed
         if 'PVE-T' in self.metrics_to_track:
@@ -326,6 +371,11 @@ class EvalMetricsTracker:
             self.metric_sums['num_samples_false_positives'] += np.sum(num_fp)
             self.metric_sums['num_samples_true_negatives'] += np.sum(num_tn)
             self.metric_sums['num_samples_false_negatives'] += np.sum(num_fn)
+            
+        for time_metric in [x for x in self.metrics_to_track if 'time' in x]:
+            exec_time = exec_times_dict[time_metric]
+            self.metric_sums[time_metric] += exec_time
+            self.per_frame_metrics[time_metric].append([np.array(exec_time, dtype=np.float32)])
 
         return transformed_points_return_dict, per_frame_metrics_return_dict
 
@@ -357,6 +407,8 @@ class EvalMetricsTracker:
                     mult = 1000.
                 elif 'joints2D' in metric_type:
                     num_per_sample = 17
+                elif 'time' in metric_type:
+                    num_per_sample = 1
                 final_metrics[metric_type] = self.metric_sums[metric_type] / (self.total_samples * num_per_sample)
 
             print(metric_type, '{:.2f}'.format(final_metrics[metric_type] * mult))

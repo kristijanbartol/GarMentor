@@ -4,26 +4,71 @@ import numpy as np
 from utils.rigid_transform_utils import aa_rotate_translate_points_pytorch3d
 
 
+COLORS = {
+    'red': (255, 0, 0),                 # 0
+    'lime': (0, 255, 0),                # 1
+    'blue': (0, 0, 255),                # 2
+    'yellow': (255, 255, 0),            # 3
+    'cyan': (0, 255, 255),              # 4
+    'magenta': (255, 0, 255),           # 5
+    'silver': (192, 192, 192),          # 6
+    'maroon': (128, 0, 0),              # 7
+    'green': (0, 128, 0),               # 8
+    'purple': (128, 0, 128),            # 9
+    'wheat': (245, 222, 179),           # 10
+    'deeppink': (255, 20, 147),         # 11
+    'white': (255, 255, 255),           # 12
+    'indigo': (75, 0, 130),             # 13
+    'midnightblue': (25, 25, 112),      # 14
+    'lightskyblue': (135, 206, 250),    # 15
+    'orange': (255, 165, 0)             # 16
+}
+
+
 class VisLogger():
     
     _nrow = 4
     _ndist_samples = 200
     
-    def __init__(self, visdom, renderer):
+    def __init__(self, visdom, renderer=None):
         self.visdom = visdom
         self.renderer = renderer
     
-    def vis_rgb(self, rgb_in):
-        self.visdom.images(rgb_in[:self._nrow], nrow=self._nrow, win='rgb_in')
+    def vis_rgb(self, rgb_in, label='rgb_in'):
+        self.visdom.images(rgb_in[:self._nrow], nrow=self._nrow, win=label,
+                           opts={
+                               'title': label
+                           })
 
     def vis_edge(self, edge_in):
         edge_in_rgb = torch.cat((edge_in,) * 3, dim=1).squeeze(dim=2) * 255
         self.visdom.images(edge_in_rgb[:self._nrow], nrow=self._nrow, win='edge_in')
 
-    def vis_j2d_heatmaps(self, j2d_heatmaps):
-        j2d_heatmaps_rgb = torch.stack(
-            (torch.sum(j2d_heatmaps, dim=1).unsqueeze(dim=1),) * 3, dim=1).squeeze(dim=2) * 255
-        self.visdom.images(j2d_heatmaps_rgb[:self._nrow], nrow=self._nrow, win='j2d_heatmaps')
+    def vis_j2d_heatmaps(self, j2d_heatmaps, label='j2d_heatmaps'):
+        colored_h2d_heatmap = torch.zeros(1, 3, 256, 256).to('cuda:0')
+        for color_idx, color_key in enumerate(COLORS):
+            heatmap = torch.stack((j2d_heatmaps[:, color_idx],) * 3, dim=1)
+            color_tensor = torch.tensor(COLORS[color_key])
+            heatmap[:, 0] *= color_tensor[0]
+            heatmap[:, 1] *= color_tensor[1]
+            heatmap[:, 2] *= color_tensor[2]
+            colored_h2d_heatmap += heatmap
+        self.visdom.images(colored_h2d_heatmap[:self._nrow], nrow=self._nrow, win=label,
+                           opts={
+                               'title': label
+                           })
+        
+    def vis_keypoints(self, keypoints, label='keypoints'):
+        colored_keypoints = torch.zeros(1, 3, 256, 256).to('cuda:0')
+        for color_idx, color_key in enumerate(COLORS):
+            x, y = [int(_x) for _x in keypoints[0, color_idx]]
+            colored_keypoints[0, :, x, y-1] = torch.tensor(COLORS[color_key])
+            colored_keypoints[0, :, x, y] = torch.tensor(COLORS[color_key])
+            colored_keypoints[0, :, x, y+1] = torch.tensor(COLORS[color_key])
+        self.visdom.images(colored_keypoints[:self._nrow], nrow=self._nrow, win=label,
+                           opts={
+                               'title': label
+                           })
         
     def vis_pred_rgb(self, pred_verts, x_axis, angle, trans, texture, cam_t, settings):
         pred_verts = aa_rotate_translate_points_pytorch3d(
