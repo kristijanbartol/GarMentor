@@ -1,67 +1,3 @@
-
-#FROM pytorch/pytorch:1.11.0-cuda11.3-cudnn8-devel
-#FROM pytorch/pytorch:1.11.0-cuda10.1-cudnn8-devel
-#FROM pytorch/pytorch:1.6.0-cuda10.1-cudnn7-devel
-
-# needed to allow apt update
-#RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
-
-#RUN apt update && apt install -y git \
-#	ninja-build \
-#	libglib2.0-0 \
-#	libsm6 \
-#	libxrender-dev \
-#	libxext6 \
-#	libgl1-mesa-glx \
-#	vim \
-#	curl \
-#	libboost-dev \
-#	tmux \
-#	freeglut3-dev
-
-#ENV BOOST_INCLUDE_DIRS=/usr/include/boost
-
-# install python dependencies
-#RUN pip install --ignore-installed PyYAML \
-#	opencv-python \
-#	tqdm \
-#	matplotlib \
-#	dataclasses \
-#	#pyyaml \
-#	yacs \
-#	fvcore==0.1.2.post20201213 \
-#	scikit-image==0.17.2 \
-#	scipy==1.5.4 \
-#	smplx==0.1.26 \
-#	trimesh \
-#	scikit-learn \
-#	tensorboard \
-#	chumpy \
-#	tensorboardX \
-#	"protobuf<4.21.0" \
-#	lmdb \
-#	visdom \
-#	notebook \
-#	pyrender \
-#	pytorch3d==0.3.0
-
-# pytorch3d prebuilt wheel
-#RUN pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py38_cu113_pyt1110/download.html
-
-# psbody.mesh installation
-#RUN mkdir /git && cd /git && git clone https://github.com/MPI-IS/mesh && cd mesh && make all
-
-# clone SMPL-X code and make tools/clean_ch.py usable with Python 3
-#RUN cd /git && git clone https://github.com/vchoutas/smplx && cd smplx && git reset --hard 5fa20519735cceda19afed0beeabd53caef711cd && cd tools && \
-#	sed -i "/body_data = / s/pickle.load(body_file)/pickle.load(body_file, encoding='latin1')/" clean_ch.py && \
-#	sed -i "s/iteritems/items/g" clean_ch.py
-
-#RUN mkdir -p /garmentor
-
-#WORKDIR /garmentor
-
-# Original Dockerfile content:
-
 FROM pytorch/pytorch:1.6.0-cuda10.1-cudnn7-devel
 
 ENV PATH=$PATH:/opt/conda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/cuda/bin/
@@ -96,6 +32,8 @@ RUN apt-get update && apt-get install -y git \
 	libboost-dev \
  	python3-pip \
  	vim \
+	unzip \
+	wget \
  	curl \
      && apt-get clean \
      && rm -rf /var/lib/apt/lists/*
@@ -124,7 +62,10 @@ RUN python3.7 -m pip install --ignore-installed PyYAML \
 	pygments==2.4.1 \
 	jupyter \
 	chumpy \
-	visdom
+	visdom \
+	open3d \
+	loguru \
+	omegaconf
 
 RUN python3.7 -m pip install --upgrade ipykernel
 

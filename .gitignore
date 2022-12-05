@@ -142,6 +142,7 @@ notebooks/data/
 output/
 
 # Dependencies
+torch-trust-ncg/
 smplx/
 torch-trust-ncg/
 

@@ -127,7 +127,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
     '''A data pregenerator class specific to SURREAL dataset.'''
 
     DATASET_NAME = 'surreal'
-    CHECKPOINT_COUNT = 10
+    CHECKPOINT_COUNT = 100
 
     def __init__(self):
         '''Initialize useful arrays, renderer, and load poses.'''

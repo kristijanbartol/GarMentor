@@ -1,0 +1,66 @@
+FROM pytorch/pytorch:1.11.0-cuda11.3-cudnn8-devel
+
+# needed to allow apt update
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
+
+RUN apt update && apt install -y git \
+    ninja-build \
+    libglib2.0-0 \
+    libsm6 \
+    libxrender-dev \
+    libxext6 \
+    libgl1-mesa-glx \
+    vim \
+    curl \
+	libboost-dev \
+	tmux \
+	freeglut3-dev \
+    unzip \
+	wget
+
+ENV BOOST_INCLUDE_DIRS=/usr/include/boost
+
+# install python dependencies
+RUN pip install --ignore-installed PyYAML \
+	opencv-python \
+	tqdm \
+	matplotlib \
+	dataclasses \
+	#pyyaml \
+	yacs \
+	fvcore==0.1.2.post20201213 \
+	scikit-image==0.17.2 \
+	scipy==1.5.4 \
+	smplx==0.1.26 \
+	trimesh \
+	scikit-learn \
+	tensorboard \
+	chumpy \
+	tensorboardX \
+	"protobuf<4.21.0" \
+	lmdb \
+	visdom \
+	notebook \
+    chumpy \
+	open3d \
+	loguru \
+	omegaconf \
+	pickle5
+
+# pytorch3d prebuilt wheel
+RUN pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py38_cu113_pyt1110/download.html
+
+# psbody.mesh installation
+RUN mkdir /git && cd /git && git clone https://github.com/MPI-IS/mesh && cd mesh && make all
+
+# torch-trust-ncg installation
+RUN cd /git && git clone https://github.com/vchoutas/torch-trust-ncg.git && cd torch-trust-ncg && python setup.py install
+
+# clone SMPL-X code and make tools/clean_ch.py usable with Python 3
+RUN cd /git && git clone https://github.com/vchoutas/smplx && cd smplx && git reset --hard 5fa20519735cceda19afed0beeabd53caef711cd && cd tools && \
+	sed -i "/body_data = / s/pickle.load(body_file)/pickle.load(body_file, encoding='latin1')/" clean_ch.py && \
+	sed -i "s/iteritems/items/g" clean_ch.py
+
+RUN mkdir -p /garmentor
+
+WORKDIR /garmentor
