@@ -131,6 +131,8 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
                                                     rot_mult_order='pre')
             target_pose[:, :3] = target_glob_vecs
 
+            # TODO: Here I should add a logic to create ground truth meshes following ClothWild.
+            # NOTE: I can also keep the unclothed ones for additional evaluation.
             if target_gender == 'm':
                 target_smpl_output_unclothed = smpl_model_male(body_pose=target_pose[:, 3:],
                                                      global_orient=target_pose[:, :3],
