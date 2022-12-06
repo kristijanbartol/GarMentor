@@ -1,3 +1,3 @@
 #!/bin/bash
 
-docker build -t $USER-garmentor .
+docker build -t $USER-garmentor -f Dockerfile.new .
