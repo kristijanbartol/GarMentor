@@ -15,11 +15,11 @@ scene_location = "D:\\data\\garmentor\\agora\\scenes\\archviz"
 # This will also determine how many scenes will be rendered in Unreal Engine
 # in a single step.
 # Provide -1 to transfer all available configurations at once
-batch_size = -1
+batch_size = 40 # -1
 
 # How many batches (of the size specified above) have already been transferred.
 # For each step, this number has to be manually increased by one.
-batches_already_processed = 0
+batches_already_processed = 1 # 0
 
 # Setup send2ue plugin
 

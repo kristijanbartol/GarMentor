@@ -44,6 +44,18 @@ def _sample_scene_data(
         pd.DataFrame: The sampled scene information
         int: Number of sampled elements
     """
+    if scene_name == 'archviz':
+        to_sample = [
+            'ag_trainset_renderpeople_bfh_archviz_5_10_cam02_00003.png',
+            'ag_trainset_renderpeople_bfh_archviz_5_10_cam02_00008.png',
+            'ag_trainset_renderpeople_bfh_archviz_5_10_cam02_00048.png'
+        ]
+    elif scene_name == 'brushifygrasslands':
+        to_sample = [
+            "ag_trainset_renderpeople_bfh_brushifygrasslands_5_15_00001.png",
+            "ag_trainset_renderpeople_bfh_brushifygrasslands_5_15_00007.png",
+            "ag_trainset_renderpeople_bfh_brushifygrasslands_5_15_00012.png"
+        ]
     next_index = 0
     df_scene = pd.DataFrame()
     for pkl_file in [file for file in os.listdir(path_cam_files) \
@@ -58,7 +70,10 @@ def _sample_scene_data(
         df_scene = pd.concat([
             df_scene,
             #df[df['imgPath'] == "ag_trainset_3dpeople_bfh_archviz_5_10_cam00_00003.png"]
-            df[df['imgPath'].str.contains(scene_name)]
+            #df[df['imgPath'].str.contains(scene_name)]
+            df[df['imgPath'].str.contains(to_sample[0])],
+            df[df['imgPath'].str.contains(to_sample[1])],
+            df[df['imgPath'].str.contains(to_sample[2])]
         ])
     # df_scene now contains all entries for the given scene
     number_rows = len(df_scene.index)
