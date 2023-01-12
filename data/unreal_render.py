@@ -38,7 +38,7 @@ ACTORS_SPAWNED = []
 UNRENDERED_SCENE_DIRECTORIES = []
 
 # Whether the directory of a rendered scene should be deleted
-DELETE_SCENE_DIRECTORIES_ONCE_RENDERED = True
+DELETE_SCENE_DIRECTORIES_ONCE_RENDERED = False      # TODO for deployment, set this back to True
 
 # Path to the pkl file that contains the camera and subject transformation information
 PATH_TRANSFORMATION_INFORMATION = f"D:\\data\\garmentor\\agora\\scenes\\archviz\\transformation_info.pkl" 

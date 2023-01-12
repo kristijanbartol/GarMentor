@@ -15,7 +15,7 @@ scene_location = "D:\\data\\garmentor\\agora\\scenes\\archviz"
 # This will also determine how many scenes will be rendered in Unreal Engine
 # in a single step.
 # Provide -1 to transfer all available configurations at once
-batch_size = 1
+batch_size = -1
 
 # How many batches (of the size specified above) have already been transferred.
 # For each step, this number has to be manually increased by one.
@@ -70,7 +70,40 @@ for scene_idx in range(
         )
         # blender automatically selects imported objects
         selected_objects = bpy.context.selected_objects
+
+        # set pivot point to z-value of lowest vertex
+        # found_body = False
+        # for mesh_object in selected_objects:
+        #     if not 'body' in mesh_object.name:
+        #         continue
+        #     bpy.context.view_layer.objects.active = mesh_object
+        #     bpy.ops.object.mode_set(mode="OBJECT")
+        #     verts = mesh_object.data.vertices
+        #     wmx = mesh_object.matrix_world
+        #     z_coords = [(wmx @ v.co).z for v in verts]
+        #     min_z = min(z_coords)
+        #     bpy.context.scene.cursor.location = (0.0, 0.0, min_z)
+        #     found_body = True
+        # if not found_body:
+        #     raise ValueError(
+        #         "The script was unable to set the pivot point, most likely "
+        #         "because no body mesh was found."
+        #     )
+
         for mesh_object in selected_objects:
+            # set pivot point to z-value of lowest vertex
+            bpy.context.view_layer.objects.active = mesh_object
+            bpy.ops.object.mode_set(mode="OBJECT")
+            verts = mesh_object.data.vertices
+            wmx = mesh_object.matrix_world
+            z_coords = [(wmx @ v.co).z for v in verts]
+            min_z = min(z_coords)
+            bpy.context.scene.cursor.location = (0.0, 0.0, min_z)
+            # move such that feet are at
+            # world origin (which is used as pivot point)
+            bpy.context.view_layer.objects.active = mesh_object
+            bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+            mesh_object.location.z = 0.0
             # In case a mesh has multiple materials assigned
             for material_slot in mesh_object.material_slots:
                 # Deactivate the mesh material's specular image texture
