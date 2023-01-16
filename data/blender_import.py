@@ -19,7 +19,7 @@ batch_size = 40 # -1
 
 # How many batches (of the size specified above) have already been transferred.
 # For each step, this number has to be manually increased by one.
-batches_already_processed = 1 # 0
+batches_already_processed = 0 # 0
 
 # Setup send2ue plugin
 

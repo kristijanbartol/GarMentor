@@ -12,6 +12,7 @@ import pickle
 # Set GUIDs of the cameras that can be used for rendering
 # In Unreal Editor, search for Actor Guid, right click the value and select copy
 ARCHVIZ_CAMERA_GUIDS = [
+    # Camera information are outdated
     "354B0DBE46586EEE563B3AAC7B34626E", # Cam00: (X=374.888062,Y=-287.670349,Z=261.453613) (Pitch=-30.000000,Yaw=-227.000000,Roll=-0.000012) (SensorWidth=83.102051,SensorHeight=46.745972,SensorAspectRatio=1.777737) (MinFocalLength=4.000000,MaxFocalLength=1000.000000,MinFStop=1.200000,MaxFStop=22.000000,MinimumFocusDistance=15.000000,DiaphragmBladeCount=7)
     "DA1A88B846241D11B446DBAAE3231740", # Cam01: (X=394.000000,Y=180.000000,Z=258.000000) (Pitch=-34.999977,Yaw=220.000015,Roll=0.000009) (SensorWidth=78.464050,SensorHeight=44.541599,SensorAspectRatio=1.761590) (MinFocalLength=4.000000,MaxFocalLength=50.000000,MinFStop=1.200000,MaxFStop=22.000000,MinimumFocusDistance=15.000000,DiaphragmBladeCount=7)
     "DDDCB82241E91637B4716C877411834D", # Cam02: (X=-449.000000,Y=127.000000,Z=258.000000) (Pitch=-35.000000,Yaw=-45.000000,Roll=0.000006) (SensorWidth=86.579849,SensorHeight=49.041878,SensorAspectRatio=1.765427) (MinFocalLength=4.000000,MaxFocalLength=50.000000,MinFStop=1.200000,MaxFStop=22.000000,MinimumFocusDistance=15.000000,DiaphragmBladeCount=7)
@@ -51,6 +52,18 @@ RENDER_FINISHED_DELEGATE = unreal.OnMoviePipelineExecutorFinished()
 # 2) https://docs.unrealengine.com/4.27/en-US/PythonAPI/class/MoviePipelineNewProcessExecutor.html?highlight=moviepipelineexecutorbase
 # Discouraged: 3) https://docs.unrealengine.com/4.27/en-US/PythonAPI/class/MoviePipelineInProcessExecutor.html?highlight=moviepipelinelinearexecutorbase
 MOVIE_PIPELINE_EXECUTOR = unreal.MoviePipelinePIEExecutor #NewProcessExecutor #PIEExecutor
+
+# How many scenes should be rendered in one go
+# Necessary since VRAM usage is increasing with each scene
+# Specify -1 to render all scenes at once
+RENDER_BATCH_SIZE = 100
+
+# How many batches (of size specified above) have already been processed.
+# For each step, this number has to be manually increased by one
+BATCHES_ALREADY_PROCESSED = 0
+
+# For internal use, keeps track of the total amount of scenes found
+__NUMBER_SCENES_FOUND = -1
 
 def spawn_actor(obj, x, y, z, z_yaw):
     actor_location = unreal.Vector(x, y, z)
@@ -186,9 +199,26 @@ def find_subdirectories(base_dir):
     return subdirs
 
 
+def get_batched_subdirectories(subdirectories, batch_size, batch_number):
+    """For the given batch size, returns the provided batch"""
+    if batch_size <= 0:
+        return subdirectories
+    return subdirectories[
+        batch_number * batch_size : (batch_number+1) * batch_size
+    ]
+
+
 def main():
     if len(UNRENDERED_SCENE_DIRECTORIES) == 0:
-        print("Finished rendering of all batches!")
+        if (BATCHES_ALREADY_PROCESSED + 1) * RENDER_BATCH_SIZE >= __NUMBER_SCENES_FOUND:
+            unreal.log_warning("Finished rendering of all batches!")
+        else:
+            unreal.log_warning("Finished rendering of all scenes in the provided batch!")
+            unreal.log_warning(
+                "Set value of BATCHES_ALREADY_PROCESSED to "
+                f"{BATCHES_ALREADY_PROCESSED + 1} in order to continue with "
+                "the next batch."
+            )
         return
     scene_dir = UNRENDERED_SCENE_DIRECTORIES[-1]    # Important that we take the last element
     scene_name = scene_dir.split('/')[-2]
@@ -220,8 +250,17 @@ if __name__ == '__main__':
     setup_and_check_required_directories()
     RENDER_FINISHED_DELEGATE.add_callable(on_rendering_finished)
     UNRENDERED_SCENE_DIRECTORIES = find_subdirectories(SCENES_BASE_DIR)
-    TRANS_INFO = None
-    # Load transformation information for the scene
-    with open(PATH_TRANSFORMATION_INFORMATION, 'rb') as file:
-        TRANS_INFO = pickle.load(file)
-    main()
+    __NUMBER_SCENES_FOUND = len(UNRENDERED_SCENE_DIRECTORIES)
+    if __NUMBER_SCENES_FOUND <= 0:
+        print(f"Could not find scenes to render in {SCENES_BASE_DIR}")
+    else:
+        UNRENDERED_SCENE_DIRECTORIES = get_batched_subdirectories(
+            UNRENDERED_SCENE_DIRECTORIES,
+            RENDER_BATCH_SIZE,
+            BATCHES_ALREADY_PROCESSED
+        )
+        TRANS_INFO = None
+        # Load transformation information for the scene
+        with open(PATH_TRANSFORMATION_INFORMATION, 'rb') as file:
+            TRANS_INFO = pickle.load(file)
+        main()
