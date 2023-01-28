@@ -26,21 +26,19 @@ def check_joints2d_visibility_torch(joints2d,
     return visibility
 
 
-def check_joints2d_occluded_torch(seg14part, vis, pixel_count_threshold=50):
+def check_joints2d_occluded_torch(seg, joints2d, vis):
     """
     Check if 2D joints are not self-occluded in the rendered silhouette/seg, by checking if corresponding body parts are
     visible in the corresponding 14 part seg.
     :param seg14part: (B, D, D)
     :param vis: (B, 17)
     """
+    # TODO: Rewrite this for fully parallel execution.
     new_vis = vis.clone()
-    joints_to_check_and_corresponding_bodyparts = {7: 3, 8: 5, 9: 12, 10: 11, 13: 7, 14: 9, 15: 14, 16: 13}
 
-    for joint_index in joints_to_check_and_corresponding_bodyparts.keys():
-        part = joints_to_check_and_corresponding_bodyparts[joint_index]
-        num_pixels_part = (seg14part == part).sum(dim=(1, 2))  # (B,)
-        visibility_flag = (num_pixels_part > pixel_count_threshold)  # (B,)
-        new_vis[:, joint_index] = (vis[:, joint_index] & visibility_flag)
+    for joint_index in range(vis.shape[1]):
+        if seg[:, joints2d[joint_index]] is True:
+            new_vis[:, joint_index] = 0
 
     return new_vis
 

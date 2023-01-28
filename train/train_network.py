@@ -14,9 +14,10 @@ from utils.cam_utils import perspective_project_torch, orthographic_project_torc
 from utils.rigid_transform_utils import rot6d_to_rotmat, aa_rotate_translate_points_pytorch3d, aa_rotate_rotmats_pytorch3d
 from utils.label_conversions import ALL_JOINTS_TO_H36M_MAP, convert_2Djoints_to_gaussian_heatmaps_torch, \
     H36M_TO_J14, BASE_JOINTS_TO_COCO_MAP, BASE_JOINTS_TO_H36M_MAP, ALL_JOINTS_TO_COCO_MAP
-from utils.joints2d_utils import check_joints2d_visibility_torch
+from utils.joints2d_utils import check_joints2d_visibility_torch, check_joints2d_occluded_torch
 from utils.image_utils import batch_add_rgb_background
 from utils.augmentation.rgb_augmentation import augment_rgb
+from utils.augmentation.proxy_rep_augmentation import augment_proxy_representation
 
 
 def train_poseMF_shapeGaussian_net(pose_shape_model,
@@ -145,12 +146,27 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
 
                     seg_maps = sample_batch['seg_maps'].to(device)
                     rgb_in = sample_batch['rgb_img'].to(device)
+                    
+                    # Check if joints are occluded by the body.
+                    if pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.PROXY_REP.CHECK_JOINTS_OCCLUDED:
+                        target_joints2d_visib_coco = check_joints2d_occluded_torch(seg_maps[-1],
+                                                                                target_joints2d_visib_coco,
+                                                                                pixel_count_threshold=50)  # (bs, 17)
+
+                    # Apply segmentation/IUV-based render augmentations + 2D joints augmentations
+                    _, target_joints2d_coco_input, target_joints2d_visib_coco = augment_proxy_representation(
+                        seg=seg_maps[-1],
+                        joints2D=target_joints2d_coco,
+                        joints2D_visib=target_joints2d_visib_coco,
+                        proxy_rep_augment_config=pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.PROXY_REP)
+                    
                     # Add background rgb
                     # NOTE: The last seg map (-1) is the whole body seg map.
                     if rgb_in is not None:
                         rgb_in = batch_add_rgb_background(backgrounds=background,
                                                         rgb=rgb_in,
-                                                        seg=seg_maps[:, -1])
+                                                        seg=seg_maps[:, -1])                        
+                    
                     # Apply RGB-based render augmentations + 2D joints augmentations
                         rgb_in, target_joints2d_coco_input, target_joints2d_visib_coco = augment_rgb(
                             rgb=rgb_in,

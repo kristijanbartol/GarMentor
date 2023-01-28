@@ -191,22 +191,17 @@ def augment_proxy_representation(seg,
     new_joints2D = joints2D.clone()
     new_joints2D_visib = joints2D_visib.clone()
 
-    # Body part removal
-    new_seg, new_joints2D_visib = random_remove_bodyparts(seg=new_seg,
-                                                          classes_to_remove=proxy_rep_augment_config.REMOVE_PARTS_CLASSES,
-                                                          probabilities_to_remove_classes=proxy_rep_augment_config.REMOVE_PARTS_PROBS,
-                                                          joints2D_visib=new_joints2D_visib,
-                                                          probability_to_remove_joints=proxy_rep_augment_config.REMOVE_APPENDAGE_JOINTS_PROB)
-
     # Box occlusion
-    new_seg = random_occlude_box(seg=new_seg,
-                                 occlude_probability=proxy_rep_augment_config.OCCLUDE_BOX_PROB,
-                                 occlude_box_dim=proxy_rep_augment_config.OCCLUDE_BOX_DIM)
+    if proxy_rep_augment_config.OCCLUDE_BOX_PROB > 0.:
+        new_seg = random_occlude_box(seg=new_seg,
+                                    occlude_probability=proxy_rep_augment_config.OCCLUDE_BOX_PROB,
+                                    occlude_box_dim=proxy_rep_augment_config.OCCLUDE_BOX_DIM)
 
     # 2D joint swapping
-    new_joints2D = random_swap_joints2D(joints_2D=new_joints2D,
-                                        joints_to_swap=proxy_rep_augment_config.JOINTS_TO_SWAP,
-                                        swap_probability=proxy_rep_augment_config.JOINTS_SWAP_PROB)
+    if proxy_rep_augment_config.JOINTS_SWAP_PROB > 0.:
+        new_joints2D = random_swap_joints2D(joints_2D=new_joints2D,
+                                            joints_to_swap=proxy_rep_augment_config.JOINTS_TO_SWAP,
+                                            swap_probability=proxy_rep_augment_config.JOINTS_SWAP_PROB)
 
     # 2D joint deviation
     new_joints2D = random_joints2D_deviation(joints2D=new_joints2D,
@@ -214,23 +209,27 @@ def augment_proxy_representation(seg,
                                              delta_j2d_hip_dev_range=proxy_rep_augment_config.DELTA_J2D_DEV_RANGE)
 
     # 2D joint removal (i.e. make invisible)
-    new_joints2D_visib = random_remove_joints2D(joints2D_visib=new_joints2D_visib,
-                                                joints_to_remove=proxy_rep_augment_config.REMOVE_JOINTS_INDICES,
-                                                probability_to_remove=proxy_rep_augment_config.REMOVE_JOINTS_PROB)
+    if proxy_rep_augment_config.REMOVE_JOINTS_PROB > 0.:
+        new_joints2D_visib = random_remove_joints2D(joints2D_visib=new_joints2D_visib,
+                                                    joints_to_remove=proxy_rep_augment_config.REMOVE_JOINTS_INDICES,
+                                                    probability_to_remove=proxy_rep_augment_config.REMOVE_JOINTS_PROB)
 
     # Occlude bottom/top/left halves of the body (but not the background - see rgb_augmentation.py)
-    new_seg, new_joints2D, new_joints2D_visib = random_occlude_bottom_half(seg=new_seg,
-                                                                           joints2D=new_joints2D,
-                                                                           joints2D_visib=new_joints2D_visib,
-                                                                           occlude_probability=proxy_rep_augment_config.OCCLUDE_BOTTOM_PROB)
-    new_seg, new_joints2D, new_joints2D_visib = random_occlude_top_half(new_seg,
-                                                                        new_joints2D,
-                                                                        new_joints2D_visib,
-                                                                        occlude_probability=proxy_rep_augment_config.OCCLUDE_TOP_PROB)
-    new_seg, new_joints2D, new_joints2D_visib = random_occlude_vertical_half(new_seg,
-                                                                             new_joints2D,
-                                                                             new_joints2D_visib,
-                                                                             occlude_probability=proxy_rep_augment_config.OCCLUDE_VERTICAL_PROB)
+    if proxy_rep_augment_config.OCCLUDE_BOTTOM_PROB > 0.:
+        new_seg, new_joints2D, new_joints2D_visib = random_occlude_bottom_half(seg=new_seg,
+                                                                            joints2D=new_joints2D,
+                                                                            joints2D_visib=new_joints2D_visib,
+                                                                            occlude_probability=proxy_rep_augment_config.OCCLUDE_BOTTOM_PROB)
+    if proxy_rep_augment_config.OCCLUDE_TOP_PROB > 0.:
+        new_seg, new_joints2D, new_joints2D_visib = random_occlude_top_half(new_seg,
+                                                                            new_joints2D,
+                                                                            new_joints2D_visib,
+                                                                            occlude_probability=proxy_rep_augment_config.OCCLUDE_TOP_PROB)
+    if proxy_rep_augment_config.OCCLUDE_VERTICAL_PROB > 0.:
+        new_seg, new_joints2D, new_joints2D_visib = random_occlude_vertical_half(new_seg,
+                                                                                new_joints2D,
+                                                                                new_joints2D_visib,
+                                                                                occlude_probability=proxy_rep_augment_config.OCCLUDE_VERTICAL_PROB)
 
     return new_seg, new_joints2D, new_joints2D_visib
 
