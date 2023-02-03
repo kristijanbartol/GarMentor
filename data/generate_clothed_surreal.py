@@ -7,6 +7,8 @@ from PIL import Image
 import sys
 import argparse
 
+from data import const
+
 _module_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(_module_dir))
 
@@ -105,13 +107,13 @@ class DataPreGenerator(object):
                             {idx:5d}_{garment_class}.png
     '''
 
-    DATA_ROOT_DIR = '/data/garmentor/'
+    DATA_ROOT_DIR = const.GARMENTOR_DIR
     IMG_DIR = 'rgb/'
     SEG_MAPS_DIR = 'segmentations/'
 
-    IMG_NAME_TEMPLATE = '{idx:05d}.png'
-    SEG_MAPS_NAME_TEMPLATE = '{idx:05d}.npz'
-    VALUES_FNAME = 'values.npy'
+    IMG_NAME_TEMPLATE = const.IMG_NAME_TEMPLATE
+    SEG_MAPS_NAME_TEMPLATE = const.SEG_MAPS_NAME_TEMPLATE
+    VALUES_FNAME = const.VALUES_FNAME
 
     def __init__(self):
         self.dataset_path_template = os.path.join(
@@ -126,7 +128,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
 
     '''A data pregenerator class specific to SURREAL dataset.'''
 
-    DATASET_NAME = 'surreal'
+    DATASET_NAME = const.SURREAL_DATASET_NAME
     CHECKPOINT_COUNT = 100
 
     def __init__(self):

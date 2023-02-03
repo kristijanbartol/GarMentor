@@ -1,6 +1,5 @@
 import os
 from data.off_the_fly_train_datasets import SurrealTrainDataset
-from renderers.surreal_renderer import SurrealRenderer
 import torch
 import torch.optim as optim
 import argparse
@@ -88,11 +87,14 @@ def run_train(device,
     pose_shape_model = PoseMFShapeGaussianNet(smpl_parents=smpl_model.parents.tolist(),
                                               config=pose_shape_cfg).to(device)
 
-    # Pytorch3D renderer for synthetic data generation
-    pytorch3d_renderer = SurrealRenderer(device=device, batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE)
-    
-    # Visualizer class to log the training progress.
-    vis_logger = VisLogger(visdom=visdom, renderer=pytorch3d_renderer) if visdom is not None else None
+    if visdom is not None:
+        # Pytorch3D renderer for synthetic data generation.
+        pytorch3d_renderer = SurrealRenderer(device=device, batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE)
+        
+        # Visualizer class to log the training progress.
+        vis_logger = VisLogger(visdom=visdom, renderer=pytorch3d_renderer)
+    else:
+        vis_logger = None
 
     # ------------------------- Loss Function + Optimiser -------------------------
     criterion = PoseMFShapeGaussianLoss(loss_config=pose_shape_cfg.LOSS.STAGE1,
@@ -146,6 +148,7 @@ if __name__ == '__main__':
     if args.vis or args.vport != 8888:
         thread.start_new_thread(os.system, (f'visdom -p {args.vport} > /dev/null 2>&1',))
         visdom = vis.Visdom(port=args.vport)
+        from renderers.surreal_renderer import SurrealRenderer
     else:
         visdom = None
 

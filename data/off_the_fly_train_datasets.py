@@ -7,8 +7,8 @@ import cv2
 from math import floor, ceil
 import imageio
 from torch.utils.data import Dataset
+from data import const
 
-from data.generate_clothed_surreal import SurrealDataPreGenerator, DataPreGenerator
 from utils.garment_classes import GarmentClasses
     
     
@@ -63,13 +63,13 @@ class TrainDataset(Dataset):
                         <SEG_MAP_1_1>
                         ...
     '''
-    DATA_ROOT_DIR = DataPreGenerator.DATA_ROOT_DIR
+    DATA_ROOT_DIR = const.GARMENTOR_DIR
     IMG_DIRNAME = 'rgb/'
     SEG_MAPS_DIRNAME = 'segmentations/'
 
-    IMG_NAME_TEMPLATE = DataPreGenerator.IMG_NAME_TEMPLATE
-    SEG_MAPS_NAME_TEMPLATE = DataPreGenerator.SEG_MAPS_NAME_TEMPLATE
-    VALUES_FNAME = DataPreGenerator.VALUES_FNAME
+    IMG_NAME_TEMPLATE = const.IMG_NAME_TEMPLATE
+    SEG_MAPS_NAME_TEMPLATE = const.SEG_MAPS_NAME_TEMPLATE
+    VALUES_FNAME = const.VALUES_FNAME
 
 
 TRAIN = 'train'
@@ -80,7 +80,7 @@ class SurrealTrainDataset(TrainDataset):
 
     '''An instance of train dataset specific to SURREAL dataset.'''
 
-    DATASET_NAME = SurrealDataPreGenerator.DATASET_NAME
+    DATASET_NAME = const.SURREAL_DATASET_NAME
 
     def __init__(self,
                  gender: str,

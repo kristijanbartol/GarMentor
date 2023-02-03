@@ -19,3 +19,9 @@ CAM_DIR = os.path.join(AGORA_DIR, 'camera/')
 
 TRAIN_CAM_DIR = os.path.join(CAM_DIR, 'train/')
 VAL_CAM_DIR = os.path.join(CAM_DIR, 'valid/')
+
+SURREAL_DATASET_NAME = 'surreal'
+
+IMG_NAME_TEMPLATE = '{idx:05d}.png'
+SEG_MAPS_NAME_TEMPLATE = '{idx:05d}.npz'
+VALUES_FNAME = 'values.npy'
