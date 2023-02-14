@@ -122,7 +122,7 @@ def random_occlude_bottom_half(seg,
                                joints2D,
                                joints2D_visib,
                                occlude_probability=0.05):
-    batch_size = seg.shape[0]
+    batch_size = joints2D.shape[0]
     wh = seg.shape[1]
 
     rand_vec = np.random.rand(batch_size)
@@ -142,7 +142,7 @@ def random_occlude_top_half(seg,
                             joints2D,
                             joints2D_visib,
                             occlude_probability=0.05):
-    batch_size = seg.shape[0]
+    batch_size = joints2D.shape[0]
     wh = seg.shape[1]
 
     rand_vec = np.random.rand(batch_size)
@@ -162,7 +162,7 @@ def random_occlude_vertical_half(seg,
                                  joints2D,
                                  joints2D_visib,
                                  occlude_probability=0.05):
-    batch_size = seg.shape[0]
+    batch_size = joints2D.shape[0]
     wh = seg.shape[1]
 
     rand_vec = np.random.rand(batch_size)

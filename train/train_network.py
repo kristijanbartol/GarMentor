@@ -149,13 +149,13 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     
                     # Check if joints are occluded by the body.
                     if pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.PROXY_REP.CHECK_JOINTS_OCCLUDED:
-                        target_joints2d_visib_coco = check_joints2d_occluded_torch(seg_maps[-1],
+                        target_joints2d_visib_coco = check_joints2d_occluded_torch(seg_maps[:, -1],
                                                                                 target_joints2d_visib_coco,
                                                                                 pixel_count_threshold=50)  # (bs, 17)
 
                     # Apply segmentation/IUV-based render augmentations + 2D joints augmentations
                     _, target_joints2d_coco_input, target_joints2d_visib_coco = augment_proxy_representation(
-                        seg=seg_maps[-1],
+                        seg=seg_maps[:, -1],
                         joints2D=target_joints2d_coco,
                         joints2D_visib=target_joints2d_visib_coco,
                         proxy_rep_augment_config=pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.PROXY_REP)
@@ -167,7 +167,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                         rgb=rgb_in,
                                                         seg=seg_maps[:, -1])                        
                     
-                    # Apply RGB-based render augmentations + 2D joints augmentations
+                        # Apply RGB-based render augmentations + 2D joints augmentations
                         rgb_in, target_joints2d_coco_input, target_joints2d_visib_coco = augment_rgb(
                             rgb=rgb_in,
                             joints2D=target_joints2d_coco,
@@ -181,9 +181,10 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     else:
                         edge_in = torch.zeros((
                             pose_shape_cfg.TRAIN.BATCH_SIZE, 
+                            1,
                             pose_shape_cfg.DATA.PROXY_REP_SIZE, 
-                            pose_shape_cfg.DATA.PROXY_REP_SIZE)
-                        )
+                            pose_shape_cfg.DATA.PROXY_REP_SIZE),
+                        device=device)
 
                     # Compute 2D joint heatmaps
                     j2d_heatmaps = convert_2Djoints_to_gaussian_heatmaps_torch(target_joints2d_coco_input,
