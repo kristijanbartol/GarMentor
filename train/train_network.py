@@ -154,11 +154,12 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                                                 pixel_count_threshold=50)  # (bs, 17)
 
                     # Apply segmentation/IUV-based render augmentations + 2D joints augmentations
-                    _, target_joints2d_coco_input, target_joints2d_visib_coco = augment_proxy_representation(
-                        seg=seg_maps[:, -1],
-                        joints2D=target_joints2d_coco,
-                        joints2D_visib=target_joints2d_visib_coco,
-                        proxy_rep_augment_config=pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.PROXY_REP)
+                    if pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.PROXY_REP.FLAG:
+                        _, target_joints2d_coco_input, target_joints2d_visib_coco = augment_proxy_representation(
+                            seg=seg_maps[:, -1],
+                            joints2D=target_joints2d_coco,
+                            joints2D_visib=target_joints2d_visib_coco,
+                            proxy_rep_augment_config=pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.PROXY_REP)
                     
                     # Add background rgb
                     # NOTE: The last seg map (-1) is the whole body seg map.
