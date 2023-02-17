@@ -1,6 +1,7 @@
 import random
 from typing import Dict, List
 import numpy as np
+import torch
 
 
 class GarmentClasses():
@@ -33,9 +34,23 @@ class GarmentClasses():
     NUM_CLASSES = len(GARMENT_CLASSES)
 
     # NOTE (kbartol): Clothless currently not supported.
-    CLOTHLESS_PROB = 0.0
+    CLOTHLESS_PROB = 0.0       
 
-    def _to_binary_vector(self, upper_garment_class, lower_garment_class):
+    def __init__(self, upper_class: str = None, lower_class: str = None):
+        '''If nothing is already provided, initialize random classes.'''
+
+        self.labels_vector: np.ndarray[bool] = None
+        if upper_class is None or lower_class is None:
+            self.labels_vector = self._generate_random_garment_classes()
+        else:
+            self.labels_vector = self._to_binary_vector(upper_class, lower_class)
+
+    def _to_binary_vector(
+            self, 
+            upper_garment_class: str = None, 
+            lower_garment_class: str = None
+        ) -> np.ndarray[bool]:
+        '''From garment classes strings to bool array of binary labels.'''
         binary_labels_vector: List[bool] = [0] * len(self.GARMENT_CLASSES)
         
         if upper_garment_class is not None:
@@ -70,15 +85,7 @@ class GarmentClasses():
             else:
                 lower_garment_class = None
 
-        return self._to_binary_vector(upper_garment_class, lower_garment_class)        
-
-    def __init__(self, upper_class: str = None, lower_class: str = None):
-        '''If nothing is already provided, initialize random classes.'''
-
-        if upper_class is None or lower_class is None:
-            self.labels_vector = self._generate_random_garment_classes()
-        else:
-            self.labels_vector = self._to_binary_vector(upper_class, lower_class)
+        return self._to_binary_vector(upper_garment_class, lower_garment_class) 
 
     @property
     def labels(self) -> Dict[str, int]:
@@ -132,3 +139,26 @@ class GarmentClasses():
 
     def __str__(self):
         return f'{self.upper_class}+{self.lower_class}'
+
+    @staticmethod
+    def to_binary_logits(labels_vector: torch.Tensor[bool]):
+        upper_class_logit = 1. if labels_vector[1] == 1. else 0.
+        lower_class_logit = 1. if labels_vector[3] == 1. else 0.
+        return upper_class_logit, lower_class_logit
+
+    @staticmethod
+    def logits_to_labels_vector(
+            upper_class_logit: float, 
+            lower_class_logit: float
+    ) -> torch.Tensor[bool]:
+        upper_class_int = torch.round(upper_class_logit)
+        lower_class_int = torch.round(lower_class_logit)
+
+        upper_label = 1 if upper_class_int == 1 else 0
+        lower_label = 3 if lower_class_int == 1 else 2
+        
+        labels_vector = [0] * len(GarmentClasses.GARMENT_CLASSES)
+        labels_vector[upper_label] = 1
+        labels_vector[lower_label] = 1
+
+        return labels_vector

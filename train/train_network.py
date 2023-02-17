@@ -184,7 +184,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     # ---------------------- FORWARD PASS -----------------------
                     #############################################################
                     pred_pose_F, pred_pose_U, pred_pose_S, pred_pose_V, pred_pose_rotmats_mode, \
-                        pred_shape_dist, pred_style_dist, pred_glob, pred_cam_wp = pose_shape_model(proxy_rep_input)
+                        pred_shape_dist, pred_style_dist, pred_upper_class_logit, pred_lower_class_logit, \
+                        pred_glob, pred_cam_wp = pose_shape_model(proxy_rep_input)
                     # Pose F, U, V and rotmats_mode are (bs, 23, 3, 3) and Pose S is (bs, 23, 3)
 
                     pred_glob_rotmats = rot6d_to_rotmat(pred_glob)  # (bs, 3, 3)
@@ -219,6 +220,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                           'pose_params_V': pred_pose_V,
                                           'shape_params': pred_shape_dist,
                                           'style_params': pred_style_dist,
+                                          'upper_class_logit': pred_upper_class_logit,
+                                          'lower_class_logit': pred_lower_class_logit,
                                           'verts': pred_vertices_mode,
                                           'joints3D': pred_joints_h36mlsp_mode,
                                           'joints2D': pred_joints2d_coco_samples,

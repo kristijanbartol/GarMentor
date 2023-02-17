@@ -6,6 +6,8 @@ See Equations 85-90 in https://arxiv.org/pdf/1710.03746.pdf for more details.
 import torch
 import torch.nn as nn
 
+from utils.garment_classes import GarmentClasses
+
 # Bessel function polynomial approximation coefficients from https://omlc.org/software/mc/conv-src/convnr.c
 bessel0_exp_scaled_coeffs_a = [1.0, 3.5156229, 3.0899424, 1.2067492, 0.2659732, 0.360768e-1, 0.45813e-2][::-1]
 bessel0_exp_scaled_coeffs_b = [0.39894228, 0.1328592e-1, 0.225319e-2, -0.157565e-2, 0.916281e-2, -0.2057706e-1, 0.2635537e-1, -0.1647633e-1, 0.392377e-2][::-1]
@@ -246,6 +248,7 @@ class PoseMFShapeGaussianLoss(nn.Module):
         self.joints2D_loss = nn.MSELoss(reduction=loss_config.REDUCTION)
         self.glob_rotmats_loss = nn.MSELoss(reduction=loss_config.REDUCTION)
         self.joints3D_loss = nn.MSELoss(reduction=loss_config.REDUCTION)
+        self.classifier_loss = nn.BCEWithLogitsLoss(reduction=loss_config.REDUCTION)
 
     def forward(self, target_dict, pred_dict):
 
@@ -267,12 +270,28 @@ class PoseMFShapeGaussianLoss(nn.Module):
             shape_nll = torch.mean(shape_nll)
         elif self.loss_config.REDUCTION == 'sum':
             shape_nll = torch.sum(shape_nll)
+
+        # Garment classifier
+        if pred_dict['upper_class_logit'] is not None:
+            target_upper_logit, target_lower_logit = GarmentClasses.to_binary_logits(target_dict['garment_labels'])
+            upper_garment_class_loss = self.classifier_loss(pred_dict['upper_class_logit'], target_upper_logit)
+            lower_garment_class_loss = self.classifier_loss(pred_dict['upper_class_logit'], target_lower_logit)
+            garment_class_loss = upper_garment_class_loss + lower_garment_class_loss
+        else:
+            garment_class_loss = 0.
+
+        if self.loss_config.USE_PRED_GARMENT_MASKS:
+            garment_labels_mask = GarmentClasses.logits_to_labels_vector(
+                pred_dict['upper_class_logit'], 
+                pred_dict['lower_class_logit']
+            )
+        else:
+            garment_labels_mask = target_dict['garment_labels']
             
         # Style NLL
         if pred_dict['style_params'] is not None:
             style_nll_per_class = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=4)
-            # NOTE: Only 2/4 (if num_classes=4) NLL losses are non-zero, others are masked.
-            style_nll = target_dict['garment_labels'] * style_nll_per_class                                    # (batch_size, num_classes=4)
+            style_nll = garment_labels_mask * style_nll_per_class                                    # (batch_size, num_classes=4)
             if self.loss_config.REDUCTION == 'mean':
                 style_nll = torch.mean(style_nll)
             elif self.loss_config.REDUCTION == 'sum':
@@ -302,6 +321,7 @@ class PoseMFShapeGaussianLoss(nn.Module):
         total_loss = pose_nll * self.loss_config.WEIGHTS.POSE \
                      + shape_nll * self.loss_config.WEIGHTS.SHAPE \
                      + style_nll * self.loss_config.WEIGHTS.STYLE \
+                     + garment_class_loss * self.loss_config.WEIGHTS.GARMENT_CLASSIFIER \
                      + joints2D_loss * self.loss_config.WEIGHTS.JOINTS2D \
                      + glob_rotmats_loss * self.loss_config.WEIGHTS.GLOB_ROTMATS \
                      + joints3D_loss * self.loss_config.WEIGHTS.JOINTS3D
