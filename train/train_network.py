@@ -14,7 +14,7 @@ from utils.cam_utils import perspective_project_torch, orthographic_project_torc
 from utils.rigid_transform_utils import rot6d_to_rotmat, aa_rotate_translate_points_pytorch3d, aa_rotate_rotmats_pytorch3d
 from utils.label_conversions import ALL_JOINTS_TO_H36M_MAP, convert_2Djoints_to_gaussian_heatmaps_torch, \
     H36M_TO_J14, BASE_JOINTS_TO_COCO_MAP, BASE_JOINTS_TO_H36M_MAP, ALL_JOINTS_TO_COCO_MAP
-from utils.joints2d_utils import check_joints2d_visibility_torch
+from utils.joints2d_utils import check_joints2d_visibility_torch, undo_keypoint_normalisation
 from utils.image_utils import batch_add_rgb_background
 from utils.augmentation.rgb_augmentation import augment_rgb
 
@@ -124,7 +124,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                     pose2rot=False)
 
                     target_vertices = target_smpl_output.vertices
-                    target_joints2d_coco = target_smpl_output.joints[:, ALL_JOINTS_TO_COCO_MAP]
+                    target_joints_coco = target_smpl_output.joints[:, ALL_JOINTS_TO_COCO_MAP]
                     target_joints_h36m = target_smpl_output.joints[:, ALL_JOINTS_TO_H36M_MAP]
                     target_joints_h36mlsp = target_joints_h36m[:, H36M_TO_J14, :]
                     
@@ -133,7 +133,12 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                          betas=target_shape).vertices
 
                     # ------------ INPUT PROXY REPRESENTATION GENERATION + 2D TARGET JOINTS ------------
-                    target_joints2d_coco = perspective_project_torch(target_joints2d_coco,
+                    target_joints2d_coco = perspective_project_torch(target_joints_coco,
+                                                                     None,
+                                                                     target_cam_t,
+                                                                     focal_length=pose_shape_cfg.TRAIN.SYNTH_DATA.FOCAL_LENGTH,
+                                                                     img_wh=pose_shape_cfg.DATA.PROXY_REP_SIZE)
+                    target_joints2d_h36m = perspective_project_torch(target_joints_h36m,
                                                                      None,
                                                                      target_cam_t,
                                                                      focal_length=pose_shape_cfg.TRAIN.SYNTH_DATA.FOCAL_LENGTH,
@@ -141,6 +146,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
 
                     # Check if joints within image dimensions before cropping + recentering.
                     target_joints2d_visib_coco = check_joints2d_visibility_torch(target_joints2d_coco,
+                                                                                 pose_shape_cfg.DATA.PROXY_REP_SIZE)  # (batch_size, 17)
+                    target_joints2d_visib_h36m = check_joints2d_visibility_torch(target_joints2d_h36m,
                                                                                  pose_shape_cfg.DATA.PROXY_REP_SIZE)  # (batch_size, 17)
 
                     seg_maps = sample_batch['seg_maps'].to(device)
@@ -158,6 +165,12 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                             joints2D_visib=target_joints2d_visib_coco,
                             rgb_augment_config=pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.RGB
                         )
+                        rgb_in, target_joints2d_h36m_input, target_joints2d_visib_h36m = augment_rgb(
+                            rgb=rgb_in,
+                            joints2D=target_joints2d_h36m,
+                            joints2D_visib=target_joints2d_visib_h36m,
+                            rgb_augment_config=pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.RGB
+                        )
                         # Compute edge-images edges
                         edge_detector_output = edge_detect_model(rgb_in)
                         edge_in = edge_detector_output['thresholded_thin_edges'] \
@@ -170,14 +183,19 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                         )
 
                     # Compute 2D joint heatmaps
-                    j2d_heatmaps = convert_2Djoints_to_gaussian_heatmaps_torch(target_joints2d_coco_input,
+                    j2d_heatmaps_coco = convert_2Djoints_to_gaussian_heatmaps_torch(target_joints2d_coco_input,
                                                                                pose_shape_cfg.DATA.PROXY_REP_SIZE,
                                                                                std=pose_shape_cfg.DATA.HEATMAP_GAUSSIAN_STD)
-                    j2d_heatmaps = j2d_heatmaps * target_joints2d_visib_coco[:, :, None, None]
+                    j2d_heatmaps_coco = j2d_heatmaps_coco * target_joints2d_visib_coco[:, :, None, None]
+
+                    j2d_heatmaps_h36m = convert_2Djoints_to_gaussian_heatmaps_torch(target_joints2d_h36m_input,
+                                                                               pose_shape_cfg.DATA.PROXY_REP_SIZE,
+                                                                               std=pose_shape_cfg.DATA.HEATMAP_GAUSSIAN_STD)
+                    j2d_heatmaps_h36m = j2d_heatmaps_h36m * target_joints2d_visib_coco[:, :, None, None]
 
                     # Concatenate edge-image and 2D joint heatmaps to create input proxy representation
                     #proxy_rep_input = torch.cat([edge_in, seg_maps, j2d_heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
-                    proxy_rep_input = torch.cat([edge_in, j2d_heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
+                    proxy_rep_input = torch.cat([edge_in, j2d_heatmaps_coco], dim=1).float()  # (batch_size, C, img_wh, img_wh)
 
                 with torch.set_grad_enabled(split == 'train'):
                     #############################################################
@@ -268,7 +286,19 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                 if vis_logger is not None:
                     vis_logger.vis_rgb(rgb_in)
                     vis_logger.vis_edge(edge_in)
-                    vis_logger.vis_j2d_heatmaps(j2d_heatmaps)
+                    vis_logger.vis_j2d_heatmaps(j2d_heatmaps_coco, label='gt_coco')
+                    vis_logger.vis_j2d_heatmaps(j2d_heatmaps_h36m, label='gt_h36m')
+
+                    pred_joints2d_normalized = undo_keypoint_normalisation(
+                        pred_joints2d_coco_samples[:, 0],
+                        pose_shape_cfg.DATA.PROXY_REP_SIZE
+                    )
+                    pred_joints2d_coco_heatmaps = convert_2Djoints_to_gaussian_heatmaps_torch(
+                        pred_joints2d_normalized,
+                        pose_shape_cfg.DATA.PROXY_REP_SIZE,
+                        std=pose_shape_cfg.DATA.HEATMAP_GAUSSIAN_STD
+                    )
+                    vis_logger.vis_j2d_heatmaps(pred_joints2d_coco_heatmaps, label='pred_coco')
 
         #############################################################
         # ------------- UPDATE METRICS HISTORY and SAVE -------------

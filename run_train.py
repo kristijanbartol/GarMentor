@@ -144,7 +144,7 @@ if __name__ == '__main__':
     print('\nDevice: {}'.format(device))
     
     if args.vis or args.vport != 8888:
-        thread.start_new_thread(os.system, (f'visdom -p {args.vport} > /dev/null 2>&1',))
+        #thread.start_new_thread(os.system, (f'visdom -p {args.vport} > /dev/null 2>&1',))
         visdom = vis.Visdom(port=args.vport)
     else:
         visdom = None

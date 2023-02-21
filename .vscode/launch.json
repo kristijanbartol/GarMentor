@@ -19,9 +19,10 @@
                 //"--visualise_uncropped", 
                 //"--pose_shape_weights", "experiments/resnet50-style-params/saved_models/epoch_095.tar"     // predict
                 //"--pose_shape_weights", "experiments/second-experiment/epoch_115.tar"     // evaluate
-                "--pose_shape_weights", "experiments/resnet50-style-params/saved_models/epoch_095.tar"     // evaluate
+                //"--pose_shape_weights", "experiments/resnet50-style-params/saved_models/epoch_095.tar"     // evaluate
                 //"--lsun_dir", "../lsun/", "--train_files_dir", "train_files/"     // copy LSUN
                 //"-E", "experiments/resnet50-coco-shape-only", "--gpu", "1"           // train
+                "-E", "experiments/tmp", "--gpu", "0", "--vport", "8889"           // train
                 ////"-G", "male", "-U", "shirt", "-L", "short-pant", "-N", "10000"      // pregenerate
             ]
         }

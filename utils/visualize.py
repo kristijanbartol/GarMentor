@@ -45,9 +45,9 @@ class VisLogger():
         self.visdom.images(edge_in_rgb[:self._nrow], nrow=self._nrow, win='edge_in')
 
     def vis_j2d_heatmaps(self, j2d_heatmaps, label='j2d_heatmaps'):
-        colored_h2d_heatmap = torch.zeros(1, 3, 256, 256).to('cuda:0')
+        colored_h2d_heatmap = torch.zeros(self._nrow, 3, 256, 256).to('cuda:0')
         for color_idx, color_key in enumerate(COLORS):
-            heatmap = torch.stack((j2d_heatmaps[:, color_idx],) * 3, dim=1)
+            heatmap = torch.stack((j2d_heatmaps[:self._nrow, color_idx],) * 3, dim=1)
             color_tensor = torch.tensor(COLORS[color_key])
             heatmap[:, 0] *= color_tensor[0]
             heatmap[:, 1] *= color_tensor[1]
