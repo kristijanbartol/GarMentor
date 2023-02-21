@@ -19,7 +19,7 @@ from models.parametric_model import ParametricModel
 from evaluate.evaluate_poseMF_shapeGaussian_net import evaluate_pose_MF_shapeGaussian_net
 from renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
 from utils.garment_classes import GarmentClasses
-from utils.visualize import VisLogger
+from visualize.vis_logger import VisLogger
 
 
 def run_evaluate(device,

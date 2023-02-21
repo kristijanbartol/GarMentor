@@ -19,7 +19,7 @@ from pytorch3d.renderer import (
 
 from utils.mesh_utils import concatenate_meshes
 from utils.garment_classes import GarmentClasses
-from utils.colors import GarmentColors, BodyColors, N
+from visualize.colors import GarmentColors, BodyColors, N
 
 from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
 

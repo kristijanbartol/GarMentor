@@ -153,7 +153,6 @@ class SurrealDataPreGenerator(DataPreGenerator):
 
     def _init_useful_arrays(self) -> None:
         '''These useful arrays are used to randomly sample data and transform points.'''
-        self.x_axis = np.array([1., 0., 0.], dtype=np.float32)
         self.delta_betas_std_vector = np.ones(
             self.cfg.MODEL.NUM_SMPL_BETAS, 
             dtype=np.float32) * \

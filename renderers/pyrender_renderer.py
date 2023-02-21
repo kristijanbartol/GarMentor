@@ -12,7 +12,7 @@ import pyrender
 
 from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
 
-from utils.colors import Colors, NoColors, BodyColors, GarmentColors, N, A
+from visualize.colors import Colors, NoColors, BodyColors, GarmentColors, N, A
 from utils.garment_classes import GarmentClasses
 
 

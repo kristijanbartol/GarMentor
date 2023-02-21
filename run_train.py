@@ -18,7 +18,7 @@ from configs import paths
 
 from train.train_network import train_poseMF_shapeGaussian_net
 
-from utils.visualize import VisLogger
+from visualize.logger import VisLogger
 
 
 def run_train(device,

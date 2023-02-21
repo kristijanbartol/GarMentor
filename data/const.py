@@ -1,8 +1,16 @@
 
 import os
 
+#######################
+### GARMENT CLASSES ###
+#######################
+
 MGN_CLASSES = ['Pants', 'ShortPants', 'ShirtNoCoat', 'TShirtNoCoat']
 GARMENT_CLASSES = ['pant', 'short-pant', 'shirt', 't-shirt']
+
+#############
+### PATHS ###
+#############
 
 DATA_DIR = '/data/'
 
