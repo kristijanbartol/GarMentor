@@ -3,18 +3,14 @@ import torch
 import numpy as np
 
 from colors import KPT_COLORS
-from data.const import MEAN_CAM_T
 from data.off_the_fly_train_datasets import SurrealTrainDataset
 from models.parametric_model import ParametricModel
 from models.smpl_official import SMPL
 from render.clothed_renderer import ClothedRenderer
 from render.body_renderer import BodyRenderer
 from utils.garment_classes import GarmentClasses
-from utils.image_utils import batch_add_rgb_background
-from utils.convert_arrays import (
-    to_arrays,
-    verify_arrays
-)
+from utils.image_utils import add_rgb_background
+from utils.convert_arrays import to_tensors
 
 
 class Visualizer(object):
@@ -39,23 +35,18 @@ class Visualizer(object):
             rgb_img: Union[np.ndarray, torch.Tensor],
             mask: Union[np.ndarray, torch.Tensor]
         ) -> Union[np.ndarray, torch.Tensor]:
+        '''Add random 2D background "behind" rendered person based on mask.'''
         if self.background_paths is not None:
             background = SurrealTrainDataset.load_background(
                 backgrounds_paths=self.backgrounds_paths,
                 img_wh=self.img_wh
             ).to(self.device)
 
-            are_numpy, (rgb_img, mask) = verify_arrays(
-                arrays=[rgb_img, mask])
-
-            rgb_img = batch_add_rgb_background(
+            rgb_img = add_rgb_background(
                 backgrounds=background,
                 rgb=rgb_img,
                 seg=mask
             )
-
-            if are_numpy:
-                rgb_img = to_arrays([rgb_img])
         else:
             print('WARNING: The background paths not provided.'\
                 ' Returning the original image.')
@@ -191,14 +182,15 @@ class BodyVisualizer(Visualizer):
             glob_orient: Union[np.ndarray, torch.Tensor] = None
     ) -> Tuple[Union[np.ndarray, torch.Tensor],
                Union[np.ndarray, torch.Tensor]]:
+        '''First run the SMPL body model to get verts and then render.'''
         if glob_orient is None:
             glob_orient = self.default_glob_orient
 
         if self.smpl_body is not None:
-            are_numpy, (pose, shape) = verify_arrays(
+            pose, shape = to_tensors(
                 arrays=[pose, shape, glob_orient]
             )
-            body_vertices = self.smpl_model(
+            body_vertices: np.ndarray = self.smpl_model(
                 body_pose=pose,
                 global_orient=glob_orient,
                 betas=shape,
@@ -206,22 +198,20 @@ class BodyVisualizer(Visualizer):
             ).vertices
 
             body_rgb, body_mask = self.renderer(body_vertices)
-            if are_numpy:
-                # TODO: Update this part (that's why I'm updating Renderers anyways.)
-                pass
             return body_rgb, body_mask
         else:
             print('WARNING: No SMPL model provided.'\
-                ' Returning None.')
+                ' Returning (None, None).')
             return None, None
 
     def vis_body_from_verts(
         self,
         verts: Union[np.ndarray, torch.Tensor]
-    ) -> Union[np.ndarray, torch.Tensor]:
-        are_numpy, (verts) = verify_arrays(
-            arrays=[verts]
-        )
+    ) -> Union[Tuple[np.ndarray, np.ndarray],
+               Tuple[torch.Tensor, torch.Tensor]]:
+        '''Render body using simple rendering strategy + get mask.'''
+        body_rgb, body_mask = self.renderer(verts)
+        return body_rgb, body_mask
 
 
 class ClothedVisualizer(Visualizer):
@@ -254,15 +244,22 @@ class ClothedVisualizer(Visualizer):
 
     def vis_clothed(
             self,
-            pose: Union[np.ndarray, torch.Tensor], 
-            shape: Union[np.ndarray, torch.Tensor], 
-            style_vector: Union[np.ndarray, torch.Tensor]
-        ) -> Tuple[Union[np.ndarray, torch.Tensor],
-                   Union[np.ndarray, torch.Tensor]]:
-        are_numpy, (pose, shape, style_vector) = verify_arrays(
+            pose: np.ndarray, 
+            shape: np.ndarray, 
+            style_vector: np.ndarray
+        ) -> Tuple[np.ndarray, np.ndarray]:
+        ''' Visualize clothed mesh(es).
+        
+            First, the parametric model is ran to obtain the verts.
+            Then, the renderer renders the clothed meshes. The method
+            returns an RGB rendered image (without background) and the
+            mask of the person's silhouette. Note that the method 
+            always expects Numpy arrays because visualizing TailorNet 
+            will not be required in training loop, for now.
+        '''
+        pose, shape, style_vector = to_tensors(
             arrays=[pose, shape, style_vector]
         )
-
         smpl_output_dict = self.parametric_model.run(
             pose=pose,
             shape=shape,
@@ -270,37 +267,6 @@ class ClothedVisualizer(Visualizer):
         )
         rgb_img, seg_maps = self.renderer(
             smpl_output_dict,
-            garment_classes=self.parametric_model.garment_classes,
-            cam_t=MEAN_CAM_T
+            garment_classes=self.parametric_model.garment_classes
         )
-        
-        if are_numpy:
-            rgb_img, seg_maps = to_arrays([rgb_img, seg_maps])
         return rgb_img, seg_maps
-    
-    def add_background(
-            self, 
-            rgb_img: Union[np.ndarray, torch.Tensor],
-            whole_seg_map: Union[np.ndarray, torch.Tensor]
-        ) -> Union[np.ndarray, torch.Tensor]:
-        if self.background_paths is not None:
-            background = SurrealTrainDataset.load_background(
-                backgrounds_paths=self.backgrounds_paths,
-                img_wh=self.img_wh
-            ).to(self.device)
-
-            are_numpy, (rgb_img, whole_seg_map) = verify_arrays(
-                arrays=[rgb_img, whole_seg_map])
-
-            rgb_img = batch_add_rgb_background(
-                backgrounds=background,
-                rgb=rgb_img,
-                seg=whole_seg_map
-            )
-
-            if are_numpy:
-                rgb_img = to_arrays([rgb_img])
-        else:
-            print('WARNING: The background paths not provided.'\
-                ' Returning the original image.')
-        return rgb_img

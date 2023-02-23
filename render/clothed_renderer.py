@@ -144,16 +144,12 @@ class ClothedRenderer(Renderer):
             self, 
             smpl_output_dict: Dict[str, SMPL4GarmentOutput],
             garment_classes: GarmentClasses,
-            cam_t: Optional[np.narray] = None,
-            orthographic_scale: float = None,
-            lights_rgb_settings: Dict[str, Tuple[float]] = None
+            *args,
+            **kwargs
         ) -> Tuple(np.ndarray, np.ndarray):
         '''Render RGB images of clothed meshes, single-colored piece-wise.'''
-        self._process_optional_arguments(
-            cam_t,
-            orthographic_scale,
-            lights_rgb_settings
-        )
+        self._process_optional_arguments(*args, **kwargs)
+
         meshes = self._prepare_meshes(smpl_output_dict)
         rgbs = []
         for mesh in meshes:

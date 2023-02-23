@@ -87,16 +87,13 @@ class BodyRenderer(Renderer):
     def forward(
             self, 
             body_verts: np.ndarray,
-            cam_t: Optional[np.ndarray] = None,
-            orthographic_scale: Optional[float] = None,
-            lights_rgb_settings: Optional[Dict[str, Tuple[float]]] = None
-        ) -> Tuple(np.ndarray, np.ndarray):
+            *args,
+            **kwargs
+        ) -> Union[Tuple[np.ndarray, np.ndarray],
+                   Tuple[torch.Tensor, torch.Tensor]]:
         '''Render RGB images of clothed meshes, single-colored piece-wise.'''
-        self._process_optional_arguments(
-            cam_t, 
-            orthographic_scale, 
-            lights_rgb_settings
-        )
+        self._process_optional_arguments(*args, **kwargs)
+        
         body_mesh = self._prepare_body_mesh(body_verts)
         fragments = self.rasterizer(
             body_mesh, 
