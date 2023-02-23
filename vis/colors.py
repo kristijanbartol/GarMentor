@@ -67,12 +67,8 @@ class BodyColors(Colors):
     OTHER_SKIN2 = (156., 102., 31.)
 
 
-def N(color_value):
+def norm_color(color_value):
     return tuple(x / 255. for x in color_value)
-
-
-def A(color_value):
-    return color_value + (1.,)
 
 
 if __name__ == '__main__':

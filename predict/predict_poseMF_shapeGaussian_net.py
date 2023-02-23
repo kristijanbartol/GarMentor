@@ -10,8 +10,8 @@ import imageio
 
 from predict.predict_hrnet import predict_hrnet
 
-from renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
-from renderers.surreal_renderer import SurrealRenderer
+from render.body_renderer import BodyRenderer
+from render.clothed_renderer import ClothedRenderer
 
 from utils.image_utils import batch_add_rgb_background, batch_crop_pytorch_affine, batch_crop_opencv_affine
 from utils.label_conversions import convert_2Djoints_to_gaussian_heatmaps_torch
@@ -42,13 +42,13 @@ def predict_poseMF_shapeGaussian_net(pose_shape_model,
     Pose predictions follow the kinematic chain.
     """
     # Setting up body visualisation renderer
-    body_vis_renderer = TexturedIUVRenderer(device=device,
+    body_vis_renderer = BodyRenderer(device=device,
                                             batch_size=1,
                                             img_wh=visualise_wh,
                                             #projection_type='orthographic',
                                             render_rgb=True,
                                             bin_size=32)
-    surreal_renderer = SurrealRenderer(
+    surreal_renderer = ClothedRenderer(
             device='cuda:0',
             batch_size=1
         )

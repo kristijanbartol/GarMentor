@@ -17,7 +17,7 @@ from utils.augmentation.smpl_augmentation import (
     normal_sample_style_numpy
 )
 from models.parametric_model import ParametricModel
-from renderers.surreal_renderer import SurrealRenderer
+from render.clothed_renderer import ClothedRenderer
 from utils.augmentation.cam_augmentation import augment_cam_t_numpy
 from utils.garment_classes import GarmentClasses
 
@@ -135,7 +135,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
         super().__init__()
         self.cfg = get_cfg_defaults()
         self._init_useful_arrays()
-        self.renderer = SurrealRenderer(
+        self.renderer = ClothedRenderer(
             device='cuda:0',
             batch_size=1
         )

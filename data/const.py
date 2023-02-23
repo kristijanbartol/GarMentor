@@ -1,5 +1,5 @@
-
 import os
+import numpy as np
 
 #######################
 ### GARMENT CLASSES ###
@@ -27,3 +27,5 @@ CAM_DIR = os.path.join(AGORA_DIR, 'camera/')
 
 TRAIN_CAM_DIR = os.path.join(CAM_DIR, 'train/')
 VAL_CAM_DIR = os.path.join(CAM_DIR, 'valid/')
+
+BODY_FACES = np.load('/data/hierprob3d/smpl/smpl_faces.npy').astype(np.int32)

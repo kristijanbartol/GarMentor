@@ -17,9 +17,9 @@ from models.poseMF_shapeGaussian_net import PoseMFShapeGaussianNet
 from models.canny_edge_detector import CannyEdgeDetector
 from models.parametric_model import ParametricModel
 from evaluate.evaluate_poseMF_shapeGaussian_net import evaluate_pose_MF_shapeGaussian_net
-from renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
+from render.body_renderer import BodyRenderer
 from utils.garment_classes import GarmentClasses
-from visualize.vis_logger import VisLogger
+from vis.logger import VisLogger
 
 
 def run_evaluate(device,
@@ -96,7 +96,7 @@ def run_evaluate(device,
         # Visualizer class to log the evaluation samples.
         vis_logger = VisLogger(visdom=visdom) if visdom is not None else None
         # Pytorch3D renderer for vertices' visualization
-        renderer = TexturedIUVRenderer(device=device,
+        renderer = BodyRenderer(device=device,
                                         batch_size=1,
                                         img_wh=512,
                                         #projection_type='orthographic',

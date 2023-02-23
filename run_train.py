@@ -1,6 +1,6 @@
 import os
 from data.off_the_fly_train_datasets import SurrealTrainDataset
-from renderers.surreal_renderer import SurrealRenderer
+from render.body_renderer import BodyRenderer
 import torch
 import torch.optim as optim
 import argparse
@@ -18,7 +18,7 @@ from configs import paths
 
 from train.train_network import train_poseMF_shapeGaussian_net
 
-from visualize.logger import VisLogger
+from vis.logger import VisLogger
 
 
 def run_train(device,
@@ -89,10 +89,10 @@ def run_train(device,
                                               config=pose_shape_cfg).to(device)
 
     # Pytorch3D renderer for synthetic data generation
-    pytorch3d_renderer = SurrealRenderer(device=device, batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE)
+    body_renderer = BodyRenderer(device=device, batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE)
     
     # Visualizer class to log the training progress.
-    vis_logger = VisLogger(visdom=visdom, renderer=pytorch3d_renderer) if visdom is not None else None
+    vis_logger = VisLogger(visdom=visdom, renderer=body_renderer) if visdom is not None else None
 
     # ------------------------- Loss Function + Optimiser -------------------------
     criterion = PoseMFShapeGaussianLoss(loss_config=pose_shape_cfg.LOSS.STAGE1,
