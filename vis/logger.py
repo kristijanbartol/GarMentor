@@ -26,7 +26,7 @@ class VisLogger():
         self.kpts_vis = KeypointsVisualizer(
             device=self.device
         )
-        self.body_visualizer = BodyVisualizer()
+        self.body_vis = BodyVisualizer()
     
     def vis_rgb(self, rgb_in, label='rgb_in'):
         self.visdom.images(rgb_in[:self._nrow], nrow=self._nrow, win=label,
@@ -60,21 +60,16 @@ class VisLogger():
             opts={'title': label}
         )
         
-    def vis_pred_rgb(self, pred_verts, x_axis, angle, trans, texture, cam_t, settings):
-        # TODO: Update this function to be able to actually get the predicted RGB.
-        pred_verts = aa_rotate_translate_points_pytorch3d(
-            points=pred_verts,
-            axes=x_axis,
-            angles=angle,
-            translations=trans)
+    def vis_pred_rgb(
+            self, 
+            pred_verts, 
+            back_img = None
+        ) -> None:
+        pred_img, pred_mask = self.body_vis.vis_body_from_verts(pred_verts)
+        if back_img is not None:
+            pred_img = self.body_vis.add_background(pred_img, pred_mask, back_img)
         
-        renderer_pred_output = self.renderer(
-            vertices=pred_verts,
-            textures=texture,
-            cam_t=cam_t,
-            lights_rgb_settings=settings)
-        
-        rgb_out = renderer_pred_output['rgb_images'].permute(0, 3, 1, 2).contiguous()  # (N, C, img_wh, img_wh)
+        rgb_out = pred_img  # (N, C, img_wh, img_wh)
         self.visdom.images(rgb_out[:self._nrow], nrow=self._nrow, win='rgb_out')
         
     def vis_shape_dist(self, pred_shape_dist, target_shape):

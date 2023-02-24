@@ -48,17 +48,19 @@ class Visualizer2D(Visualizer):
     def add_background(
             self, 
             rgb_img: Union[np.ndarray, torch.Tensor],
-            mask: Union[np.ndarray, torch.Tensor]
+            mask: Union[np.ndarray, torch.Tensor],
+            back_img: Union[np.ndarray, torch.Tensor]
         ) -> Union[np.ndarray, torch.Tensor]:
         '''Add random 2D background "behind" rendered person based on mask.'''
-        if self.background_paths is not None:
-            background = SurrealTrainDataset.load_background(
-                backgrounds_paths=self.backgrounds_paths,
-                img_wh=self.img_wh
-            ).to(self.device)
+        if self.background_paths is not None and back_img is not None:
+            if back_img is None:
+                back_img = SurrealTrainDataset.load_background(
+                    backgrounds_paths=self.backgrounds_paths,
+                    img_wh=self.img_wh
+                ).to(self.device)
 
             rgb_img = add_rgb_background(
-                backgrounds=background,
+                backgrounds=back_img,
                 rgb=rgb_img,
                 seg=mask
             )
