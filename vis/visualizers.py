@@ -1,8 +1,13 @@
-from typing import Union, Tuple
+from typing import Union, Tuple, Optional
 import torch
 import numpy as np
+import cv2
 
-from colors import KPT_COLORS
+from colors import (
+    KPT_COLORS,
+    LCOLOR,
+    RCOLOR
+)
 from data.off_the_fly_train_datasets import SurrealTrainDataset
 from models.parametric_model import ParametricModel
 from models.smpl_official import SMPL
@@ -11,9 +16,18 @@ from render.body_renderer import BodyRenderer
 from utils.garment_classes import GarmentClasses
 from utils.image_utils import add_rgb_background
 from utils.convert_arrays import to_tensors
+from utils.label_conversions import (
+    COCO_START_IDXS,
+    COCO_END_IDXS,
+    COCO_LR
+)
 
 
 class Visualizer(object):
+    pass
+
+
+class Visualizer2D(Visualizer):
 
     default_glob_orient = torch.Tensor([0., 0., 0.])
 
@@ -21,11 +35,12 @@ class Visualizer(object):
             self,
             backgrounds_dir_path: str = None
     ) -> None:
+        super().__init__()
         self.backgrounds_dir_path = backgrounds_dir_path
 
         self.background_paths = None
         if backgrounds_dir_path is not None:
-            self.backgrounds_paths = self._get_background_paths(
+            self.backgrounds_paths = SurrealTrainDataset._get_background_paths(
                 backgrounds_dir_path=backgrounds_dir_path,
                 num_backgrounds=1000
             )
@@ -53,7 +68,13 @@ class Visualizer(object):
         return rgb_img
 
 
-class KeypointsVisualizer(Visualizer):
+class Visualizer3D(Visualizer):
+
+    def __init__(self):
+        super().__init__()
+
+
+class KeypointsVisualizer(Visualizer2D):
 
     def __init__(
             self, 
@@ -71,7 +92,7 @@ class KeypointsVisualizer(Visualizer):
             heatmaps: torch.Tensor, 
             num_heatmaps: int
         ) -> torch.Tensor:
-        colored_heatmaps = torch.zeros(num_heatmaps, 3, 256, 256).to(self.device)
+        colored_heatmaps = torch.zeros(num_heatmaps, 3, self.img_wh, self.img_wh).to(self.device)
         for color_idx, color_key in enumerate(KPT_COLORS):
             heatmaps = torch.stack((heatmaps[:num_heatmaps, color_idx],) * 3, dim=1)
             color_tensor = torch.tensor(KPT_COLORS[color_key])
@@ -85,7 +106,7 @@ class KeypointsVisualizer(Visualizer):
             self,
             heatmap: torch.Tensor
     ) -> Union[np.ndarray, torch.Tensor]:
-        colored_heatmap = torch.zeros(3, 256, 256).to(self.device)
+        colored_heatmap = torch.zeros(3, self.img_wh, self.img_wh).to(self.device)
         for color_idx, color_key in enumerate(KPT_COLORS):
             heatmap = torch.stack((heatmap[color_idx],) * 3, dim=1)
             color_tensor = torch.tensor(KPT_COLORS[color_key])
@@ -99,66 +120,51 @@ class KeypointsVisualizer(Visualizer):
             self,
             heatmap: np.ndarray
     ) -> np.ndarray:
-        colored_heatmap = np.zeros(3, 256, 256)
+        colored_heatmap = np.zeros(3, self.img_wh, self.img_wh)
         for color_idx, color_key in enumerate(KPT_COLORS):
             heatmap = np.stack((heatmap[color_idx],) * 3, dim=1)
-            color_tensor = np.array(KPT_COLORS[color_key])
-            heatmap[0] *= color_tensor[0]
-            heatmap[1] *= color_tensor[1]
-            heatmap[2] *= color_tensor[2]
+            heatmap[0] *= KPT_COLORS[color_key][0]
+            heatmap[1] *= KPT_COLORS[color_key][1]
+            heatmap[2] *= KPT_COLORS[color_key][2]
             colored_heatmaps += heatmap
         return colored_heatmap
-
-    def batched_vis_pose(
+    
+    def vis_keypoints(
             self,
-            kpts: torch.Tensor,
-            num_maps: int
-    ) -> torch.Tensor:
-        colored_pose_imgs = torch.zeros(num_maps, 3, 256, 256).to(self.device)
-        # TODO: Need to define start and end joints to create stick figures.
+            kpts: np.ndarray,
+            back_img: Optional[np.ndarray] = None
+    ) -> np.ndarray:
+        if back_img is None:
+            back_img = np.zeros(3, self.img_wh, self.img_wh)
+            
+        for idx, color_key in enumerate(KPT_COLORS):
+            kpt = kpts[idx]
+            color = KPT_COLORS[color_key]
+            cv2.circle(back_img, kpt, 3, color, 3)
+        return back_img
 
-    def vis_pose_torch(
+    def vis_pose(
             self,
-            kpts: torch.Tensor,
-            num_maps: int
-    ) -> torch.Tensor:
-        colored_pose_imgs = torch.zeros(num_maps, 3, 256, 256).to(self.device)
-        # TODO: Need to define start and end joints to create stick figures.
-
-    def vis_pose_numpy(
-            self,
-            kpts: torch.Tensor,
-            num_maps: int
-    ) -> torch.Tensor:
-        colored_pose_imgs = torch.zeros(num_maps, 3, 256, 256).to(self.device)
-        # TODO: Need to define start and end joints to create stick figures.
-
-    def vis_pose_from_params_torch(
-            self,
-            kpts: torch.Tensor,
-            num_maps: int
-    ) -> torch.Tensor:
-        colored_pose_imgs = torch.zeros(num_maps, 3, 256, 256).to(self.device)
-        # TODO: Need to define start and end joints to create stick figures.
-
-    def vis_pose_from_params_numpy(
-            self,
-            kpts: torch.Tensor,
-            num_maps: int
-    ) -> torch.Tensor:
-        colored_pose_imgs = torch.zeros(num_maps, 3, 256, 256).to(self.device)
-        # TODO: Need to define start and end joints to create stick figures.
+            kpts: np.ndarray,
+            back_img: Optional[np.ndarray] = None
+    ) -> np.ndarray:
+        pose_img = self.vis_keypoints(kpts, back_img)
+        for line_idx, start_idx in COCO_START_IDXS:
+            start_kpt = kpts[start_idx]
+            end_kpt = kpts[COCO_END_IDXS[line_idx]]
+            color = LCOLOR if COCO_LR[line_idx] else RCOLOR
+            cv2.line(pose_img, start_kpt, end_kpt, color, 2) 
+        return pose_img
 
     def overlay_keypoints(
             self,
-            kpts: Union[np.ndarray, torch.Tensor],
-            img: Union[np.ndarray, torch.Tensor]
-    ) -> Union[np.ndarray, torch.Tensor]:
-        # TODO: Overlay keypoints on top of the image.
-        pass
+            kpts: np.ndarray,
+            back_img: np.ndarray
+    ) -> np.ndarray:
+        return self.vis_pose(kpts, back_img)
 
 
-class BodyVisualizer(Visualizer):
+class BodyVisualizer(Visualizer2D):
 
     def __init__(
             self, 
@@ -214,7 +220,36 @@ class BodyVisualizer(Visualizer):
         return body_rgb, body_mask
 
 
-class ClothedVisualizer(Visualizer):
+class ClothedVisualizer(Visualizer2D):
+
+    def __init__(
+            self, 
+            gender: str,
+            upper_class: str,
+            lower_class: str,
+            device: str,
+            backgrounds_dir_path: str = None,
+            img_wh=256
+        ) -> None:
+        super().__init__(backgrounds_dir_path)
+
+        _garment_classes = GarmentClasses(
+            upper_class, 
+            lower_class
+        )
+        self.parametric_model = ParametricModel(
+            gender=gender, 
+            garment_classes=_garment_classes
+        )
+        self.device = device
+        self.renderer = ClothedRenderer(
+            device=self.device,
+            batch_size=1
+        )
+        self.img_wh = img_wh
+
+
+class ClothedVisualizer(Visualizer2D):
 
     def __init__(
             self, 
@@ -270,3 +305,9 @@ class ClothedVisualizer(Visualizer):
             garment_classes=self.parametric_model.garment_classes
         )
         return rgb_img, seg_maps
+
+
+class ClothedVisualizer3D(Visualizer3D):
+
+    def __init__(self):
+        pass

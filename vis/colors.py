@@ -21,6 +21,9 @@ KPT_COLORS = {
     'orange': (255, 165, 0)             # 16
 }
 
+LCOLOR = KPT_COLORS['red']
+RCOLOR = KPT_COLORS['blue']
+
 
 class Colors(Enum):
     pass

@@ -6,14 +6,23 @@ from torch.utils.data import DataLoader
 from smplx.lbs import batch_rodrigues
 from tqdm import tqdm
 
-from data.const import MEAN_CAM_T
 from metrics.train_loss_and_metrics_tracker import TrainingLossesAndMetricsTracker
 from utils.checkpoint_utils import load_training_info_from_checkpoint
-from utils.cam_utils import perspective_project_torch, orthographic_project_torch
+from utils.cam_utils import (
+    perspective_project_torch, 
+    orthographic_project_torch
+)
 from utils.rigid_transform_utils import rot6d_to_rotmat
-from utils.label_conversions import ALL_JOINTS_TO_H36M_MAP, convert_2Djoints_to_gaussian_heatmaps_torch, \
-    H36M_TO_J14, BASE_JOINTS_TO_COCO_MAP, BASE_JOINTS_TO_H36M_MAP, ALL_JOINTS_TO_COCO_MAP
-from utils.joints2d_utils import check_joints2d_visibility_torch, undo_keypoint_normalisation
+from utils.label_conversions import (
+    ALL_JOINTS_TO_H36M_MAP, 
+    convert_2Djoints_to_gaussian_heatmaps_torch,
+    H36M_TO_J14, 
+    ALL_JOINTS_TO_COCO_MAP
+)
+from utils.joints2d_utils import (
+    check_joints2d_visibility_torch, 
+    undo_keypoint_normalisation
+)
 from utils.image_utils import batch_add_rgb_background
 from utils.augmentation.rgb_augmentation import augment_rgb
 
