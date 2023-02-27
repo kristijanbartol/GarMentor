@@ -8,8 +8,8 @@ import visdom as vis
 from configs import paths
 from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
 
-from data.pw3d_eval_dataset import PW3DEvalDataset
-from data.ssp3d_eval_dataset import SSP3DEvalDataset
+from data.datasets.pw3d_eval_dataset import PW3DEvalDataset
+from data.datasets.ssp3d_eval_dataset import SSP3DEvalDataset
 from models.fully_parametric_net import FullyParametricNet
 
 from models.smpl_official import SMPL

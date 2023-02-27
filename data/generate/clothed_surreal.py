@@ -207,6 +207,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
             style_vector=style_vector
         )
 
+        # TODO: Use Visualizer object instead to get RGB and masks.
         rgb_img, seg_maps = self.renderer(
             smpl_output_dict,
             garment_classes=parametric_model.garment_classes,

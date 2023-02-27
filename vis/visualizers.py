@@ -8,7 +8,7 @@ from colors import (
     LCOLOR,
     RCOLOR
 )
-from data.off_the_fly_train_datasets import SurrealTrainDataset
+from data.datasets.off_the_fly_train_datasets import SurrealTrainDataset
 from models.parametric_model import ParametricModel
 from models.smpl_official import SMPL
 from render.clothed_renderer import ClothedRenderer
@@ -21,6 +21,8 @@ from utils.label_conversions import (
     COCO_END_IDXS,
     COCO_LR
 )
+
+from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
 
 
 class Visualizer(object):
@@ -94,6 +96,7 @@ class KeypointsVisualizer(Visualizer2D):
             heatmaps: torch.Tensor, 
             num_heatmaps: int
         ) -> torch.Tensor:
+        '''Visualize a number of colored heatmaps, given the batch of keypoints.'''
         colored_heatmaps = torch.zeros(num_heatmaps, 3, self.img_wh, self.img_wh).to(self.device)
         for color_idx, color_key in enumerate(KPT_COLORS):
             heatmaps = torch.stack((heatmaps[:num_heatmaps, color_idx],) * 3, dim=1)
@@ -107,7 +110,8 @@ class KeypointsVisualizer(Visualizer2D):
     def vis_heatmap_torch(
             self,
             heatmap: torch.Tensor
-    ) -> Union[np.ndarray, torch.Tensor]:
+    ) -> torch.Tensor:
+        '''Visualize a colored heatmap based on given heatmap in Torch.'''
         colored_heatmap = torch.zeros(3, self.img_wh, self.img_wh).to(self.device)
         for color_idx, color_key in enumerate(KPT_COLORS):
             heatmap = torch.stack((heatmap[color_idx],) * 3, dim=1)
@@ -122,6 +126,7 @@ class KeypointsVisualizer(Visualizer2D):
             self,
             heatmap: np.ndarray
     ) -> np.ndarray:
+        '''Visualize a colored heatmap based on given heatmap in Numpy.'''
         colored_heatmap = np.zeros(3, self.img_wh, self.img_wh)
         for color_idx, color_key in enumerate(KPT_COLORS):
             heatmap = np.stack((heatmap[color_idx],) * 3, dim=1)
@@ -136,6 +141,7 @@ class KeypointsVisualizer(Visualizer2D):
             kpts: np.ndarray,
             back_img: Optional[np.ndarray] = None
     ) -> np.ndarray:
+        '''Visualize a colored image of keypoints, given coordinates.'''
         if back_img is None:
             back_img = np.zeros(3, self.img_wh, self.img_wh)
             
@@ -150,6 +156,7 @@ class KeypointsVisualizer(Visualizer2D):
             kpts: np.ndarray,
             back_img: Optional[np.ndarray] = None
     ) -> np.ndarray:
+        '''Visualize a colored image of the pose, given coordinates.'''
         pose_img = self.vis_keypoints(kpts, back_img)
         for line_idx, start_idx in COCO_START_IDXS:
             start_kpt = kpts[start_idx]
@@ -158,11 +165,12 @@ class KeypointsVisualizer(Visualizer2D):
             cv2.line(pose_img, start_kpt, end_kpt, color, 2) 
         return pose_img
 
-    def overlay_keypoints(
+    def overlay_pose(
             self,
             kpts: np.ndarray,
             back_img: np.ndarray
     ) -> np.ndarray:
+        '''Overlay pose on top of the background image.'''
         return self.vis_pose(kpts, back_img)
 
 
@@ -253,6 +261,8 @@ class ClothedVisualizer(Visualizer2D):
 
 class ClothedVisualizer(Visualizer2D):
 
+    # TODO: Add TextureLoader object to this class.
+
     def __init__(
             self, 
             gender: str,
@@ -279,11 +289,24 @@ class ClothedVisualizer(Visualizer2D):
         )
         self.img_wh = img_wh
 
-    def vis_clothed(
+    def vis(self,
+            smpl_output_dict: SMPL4GarmentOutput,
+            cam_t: Optional[np.ndarray] = None
+        ) -> Tuple[np.ndarray, np.ndarray]:
+        ''' Visualize clothed mesh(es), given SMPL4GarmentOutput info.'''
+        rgb_img, seg_maps = self.renderer(
+            smpl_output_dict,
+            self.parametric_model.garment_classes,
+            cam_t
+        )
+        return rgb_img, seg_maps
+
+    def vis_from_params(
             self,
             pose: np.ndarray, 
             shape: np.ndarray, 
-            style_vector: np.ndarray
+            style_vector: np.ndarray,
+            cam_t: Optional[np.ndarray] = None
         ) -> Tuple[np.ndarray, np.ndarray]:
         ''' Visualize clothed mesh(es).
         
@@ -304,12 +327,17 @@ class ClothedVisualizer(Visualizer2D):
         )
         rgb_img, seg_maps = self.renderer(
             smpl_output_dict,
-            garment_classes=self.parametric_model.garment_classes
+            self.parametric_model.garment_classes,
+            cam_t
         )
         return rgb_img, seg_maps
 
 
 class ClothedVisualizer3D(Visualizer3D):
 
+    # TODO: Add TextureLoader object to this class.
+    # NOTE: This will use psbody.Mesh object and not pytorch3d.structures.Meshes.
+
     def __init__(self):
         pass
+

@@ -1,5 +1,5 @@
 import os
-from data.off_the_fly_train_datasets import SurrealTrainDataset
+from data.datasets.off_the_fly_train_datasets import SurrealTrainDataset
 from render.body_renderer import BodyRenderer
 import torch
 import torch.optim as optim
@@ -85,6 +85,7 @@ def run_train(device,
                       gender=gender).to(device)
 
     # 3D shape and pose distribution predictor
+    # TODO: Use FullyParametriccNet instead of PoseMFShapeGaussianNet.
     pose_shape_model = PoseMFShapeGaussianNet(smpl_parents=smpl_model.parents.tolist(),
                                               config=pose_shape_cfg).to(device)
 
