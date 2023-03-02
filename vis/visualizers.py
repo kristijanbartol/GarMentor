@@ -9,6 +9,7 @@ from colors import (
     RCOLOR
 )
 from data.datasets.off_the_fly_train_datasets import SurrealTrainDataset
+from data.prepare.textures import TextureManager
 from models.parametric_model import ParametricModel
 from models.smpl_official import SMPL
 from render.clothed_renderer import ClothedRenderer
@@ -261,7 +262,15 @@ class ClothedVisualizer(Visualizer2D):
 
 class ClothedVisualizer(Visualizer2D):
 
-    # TODO: Add TextureLoader object to this class.
+    ''' Visualize a parametric model with clothing.
+    
+        Note that this class does not support texture mapping because
+        then I would need psbody.Mesh object and I am only using the
+        pytorch3d.structures.Meshes. I can't render psbody.Mesh using
+        my current renderers. The ClothedVisualizer class is a subclass
+        of Visualizer2D, therefore, it has a method for adding a
+        background.
+    '''
 
     def __init__(
             self, 
@@ -272,6 +281,7 @@ class ClothedVisualizer(Visualizer2D):
             backgrounds_dir_path: str = None,
             img_wh=256
         ) -> None:
+        ''' Initialize the visualizer using parameter specification.'''
         super().__init__(backgrounds_dir_path)
 
         _garment_classes = GarmentClasses(
@@ -335,9 +345,58 @@ class ClothedVisualizer(Visualizer2D):
 
 class ClothedVisualizer3D(Visualizer3D):
 
-    # TODO: Add TextureLoader object to this class.
-    # NOTE: This will use psbody.Mesh object and not pytorch3d.structures.Meshes.
+    ''' Visualize 3D clothed parametric mesh (texture-only).
+    
+        Note that this class can only produce textured meshes and not simply
+        single-colored meshes because pytorch3d.structures.Meshes are required
+        for single-color meshes, but then you can't easily properly save them
+        as obj + texture image. On the other hand, psbody.Mesh can be saved,
+        but the current functionalities do not allow creating texture maps for
+        single-color meshes. This class is intended to be used in a way that
+        it produces 3D meshes at the end which are then stored to the disk.
+    '''
 
-    def __init__(self):
-        pass
+    def __init__(
+            self,
+            gender: str,
+            upper_class: str,
+            lower_class: str,
+        ) -> None:
+        self.gender = gender
+        _garment_classes = GarmentClasses(
+            upper_class, 
+            lower_class
+        )
+        self.texture_manager = TextureManager(save_maps_to_disk=True)
+        self.parametric_model = ParametricModel(
+            gender=gender, 
+            garment_classes=_garment_classes
+        )
 
+    def vis_from_params(
+            self,
+            pose: np.ndarray, 
+            shape: np.ndarray, 
+            style_vector: np.ndarray,
+        ) -> Tuple[np.ndarray, np.ndarray]:
+        ''' Visualize clothed mesh(es), given SMPL4GarmentOutput info.'''
+        pose, shape, style_vector = to_tensors(
+            arrays=[pose, shape, style_vector]
+        )
+        smpl_output_dict = self.parametric_model.run(
+            pose=pose,
+            shape=shape,
+            style_vector=style_vector
+        )
+        return rgb_img, seg_maps
+
+    def vis(self,
+            smpl_output_dict: SMPL4GarmentOutput
+        ) -> Tuple[np.ndarray, np.ndarray]:
+        ''' Visualize clothed mesh(es), given SMPL4GarmentOutput info.'''
+        rgb_img, seg_maps = self.renderer(
+            smpl_output_dict,
+            self.parametric_model.garment_classes,
+            cam_t
+        )
+        return rgb_img, seg_maps

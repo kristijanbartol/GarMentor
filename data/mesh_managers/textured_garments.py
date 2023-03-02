@@ -1,15 +1,11 @@
-
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from os.path import join
 from glob import glob
 from psbody.mesh import Mesh
 from PIL import Image
 import numpy as np
 import os
-import sys
 from tqdm import tqdm
-
-sys.path.append('/garmentor/')
 
 from data.const import (
     MGN_CLASSES,
@@ -17,77 +13,30 @@ from data.const import (
     MGN_DATASET,
     UV_MAPS_PATH
 )
+from data.mesh_managers.common import (
+    MeshManager,
+    create_psbody_meshes
+)
+from utils.garment_classes import GarmentClasses
+
+from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
 
 
-def texture_meshes(
-        self,
-        meshes: list, 
-        texture_paths: list, 
-        garment_tag: list, 
-        uv_maps_pth: str
-    ) -> Tuple[Mesh]:
-    '''
-    Texture the [body, upper garment, lower garment] meshes from list meshes
-    with textures from texture_paths -- mesh can be None if no mesh is available
-    Arguments:
-        meshes: list of 3 psbody Mesh classes for the body, upper garment and lower garment.
-                a mesh can be None if you don't want to texture that part of mesh
-        texture_paths: list of 3 paths to texture images for body, upper garment and lower garment
-        garment_tag: list of 2 garment labels for the upper garment and lower garment
-        uv_maps_pth: folder path where the uv maps are stored for each garment type
-    Returns:
-        textured_meshes: list of 3 textured meshes from the input
-    '''
-    body_mesh = meshes[0]
-    ug_mesh = meshes[1]
-    lg_mesh = meshes[2]
-
-    # load pre-defined uv maps
-    general_vt = np.load(f'{uv_maps_pth}/general_vt.npy')
-
-    # texture body
-    if body_mesh is not None:
-        body_ft = np.load(f'{uv_maps_pth}/body_ft.npy')
-        
-        body_mesh.vt = general_vt
-        body_mesh.ft = body_ft
-        body_mesh.set_texture_image(texture_paths[0])
-
-    # texture upper garment
-    if ug_mesh is not None:
-        
-        ug_tag = garment_tag[0]
-        ug_ft = np.load(f'{uv_maps_pth}/{ug_tag}_ft.npy')
-
-        ug_mesh.vt = general_vt
-        ug_mesh.ft = ug_ft
-        ug_mesh.set_texture_image(texture_paths[1])
-
-    # texture lower garment
-    if lg_mesh is not None:
-
-        lg_tag = garment_tag[1]
-        lg_ft = np.load(f'{uv_maps_pth}/{lg_tag}_ft.npy')
-
-        lg_mesh.vt = general_vt
-        lg_mesh.ft = lg_ft
-        lg_mesh.set_texture_image(texture_paths[2])
-
-    return [body_mesh, ug_mesh, lg_mesh]
-
-
-class TextureManager:
+class TexturedGarmentsMeshManager(MeshManager):
 
     def __init__(
             self, 
-            save_to_disk: bool = False
+            save_maps_to_disk: bool = False
         ) -> None:
-        garment_dict = {}
+        self.garment_dict = {}
         for garment in MGN_CLASSES:
-            garment_dict[garment] = glob(join(MGN_DATASET, '*', garment + '.obj'))
+            self.garment_dict[garment] = glob(join(MGN_DATASET, '*', garment + '.obj'))
         
-        self.save_to_disk = save_to_disk
-        if not os.path.exists(UV_MAPS_PATH) and save_to_disk:
+        self.save_maps_to_disk = save_maps_to_disk
+        self._prepare_texture_maps()
+
+    def _prepare_texture_maps(self) -> None:
+        if not os.path.exists(UV_MAPS_PATH) and self.save_maps_to_disk:
             os.makedirs(UV_MAPS_PATH)
         
         self.vt_map = None
@@ -95,17 +44,19 @@ class TextureManager:
         self.body_ft_map = None
         self.texture_images = []
 
-        self._create_vt_map(garment_dict, UV_MAPS_PATH)
-        self._create_ft_maps(garment_dict, UV_MAPS_PATH)
+        self._create_vt_map(self.garment_dict, UV_MAPS_PATH)
+        self._create_ft_maps(self.garment_dict, UV_MAPS_PATH)
         self._create_body_ft_map(UV_MAPS_PATH)
-        
-        all_textures = sorted(glob(f'{MGN_DATASET}/*/multi_tex.jpg'))
-        all_segmentations = sorted(glob(f'{MGN_DATASET}/*/segmentation.png'))
 
+        self.texture_dirpaths = [
+            os.path.join(MGN_DATASET, x) for x in os.listdir(MGN_DATASET)
+        ]
+
+        _all_textures = sorted(glob(f'{MGN_DATASET}/*/multi_tex.jpg'))
+        _all_segmentations = sorted(glob(f'{MGN_DATASET}/*/segmentation.png'))
         self._generate_body_texture_from_texture(
-            texture_pth=all_textures,
-            segmentation_pth=all_segmentations,
-            save_to_disk=True
+            texture_pth=_all_textures,
+            segmentation_pth=_all_segmentations
         )
 
     def _create_vt_map(self, garment_dict: dict, save_to: str):
@@ -121,7 +72,7 @@ class TextureManager:
         loaded_mesh =  Mesh(filename=random_mesh_name)
 
         vt_map = loaded_mesh.vt
-        if self.save_to_disk:
+        if self.save_maps_to_disk:
             np.save(f'{save_to}/general_vt.npy', vt_map)
         else:
             self.vt_map = vt_map
@@ -147,7 +98,7 @@ class TextureManager:
             garment_tailornet_name = GARMENT_CLASSES[index]
 
             ft_map = loaded_mesh.ft
-            if self.save_to_disk:
+            if self.save_maps_to_disk:
                 np.save(f'{save_to}/{garment_tailornet_name}_ft.npy', ft_map)
             else:
                 self.garment_ft_maps.append(ft_map)
@@ -171,7 +122,7 @@ class TextureManager:
         loaded_mesh =  Mesh(filename=random_mesh_name)
 
         body_ft_map = loaded_mesh.ft
-        if self.save_to_disk:
+        if self.save_maps_to_disk:
             np.save(f'{save_to}/body_ft.npy', body_ft_map)
         else:
             self.body_ft_map = body_ft_map
@@ -180,8 +131,7 @@ class TextureManager:
             self, 
             texture_paths: List[str], 
             segmentation_paths: List[str], 
-            skin_color_pixel: List[float],
-            save_to_disk: bool = False
+            skin_color_pixel: List[float]
         ) -> None:
         '''
         From a mgn texture multi_tex.jpg, set all pixels that are not related to the 
@@ -192,7 +142,6 @@ class TextureManager:
             segmentation_pth: path to segmentation of the texture from a mgn dataset
             skin_color_pixel: pixel location from texture map that correspondns to a skin color
                             value
-            save_to_disk: save generated body texture to same folder as texture_pth
             show_fig: show the figure in matplotlib
         Returns:
             saves a body_tex.jpg to disk in same folder as texture_pth
@@ -237,11 +186,105 @@ class TextureManager:
             texture_img_array[background_pixels] = skin_color
 
             texture_image = Image.fromarray(texture_img_array)
-            if save_to_disk:
+            if self.save_maps_to_disk:
                 texture_image.save(f'{save_to}/body_tex.jpg')
             else:
                 self.texture_images.append(texture_image)
 
+    def _get_random_texture_paths(self) -> Tuple[str, str, str]:
+        '''
+        Get a random texture dirpath from the MGN dataset.
+        '''
+        texture_dirpath = self.texture_dirpaths[
+            np.random.randint(0,len(self.texture_dirpaths))
+        ]
+        return (
+            f'{texture_dirpath}/body_tex.jpg',
+            f'{texture_dirpath}/multi_tex.jpg',
+            f'{texture_dirpath}/multi_tex.jpg'
+        )
+    
+    @staticmethod
+    def create_meshes(smpl_output_dict: SMPL4GarmentOutput
+                       ) -> Tuple[Mesh, Mesh, Mesh]:
+        return create_psbody_meshes(smpl_output_dict)
+
+    def texture_meshes(
+            self,
+            smpl_output_dict: SMPL4GarmentOutput,
+            garment_classes: GarmentClasses
+        ) -> List[Mesh]:
+        '''
+        Texture the [body, upper garment, lower garment] meshes from list meshes
+        with textures from texture_paths -- mesh can be None if no mesh is available
+        
+        Parameters:
+            smpl_output_dict: SMPL4GarmentOutput class with body, upper, and lower garment
+                              mesh information
+            garment_classes: a GarmentClasses object with the garment classes for the upper 
+                    and lower garment
+        Returns:
+            textured_meshes: list of 3 textured meshes from the input
+        '''
+        meshes = self._create_meshes(smpl_output_dict)
+
+        # Load pre-defined uv maps and random texture paths.
+        general_vt = np.load(f'{UV_MAPS_PATH}/general_vt.npy')
+        texture_paths = self._get_random_texture_paths()
+
+        mesh_labels_list = [
+            'body',
+            garment_classes.upper_class,
+            garment_classes.lower_class
+        ]
+        for mesh_idx, mesh_label in enumerate(mesh_labels_list):
+            if meshes[mesh_idx] is not None:
+                meshes[mesh_idx].ft = np.load(f'{UV_MAPS_PATH}/{mesh_label}_ft.npy')
+                meshes[mesh_idx].vt = general_vt
+                meshes[mesh_idx].set_texture_image(texture_paths[mesh_idx])
+
+        return meshes
+    
+    # TODO: Move this to the superclass.
+    def save_meshes(
+            self,
+            meshes: List[Mesh],
+            rel_path: str
+    ) -> None:
+        meshes[0].write_obj(f'{rel_path}-body.obj')
+        meshes[1].write_obj(f'{rel_path}-upper.obj')
+        meshes[2].write_obj(f'{rel_path}-lower.obj')
+
+    def postprocess_meshes(
+            self,
+            rel_path: str
+    ) -> None:
+        ''' Modify obj files to support material in Blender.
+
+            By default, psbody mesh's write_obj() function does not utilize
+            the `usemtl` keyword, which results in blender not showing the
+            material.
+        '''
+        for mesh_type in ["body", "upper", "lower"]:
+            obj_fpath = f"{rel_path}-{mesh_type}.obj"
+            content = ""
+            with open(obj_fpath, "r") as obj_file:
+                first_face = True
+                usemtl_encountered = False
+                for line in obj_file:
+                    if not usemtl_encountered and \
+                        line.strip().split(' ')[0] == 'usemtl':
+                        usemtl_encountered = True
+                    if first_face and line.strip().split(' ')[0] == 'f':
+                        first_face = False
+                        if not usemtl_encountered:
+                            content += \
+                                f"usemtl {rel_path}-{mesh_type}\n"
+                            usemtl_encountered = True
+                    content += line
+            with open(obj_fpath, "w") as obj_file:
+                obj_file.write(content)
+
 
 if __name__ == '__main__':
-    TextureManager()
+    TexturedGarmentsMeshManager(save_maps_to_disk=True)

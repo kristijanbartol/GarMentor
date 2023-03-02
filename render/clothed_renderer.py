@@ -33,11 +33,13 @@ class ClothedRenderer(Renderer):
             **kwargs
         ) -> None:
         ''' The clothed renderer constructor.'''
+        # TODO: Create ColoredMeshManager to call prepare_mesh method.
         super().__init__(*args, **kwargs)
         
     def _random_pallete_color(self, pallete):
         return np.array(norm_color(list(pallete)[randint(0, len(pallete) - 1)].value))
         
+    # TODO: Use MeshManager to prepare meshes.
     def _prepare_meshes(
             self, 
             smpl_output_dict: Dict[str, SMPL4GarmentOutput]

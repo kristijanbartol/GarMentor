@@ -1,13 +1,9 @@
-from typing import Set, List
 import os
 import sys
 import pickle
-import random
 import numpy as np
 from os import path as osp
 from tqdm import tqdm
-
-from psbody.mesh import Mesh
 
 sys.path.append('/garmentor/')
 
@@ -16,17 +12,14 @@ from models.smpl_conversions import smplx2smpl
 from utils.augmentation.smpl_augmentation import normal_sample_style_numpy
 from utils.garment_classes import GarmentClasses
 from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
-# TODO: Make texture_meshes function usable by both textures module and this module.
-from prepare.textures import texture_meshes
+from prepare.textures import TextureManager
 
 from data.const import (
     GARMENTOR_DIR,
     SUBJECT_OBJ_SAVEDIR,
-    UV_MAPS_PATH,
     MGN_DATASET,
     SCANS_DIR
 )
-
 
 
 def _is_already_processed(output_dir: str, pickle_fpath: str) -> bool:
@@ -102,24 +95,29 @@ if __name__ == '__main__':
 
     UPPER_GARMENT_TYPE = "t-shirt"
     LOWER_GARMENT_TYPE = "short-pant"
-    SUBJECT_GARMENT_SUBDIR = f"{UPPER_GARMENT_TYPE}_{LOWER_GARMENT_TYPE}"
+
+    garment_classes = GarmentClasses(
+        upper_class=UPPER_GARMENT_TYPE,
+        lower_class=LOWER_GARMENT_TYPE
+    )
+    subject_garment_subdir = str(garment_classes)
 
     parametric_models = {
-        'male': ParametricModel(gender='male', 
-                                garment_classes=GarmentClasses(
-                                upper_class=UPPER_GARMENT_TYPE,
-                                lower_class=LOWER_GARMENT_TYPE)
-                                ),
-        'female': ParametricModel(gender='female',
-                                garment_classes=GarmentClasses(
-                                upper_class=UPPER_GARMENT_TYPE,
-                                lower_class=LOWER_GARMENT_TYPE)
-                                )   
+        'male': ParametricModel(
+            gender='male', 
+            garment_classes=garment_classes
+        ),
+        'female': ParametricModel(
+            gender='female',
+            garment_classes=garment_classes
+        )
     }
     
     texture_dirpaths = [
         os.path.join(MGN_DATASET, x) for x in os.listdir(MGN_DATASET)
     ]
+
+    texture_manager = TextureManager(store_maps_to_disk=True)
     
     if not os.path.exists(GARMENTOR_DIR):
         os.makedirs(GARMENTOR_DIR)
@@ -134,9 +132,11 @@ if __name__ == '__main__':
         ):
             pkl_fpath = os.path.join(scan_dirpath, pkl_fname)   # e.g. /data/agora/smplx_gt/trainset_3dpeople_adults_bfh/10004_w_Amaya_0_0.pkl
 
+            # TODO: Provide mesh_dir + mesh_basename as rel_path to the TexturedGarmentsMeshManager.save_meshes.
+            # NOTE: Have to make sure that mesh_dir exists.
             mesh_dir = os.path.join(
                 SUBJECT_OBJ_SAVEDIR,
-                SUBJECT_GARMENT_SUBDIR,
+                subject_garment_subdir,
                 scan_dir
             )
             os.makedirs(mesh_dir, exist_ok=True)
@@ -196,7 +196,7 @@ if __name__ == '__main__':
                 style_lower,
                 osp.join(
                     SUBJECT_OBJ_SAVEDIR,
-                    SUBJECT_GARMENT_SUBDIR
+                    subject_garment_subdir
                 ),
                 scan_dir,
                 mesh_basename
@@ -207,36 +207,10 @@ if __name__ == '__main__':
                 shape=beta,
                 style_vector=style_vector
             )
-
-            body_mesh = Mesh(
-                v=smpl_output_dict['upper'].body_verts, 
-                f=smpl_output_dict['upper'].body_faces
-            )
-            upper_mesh = Mesh(
-                v=smpl_output_dict['upper'].garment_verts, 
-                f=smpl_output_dict['upper'].garment_faces
-            )
-            lower_mesh = Mesh(
-                v=smpl_output_dict['lower'].garment_verts, 
-                f=smpl_output_dict['lower'].garment_faces
-            )
             
-            random_texture_dirpath = \
-                texture_dirpaths[random.randint(0, len(texture_dirpaths) - 1)]
-            
-            textured_meshes = texture_meshes(
-                meshes=[
-                    body_mesh, 
-                    upper_mesh, 
-                    lower_mesh
-                ], 
-                texture_paths=[
-                    f'{random_texture_dirpath}/body_tex.jpg',
-                    f'{random_texture_dirpath}/multi_tex.jpg',
-                    f'{random_texture_dirpath}/multi_tex.jpg'
-                ], 
-                garment_tag=[UPPER_GARMENT_TYPE, LOWER_GARMENT_TYPE],
-                uv_maps_pth=UV_MAPS_PATH
+            textured_meshes = texture_manager.texture_meshes(
+                smpl_output_dict=smpl_output_dict,
+                garment_classes=garment_classes
             )
 
             textured_meshes[0].write_obj(f'{mesh_basepath}-body.obj')
@@ -290,7 +264,7 @@ if __name__ == '__main__':
         with open(
             os.path.join(
                 SUBJECT_OBJ_SAVEDIR,
-                SUBJECT_GARMENT_SUBDIR,
+                subject_garment_subdir,
                 "invalid_subjects.txt"
             ),
             "w"

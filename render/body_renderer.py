@@ -27,6 +27,7 @@ class BodyRenderer(Renderer):
         ''' The body renderer constructor.'''
         super().__init__(*args, **kwargs)
         
+    # TODO: Use MeshManager to prepare meshes.
     def _prepare_body_mesh_numpy(
             self, 
             body_verts: np.ndarray
@@ -48,6 +49,7 @@ class BodyRenderer(Renderer):
             textures=Textures(verts_rgb=body_colors)
         )
 
+    # TODO: Use MeshManager to prepare meshes.
     def _prepare_body_mesh_torch(
             self, 
             body_verts: torch.Tensor
@@ -62,6 +64,7 @@ class BodyRenderer(Renderer):
             textures=Textures(verts_rgb=body_colors)
         )
 
+    # TODO: Use MeshManager to prepare meshes.
     def _prepare_body_mesh(
         self,
         body_verts: Union[np.ndarray, torch.Tensor]
