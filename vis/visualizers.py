@@ -234,35 +234,6 @@ class BodyVisualizer(Visualizer2D):
 
 class ClothedVisualizer(Visualizer2D):
 
-    def __init__(
-            self, 
-            gender: str,
-            upper_class: str,
-            lower_class: str,
-            device: str,
-            backgrounds_dir_path: str = None,
-            img_wh=256
-        ) -> None:
-        super().__init__(backgrounds_dir_path)
-
-        _garment_classes = GarmentClasses(
-            upper_class, 
-            lower_class
-        )
-        self.parametric_model = ParametricModel(
-            gender=gender, 
-            garment_classes=_garment_classes
-        )
-        self.device = device
-        self.renderer = ClothedRenderer(
-            device=self.device,
-            batch_size=1
-        )
-        self.img_wh = img_wh
-
-
-class ClothedVisualizer(Visualizer2D):
-
     ''' Visualize a parametric model with clothing.
     
         Note that this class does not support texture mapping because
