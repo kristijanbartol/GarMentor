@@ -7,12 +7,12 @@ from tqdm import tqdm
 
 sys.path.append('/garmentor/')
 
+from data.mesh_managers.textured_garments import TexturedGarmentsMeshManager
 from models.parametric_model import ParametricModel
 from models.smpl_conversions import smplx2smpl
 from utils.augmentation.smpl_augmentation import normal_sample_style_numpy
 from utils.garment_classes import GarmentClasses
 from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
-from prepare.textures import TextureManager
 
 from data.const import (
     GARMENTOR_DIR,
@@ -117,7 +117,7 @@ if __name__ == '__main__':
         os.path.join(MGN_DATASET, x) for x in os.listdir(MGN_DATASET)
     ]
 
-    texture_manager = TextureManager(store_maps_to_disk=True)
+    textured_mesh_manager = TexturedGarmentsMeshManager(store_maps_to_disk=True)
     
     if not os.path.exists(GARMENTOR_DIR):
         os.makedirs(GARMENTOR_DIR)
@@ -132,16 +132,13 @@ if __name__ == '__main__':
         ):
             pkl_fpath = os.path.join(scan_dirpath, pkl_fname)   # e.g. /data/agora/smplx_gt/trainset_3dpeople_adults_bfh/10004_w_Amaya_0_0.pkl
 
-            # TODO: Provide mesh_dir + mesh_basename as rel_path to the TexturedGarmentsMeshManager.save_meshes.
-            # NOTE: Have to make sure that mesh_dir exists.
             mesh_dir = os.path.join(
                 SUBJECT_OBJ_SAVEDIR,
                 subject_garment_subdir,
                 scan_dir
             )
             os.makedirs(mesh_dir, exist_ok=True)
-            mesh_basename = osp.splitext(pkl_fname)[0]
-            mesh_basepath = os.path.join(mesh_dir, mesh_basename)          
+            mesh_basename = osp.splitext(pkl_fname)[0]      
 
             # Check if this subject (with the current garment combination) is
             # already present in the output directory
@@ -208,54 +205,16 @@ if __name__ == '__main__':
                 style_vector=style_vector
             )
             
-            textured_meshes = texture_manager.texture_meshes(
+            textured_meshes = textured_mesh_manager.texture_meshes(
                 smpl_output_dict=smpl_output_dict,
                 garment_classes=garment_classes
             )
-
-            textured_meshes[0].write_obj(f'{mesh_basepath}-body.obj')
-            os.replace(
-                f"{mesh_basepath}-body.obj",
-                f"{mesh_basepath}-body_buffer.obj"
+            mesh_basepath = os.path.join(mesh_dir, mesh_basename)
+            textured_mesh_manager.save_meshes(
+                meshes=textured_meshes,
+                rel_path=mesh_basepath
             )
-            textured_meshes[1].write_obj(f'{mesh_basepath}-upper.obj')
-            os.replace(
-                f"{mesh_basepath}-upper.obj",
-                f"{mesh_basepath}-upper_buffer.obj"
-            )
-            textured_meshes[2].write_obj(f'{mesh_basepath}-lower.obj')
-            os.replace(
-                f"{mesh_basepath}-lower.obj",
-                f"{mesh_basepath}-lower_buffer.obj"
-            )
-
-            # modify obj files to support material in blender
-            # by default, psbody mesh's write_obj() function does not utilize
-            # the `usemtl` keyword, which results in blender not showing the
-            # material
-            for mesh_type in ["body", "upper", "lower"]:
-                obj_fpath = f"{mesh_basepath}-{mesh_type}_buffer.obj"
-                content = ""
-                with open(obj_fpath, "r") as obj_file:
-                    first_face = True
-                    usemtl_encountered = False
-                    for line in obj_file:
-                        if not usemtl_encountered and \
-                            line.strip().split(' ')[0] == 'usemtl':
-                            usemtl_encountered = True
-                        if first_face and line.strip().split(' ')[0] == 'f':
-                            first_face = False
-                            if not usemtl_encountered:
-                                content += \
-                                    f"usemtl {mesh_basename}-{mesh_type}\n"
-                                usemtl_encountered = True
-                        content += line
-                with open(obj_fpath, "w") as obj_file:
-                    obj_file.write(content)
-                os.replace(
-                    f"{mesh_basepath}-{mesh_type}_buffer.obj",
-                    f"{mesh_basepath}-{mesh_type}.obj"
-                )
+            textured_mesh_manager.postprocess_meshes(mesh_basepath)
 
     if len(invalid_subjects) > 0:
         print(
