@@ -1,13 +1,10 @@
-from typing import Dict, Tuple, Optional, Union
+from typing import Tuple, Union
 
 import torch
 import numpy as np
 
-from pytorch3d.structures import Meshes
-from pytorch3d.renderer import Textures
-
+from data.mesh_managers.body import BodyMeshManager
 from renderer import Renderer
-from vis.colors import BodyColors
 
 
 class BodyRenderer(Renderer):
@@ -21,59 +18,13 @@ class BodyRenderer(Renderer):
 
     def __init__(
             self,
+            device: str,
             *args,
             **kwargs
         ) -> None:
         ''' The body renderer constructor.'''
         super().__init__(*args, **kwargs)
-        
-    # TODO: Use MeshManager to prepare meshes.
-    def _prepare_body_mesh_numpy(
-            self, 
-            body_verts: np.ndarray
-        ) -> Meshes:
-        '''Numpy version of body mesh preparation.'''
-        body_colors = np.ones_like(body_verts) * \
-            self._random_pallete_color(BodyColors)
-        
-        body_verts = torch.from_numpy(
-            body_verts).float().unsqueeze(0).to(self.device)
-        body_faces = torch.from_numpy(
-            self.body_faces.astype(np.int32)).unsqueeze(0).to(self.device)
-        body_colors = torch.from_numpy(
-            body_colors).float().unsqueeze(0).to(self.device)
-        
-        return Meshes(
-            verts=body_verts,
-            faces=body_faces,
-            textures=Textures(verts_rgb=body_colors)
-        )
-
-    # TODO: Use MeshManager to prepare meshes.
-    def _prepare_body_mesh_torch(
-            self, 
-            body_verts: torch.Tensor
-        ) -> Meshes:
-        '''Torch version of body mesh preparation.'''
-        body_colors = (torch.ones_like(body_verts) * \
-            torch.tensor(BodyColors.WHITE_SKIN)).float().to(self.device)
-        
-        return Meshes(
-            verts=body_verts,
-            faces=self.body_faces_torch,
-            textures=Textures(verts_rgb=body_colors)
-        )
-
-    # TODO: Use MeshManager to prepare meshes.
-    def _prepare_body_mesh(
-        self,
-        body_verts: Union[np.ndarray, torch.Tensor]
-    ) -> Meshes:
-        '''Extract trimesh Meshes for the body mesh.'''
-        if type(body_verts) == np.ndarray:
-            self._prepare_body_mesh_numpy(body_verts)
-        else:
-            self._prepare_body_mesh_torch(body_verts)
+        self.mesh_manager = BodyMeshManager(device)
     
     def _extract_seg_map(
             self, 

@@ -244,16 +244,6 @@ class TexturedGarmentsMeshManager(MeshManager):
                 meshes[mesh_idx].set_texture_image(texture_paths[mesh_idx])
 
         return meshes
-    
-    # TODO: Move this to the superclass.
-    def save_meshes(
-            self,
-            meshes: List[Mesh],
-            rel_path: str
-    ) -> None:
-        meshes[0].write_obj(f'{rel_path}-body.obj')
-        meshes[1].write_obj(f'{rel_path}-upper.obj')
-        meshes[2].write_obj(f'{rel_path}-lower.obj')
 
     def postprocess_meshes(
             self,
