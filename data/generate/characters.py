@@ -204,9 +204,11 @@ if __name__ == '__main__':
                 shape=beta,
                 style_vector=style_vector
             )
-            
+            meshes = textured_mesh_manager.create_meshes(
+                smpl_output_dict=smpl_output_dict
+            )
             textured_meshes = textured_mesh_manager.texture_meshes(
-                smpl_output_dict=smpl_output_dict,
+                meshes=meshes,
                 garment_classes=garment_classes
             )
             mesh_basepath = os.path.join(mesh_dir, mesh_basename)

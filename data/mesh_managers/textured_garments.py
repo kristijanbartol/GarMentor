@@ -211,7 +211,7 @@ class TexturedGarmentsMeshManager(MeshManager):
 
     def texture_meshes(
             self,
-            smpl_output_dict: SMPL4GarmentOutput,
+            meshes: Tuple[Mesh, Mesh, Mesh],
             garment_classes: GarmentClasses
         ) -> List[Mesh]:
         '''
@@ -226,8 +226,6 @@ class TexturedGarmentsMeshManager(MeshManager):
         Returns:
             textured_meshes: list of 3 textured meshes from the input
         '''
-        meshes = self._create_meshes(smpl_output_dict)
-
         # Load pre-defined uv maps and random texture paths.
         general_vt = np.load(f'{UV_MAPS_PATH}/general_vt.npy')
         texture_paths = self._get_random_texture_paths()

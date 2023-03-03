@@ -2,6 +2,7 @@ from typing import Union, Tuple, Optional
 import torch
 import numpy as np
 import cv2
+from psbody.mesh import Mesh
 
 from colors import (
     KPT_COLORS,
@@ -9,7 +10,7 @@ from colors import (
     RCOLOR
 )
 from data.datasets.off_the_fly_train_datasets import SurrealTrainDataset
-from data.prepare.textures import TextureManager
+from data.mesh_managers.textured_garments import TexturedGarmentsMeshManager
 from models.parametric_model import ParametricModel
 from models.smpl_official import SMPL
 from render.clothed_renderer import ClothedRenderer
@@ -362,15 +363,33 @@ class ClothedVisualizer3D(Visualizer3D):
             upper_class: str,
             lower_class: str,
         ) -> None:
+        '''Prepare texture mesh manager and parametric model.'''
         self.gender = gender
-        _garment_classes = GarmentClasses(
+        self.garment_classes = GarmentClasses(
             upper_class, 
             lower_class
         )
-        self.texture_manager = TextureManager(save_maps_to_disk=True)
+        self.textured_mesh_manager = TexturedGarmentsMeshManager(save_maps_to_disk=True)
         self.parametric_model = ParametricModel(
             gender=gender, 
-            garment_classes=_garment_classes
+            garment_classes=self.garment_classes
+        )
+
+    def vis(self,
+            smpl_output_dict: SMPL4GarmentOutput
+        ) -> Tuple[Mesh, Mesh, Mesh]:
+        ''' Visualize clothed mesh(es), given SMPL4GarmentOutput info.'''
+        meshes = self.textured_mesh_manager.create_meshes(
+            smpl_output_dict=smpl_output_dict
+        )
+        meshes = self.textured_mesh_manager.texture_meshes(
+            meshes=meshes,
+            garment_classes=self.garment_classes
+        )
+        return (
+            meshes[0],  # body mesh
+            meshes[1],  # upper garment mesh
+            meshes[2]   # lower garment mesh
         )
 
     def vis_from_params(
@@ -378,8 +397,8 @@ class ClothedVisualizer3D(Visualizer3D):
             pose: np.ndarray, 
             shape: np.ndarray, 
             style_vector: np.ndarray,
-        ) -> Tuple[np.ndarray, np.ndarray]:
-        ''' Visualize clothed mesh(es), given SMPL4GarmentOutput info.'''
+        ) -> Tuple[Mesh, Mesh, Mesh]:
+        ''' Visualize clothed mesh(es), given pose, shape, and style params.'''
         pose, shape, style_vector = to_tensors(
             arrays=[pose, shape, style_vector]
         )
@@ -388,15 +407,20 @@ class ClothedVisualizer3D(Visualizer3D):
             shape=shape,
             style_vector=style_vector
         )
-        return rgb_img, seg_maps
-
-    def vis(self,
-            smpl_output_dict: SMPL4GarmentOutput
-        ) -> Tuple[np.ndarray, np.ndarray]:
-        ''' Visualize clothed mesh(es), given SMPL4GarmentOutput info.'''
-        rgb_img, seg_maps = self.renderer(
-            smpl_output_dict,
-            self.parametric_model.garment_classes,
-            cam_t
+        meshes = self.vis(smpl_output_dict)
+        return (
+            meshes[0],  # body mesh
+            meshes[1],  # upper garment mesh
+            meshes[2]   # lower garment mesh
         )
-        return rgb_img, seg_maps
+
+    def save_vis(
+            self,
+            meshes: Tuple[Mesh, Mesh, Mesh],
+            rel_path: str
+    ) -> None:
+        '''Save the visualization of 3D meshes to disk (only way to observe).'''
+        self.textured_mesh_manager.save_meshes(
+            meshes=meshes,
+            rel_path=rel_path
+        )
