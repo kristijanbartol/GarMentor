@@ -1,6 +1,6 @@
 import os
 from data.datasets.off_the_fly_train_datasets import SurrealTrainDataset
-from render.body_renderer import BodyRenderer
+from rendering.body_renderer import BodyRenderer
 import torch
 import torch.optim as optim
 import argparse

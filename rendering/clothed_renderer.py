@@ -1,21 +1,10 @@
-from typing import Dict, Tuple, List, Optional
+from typing import Dict, Tuple, List
 
-import torch
 import numpy as np
-from random import randint
-
-from pytorch3d.structures import Meshes
-from pytorch3d.renderer import Textures
 
 from data.mesh_managers.colored_garments import ColoredGarmentsMeshManager
-from renderer import Renderer
-from utils.mesh_utils import concatenate_meshes
+from rendering.renderer import Renderer
 from utils.garment_classes import GarmentClasses
-from vis.colors import (
-    GarmentColors, 
-    BodyColors, 
-    norm_color
-)
 
 from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
 
@@ -86,7 +75,7 @@ class ClothedRenderer(Renderer):
             garment_classes: GarmentClasses,
             *args,
             **kwargs
-        ) -> Tuple(np.ndarray, np.ndarray):
+        ) -> Tuple[np.ndarray, np.ndarray]:
         '''Render RGB images of clothed meshes, single-colored piece-wise.'''
         self._process_optional_arguments(*args, **kwargs)
 

@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from typing import Optional
 import torch
 import numpy as np
 
@@ -16,7 +17,11 @@ def orthographic_project_torch(points3D, cam_params):
     return proj_points
 
 
-def get_intrinsics_matrix(img_width, img_height, focal_length):
+def get_intrinsics_matrix(
+        img_width: int, 
+        img_height: int, 
+        focal_length: float
+    ) -> np.ndarray:
     """
     Camera intrinsic matrix (calibration matrix) given focal length in pixels and img_width and
     img_height. Assumes that principal point is at (width/2, height/2).
@@ -59,6 +64,74 @@ def perspective_project_torch(points, rotation, translation, cam_K=None,
     projected_points = torch.einsum('bij,bkj->bki', cam_K, projected_points)
 
     return projected_points[:, :, :-1]
+
+
+def get_intrinsics_matrix(
+        img_width: int, 
+        img_height: int, 
+        focal_length: float
+    ) -> np.ndarray:
+    """
+    Camera intrinsic matrix (calibration matrix) given focal length in pixels and img_width and
+    img_height. Assumes that principal point is at (width/2, height/2).
+    """
+    K = np.array([[focal_length, 0., img_width/2.0],
+                  [0., focal_length, img_height/2.0],
+                  [0., 0., 1.]])
+    return K
+
+
+def orthographic_project(
+        points3D: np.ndarray, 
+        cam_params: np.ndarray
+    ) -> np.ndarray:
+    ''' Scaled orthographic projection (i.e. weak perspective projection).
+
+        Parameters:
+        -----------
+            points3D: (N, 3) batch of 3D point sets.
+            cam_params: (3,) batch of weak-perspective camera parameters 
+                               (scale, trans x, trans y).
+    '''
+    return cam_params[None, [0]] * (points3D[:, :2] + cam_params[None, 1:])
+
+
+def perspective_project(
+        points: np.ndarray, 
+        rotation: np.ndarray, 
+        translation: np.ndarray, 
+        cam_K: Optional[np.ndarray] = None,
+        focal_length: Optional[np.ndarray] = None,
+        img_wh: Optional[np.ndarray] = None
+    ) -> np.ndarray:
+    ''' Computes the perspective projection of a set of points in torch.
+    
+        Parameters:
+        -----------
+            points (N, 3): 3D points
+            rotation (3, 3): Camera rotation
+            translation (3,): Camera translation
+            Either
+            cam_K (3, 3): Camera intrinsics matrix
+            Or
+            focal_length scalar: Focal length
+            camera_center (2,): Camera center
+    '''
+    if cam_K is None:
+        cam_K = get_intrinsics_matrix(img_wh, img_wh, focal_length)
+
+    # Transform points
+    if rotation is not None:
+        points = np.einsum('bij,bkj->bki', rotation, points)
+    points = points + np.expand_dims(translation, axis=0)
+
+    # Apply perspective distortion
+    projected_points = points / np.expand_dims(points[:, -1], axis=-1)
+
+    # Apply camera intrinsics
+    projected_points = np.einsum('bij,bkj->bki', cam_K, projected_points)
+
+    return projected_points[:, :-1]
 
 
 def convert_weak_perspective_to_camera_translation(cam_wp, focal_length, resolution):

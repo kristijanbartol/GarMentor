@@ -17,7 +17,7 @@ from utils.augmentation.smpl_augmentation import (
     normal_sample_style_numpy
 )
 from models.parametric_model import ParametricModel
-from render.clothed_renderer import ClothedRenderer
+from rendering.clothed_renderer import ClothedRenderer
 from utils.augmentation.cam_augmentation import augment_cam_t_numpy
 from utils.garment_classes import GarmentClasses
 

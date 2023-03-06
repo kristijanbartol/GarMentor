@@ -1,20 +1,17 @@
+from abc import abstractmethod
 from typing import Union, Tuple, Optional
 import torch
 import numpy as np
 import cv2
 from psbody.mesh import Mesh
 
-from colors import (
-    KPT_COLORS,
-    LCOLOR,
-    RCOLOR
-)
+from configs.const import MEAN_CAM_T
 from data.datasets.off_the_fly_train_datasets import SurrealTrainDataset
 from data.mesh_managers.textured_garments import TexturedGarmentsMeshManager
 from models.parametric_model import ParametricModel
 from models.smpl_official import SMPL
-from render.clothed_renderer import ClothedRenderer
-from render.body_renderer import BodyRenderer
+from rendering.clothed_renderer import ClothedRenderer
+from rendering.body_renderer import BodyRenderer
 from utils.garment_classes import GarmentClasses
 from utils.image_utils import add_rgb_background
 from utils.convert_arrays import to_tensors
@@ -23,17 +20,49 @@ from utils.label_conversions import (
     COCO_END_IDXS,
     COCO_LR
 )
+from vis.colors import (
+    KPT_COLORS,
+    LCOLOR,
+    RCOLOR
+)
 
 from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
 
 
 class Visualizer(object):
-    pass
+    
+    @abstractmethod
+    def vis(self,
+            kpts: Optional[np.ndarray] = None,
+            back_img: Optional[np.ndarray] = None,
+            skeleton: Optional[bool] = None,
+            verts: Optional[Union[np.ndarray, torch.Tensor]] = None,
+            smpl_output_dict: Optional[SMPL4GarmentOutput] = None,
+            cam_t: Optional[np.ndarray] = None
+        ) -> Union[Tuple[Mesh, Mesh, Mesh],                     # Visualizer3D
+               Union[Tuple[np.ndarray, np.ndarray],         # BodyVisualizer
+                     Tuple[torch.Tensor, torch.Tensor]],    
+               Tuple[np.ndarray, np.ndarray],               # ClothedVisualizer
+               np.ndarray]: ...                             # KeypointsVisualizer
+
+    @abstractmethod
+    def vis_from_params(
+            self,
+            pose: Union[np.ndarray, torch.Tensor], 
+            shape: Union[np.ndarray, torch.Tensor], 
+            style_vector: Optional[Union[np.ndarray, torch.Tensor]] = None,
+            cam_t: Optional[np.ndarray] = None
+    ) -> Union[Tuple[Mesh, Mesh, Mesh],                     # Visualizer3D
+               Union[Tuple[np.ndarray, np.ndarray],         # BodyVisualizer
+                     Tuple[torch.Tensor, torch.Tensor]],    
+               Tuple[np.ndarray, np.ndarray],               # ClothedVisualizer
+               np.ndarray]: ...                             # KeypointsVisualizer
 
 
 class Visualizer2D(Visualizer):
 
     default_glob_orient = torch.Tensor([0., 0., 0.])
+    default_cam_t = np.array(MEAN_CAM_T)
 
     def __init__(
             self,
@@ -78,6 +107,13 @@ class Visualizer3D(Visualizer):
 
     def __init__(self):
         super().__init__()
+
+    @abstractmethod
+    def save_vis(
+            self,
+            meshes: Tuple[Mesh, Mesh, Mesh],
+            rel_path: str
+    ) -> None: ...
 
 
 class KeypointsVisualizer(Visualizer2D):
@@ -153,19 +189,43 @@ class KeypointsVisualizer(Visualizer2D):
             cv2.circle(back_img, kpt, 3, color, 3)
         return back_img
 
-    def vis_pose(
-            self,
+    def _add_skeleton(
+            self, 
             kpts: np.ndarray,
-            back_img: Optional[np.ndarray] = None
+            pose_img: np.ndarray
     ) -> np.ndarray:
-        '''Visualize a colored image of the pose, given coordinates.'''
-        pose_img = self.vis_keypoints(kpts, back_img)
+        '''Add line connections between the joints (COCO-specific).'''
         for line_idx, start_idx in COCO_START_IDXS:
             start_kpt = kpts[start_idx]
             end_kpt = kpts[COCO_END_IDXS[line_idx]]
             color = LCOLOR if COCO_LR[line_idx] else RCOLOR
             cv2.line(pose_img, start_kpt, end_kpt, color, 2) 
         return pose_img
+
+    def vis(self,
+            kpts: np.ndarray,
+            back_img: Optional[np.ndarray] = None,
+            skeleton: Optional[bool] = True
+    ) -> np.ndarray:
+        '''Visualize a colored image of the pose, given coordinates.'''
+        pose_img = self.vis_keypoints(kpts, back_img)
+        if skeleton:
+            self._add_skeleton(kpts, pose_img)
+        return pose_img
+
+    def vis_from_params(
+            self,
+            pose: np.ndarray,
+            shape: np.ndarray,
+            glob_orient: Optional[np.ndarray] = None,
+            cam_t: Optional[np.ndarray] = None
+    ):
+        if glob_orient is None:
+            glob_orient = self.default_glob_orient
+        if cam_t is None:
+            cam_t = self.default_cam_t
+
+        
 
     def overlay_pose(
             self,
@@ -193,45 +253,47 @@ class BodyVisualizer(Visualizer2D):
         )
         self.smpl_model = smpl_model
 
-    def vis_body_from_params(
+    def vis(
+        self,
+        verts: Union[np.ndarray, torch.Tensor],
+        cam_t: Optional[np.ndarray] = None
+    ) -> Union[Tuple[np.ndarray, np.ndarray],
+               Tuple[torch.Tensor, torch.Tensor]]:
+        '''Render body using simple rendering strategy + get mask.'''
+        body_rgb, body_mask = self.renderer(
+            verts=verts,
+            cam_t=cam_t
+        )
+        return body_rgb, body_mask
+
+    def vis_from_params(
             self,
             pose: Union[np.ndarray, torch.Tensor],
             shape: Union[np.ndarray, torch.Tensor],
-            glob_orient: Union[np.ndarray, torch.Tensor] = None
-    ) -> Tuple[Union[np.ndarray, torch.Tensor],
-               Union[np.ndarray, torch.Tensor]]:
+            glob_orient: Union[np.ndarray, torch.Tensor] = None,
+            cam_t: Optional[np.ndarray] = None
+    ) -> Union[Tuple[np.ndarray, np.ndarray],
+               Tuple[torch.Tensor, torch.Tensor]]:
         '''First run the SMPL body model to get verts and then render.'''
         if glob_orient is None:
             glob_orient = self.default_glob_orient
 
-        if self.smpl_body is not None:
-            pose, shape = to_tensors(
-                arrays=[pose, shape, glob_orient]
-            )
-            body_vertices: np.ndarray = self.smpl_model(
-                body_pose=pose,
-                global_orient=glob_orient,
-                betas=shape,
-                pose2rot=False
-            ).vertices
+        pose, shape, glob_orient = to_tensors(
+            arrays=[pose, shape, glob_orient]
+        )
+        body_vertices: np.ndarray = self.smpl_model(
+            body_pose=pose,
+            global_orient=glob_orient,
+            betas=shape,
+            pose2rot=False
+        ).vertices
 
-            body_rgb, body_mask = self.renderer(body_vertices)
-            return body_rgb, body_mask
-        else:
-            print('WARNING: No SMPL model provided.'\
-                ' Returning (None, None).')
-            return None, None
+        return self.vis(
+            verts=body_vertices,
+            cam_t=cam_t
+        )
 
-    def vis_body_from_verts(
-        self,
-        verts: Union[np.ndarray, torch.Tensor]
-    ) -> Union[Tuple[np.ndarray, np.ndarray],
-               Tuple[torch.Tensor, torch.Tensor]]:
-        '''Render body using simple rendering strategy + get mask.'''
-        body_rgb, body_mask = self.renderer(verts)
-        return body_rgb, body_mask
-
-
+    
 class ClothedVisualizer(Visualizer2D):
 
     ''' Visualize a parametric model with clothing.

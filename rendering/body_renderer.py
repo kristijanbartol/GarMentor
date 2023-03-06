@@ -4,7 +4,7 @@ import torch
 import numpy as np
 
 from data.mesh_managers.body import BodyMeshManager
-from renderer import Renderer
+from rendering.renderer import Renderer
 
 
 class BodyRenderer(Renderer):
