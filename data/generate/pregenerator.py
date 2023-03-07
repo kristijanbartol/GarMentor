@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from dataclasses import dataclass, fields
 import numpy as np
 import torch
@@ -6,19 +6,20 @@ import os
 from PIL import Image
 import sys
 import argparse
+from random import randrange
 
 _module_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(_module_dir))
 
 from configs import paths
 from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
+from models.parametric_model import ParametricModel
+from rendering.clothed_renderer import ClothedRenderer
+from utils.augmentation.cam_augmentation import augment_cam_t_numpy
 from utils.augmentation.smpl_augmentation import (
     normal_sample_shape_numpy,
     normal_sample_style_numpy
 )
-from models.parametric_model import ParametricModel
-from rendering.clothed_renderer import ClothedRenderer
-from utils.augmentation.cam_augmentation import augment_cam_t_numpy
 from utils.garment_classes import GarmentClasses
 
 
@@ -120,25 +121,8 @@ class DataPreGenerator(object):
             '{gender}',
             '{upper_garment_class}+{lower_garment_class}'
         )
-
-
-class SurrealDataPreGenerator(DataPreGenerator):
-
-    '''A data pregenerator class specific to SURREAL dataset.'''
-
-    DATASET_NAME = 'surreal'
-    CHECKPOINT_COUNT = 100
-
-    def __init__(self):
-        '''Initialize useful arrays, renderer, and load poses.'''
-        
-        super().__init__()
         self.cfg = get_cfg_defaults()
         self._init_useful_arrays()
-        self.renderer = ClothedRenderer(
-            device='cuda:0',
-            batch_size=1
-        )
         self.poses = self._load_poses()
         self.num_poses = self.poses.shape[0]
 
@@ -150,7 +134,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
         indices = [i for i, x in enumerate(fnames)
                     if (x.startswith('h36m') or x.startswith('up3d') or x.startswith('3dpw'))]
         return np.stack([poses[i] for i in indices], axis=0)
-
+    
     def _init_useful_arrays(self) -> None:
         '''These useful arrays are used to randomly sample data and transform points.'''
         self.delta_betas_std_vector = np.ones(
@@ -170,6 +154,52 @@ class SurrealDataPreGenerator(DataPreGenerator):
         self.mean_cam_t = np.array(
             self.cfg.TRAIN.SYNTH_DATA.MEAN_CAM_T, 
             dtype=np.float32)
+        
+    def generate_random_params(
+            self, 
+            idx: Optional[int] = None
+        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        '''Generate random pose, shape, camera T, and style vector.'''
+        if idx is None:
+            idx = randrange(self.num_poses)
+        pose = self.poses[idx % self.num_poses]
+
+        shape = normal_sample_shape_numpy(
+            mean_params=self.mean_shape,
+            std_vector=self.delta_betas_std_vector
+        )
+        style_vector = normal_sample_style_numpy(
+            num_garment_classes=GarmentClasses.NUM_CLASSES,
+            mean_params=self.mean_style,
+            std_vector=self.delta_style_std_vector
+        )
+        cam_t = augment_cam_t_numpy(
+            self.mean_cam_t,
+            xy_std=self.cfg.TRAIN.SYNTH_DATA.AUGMENT.CAM.XY_STD,
+            delta_z_range=self.cfg.TRAIN.SYNTH_DATA.AUGMENT.CAM.DELTA_Z_RANGE
+        )
+        return (
+            pose,
+            shape,
+            style_vector,
+            cam_t
+        )
+
+
+class SurrealDataPreGenerator(DataPreGenerator):
+
+    '''A data pregenerator class specific to SURREAL dataset.'''
+
+    DATASET_NAME = 'surreal'
+    CHECKPOINT_COUNT = 100
+
+    def __init__(self):
+        '''Initialize superclass and create clothed renderer.'''
+        super().__init__()
+        self.renderer = ClothedRenderer(
+            device='cuda:0',
+            batch_size=1
+        )
 
     def generate_sample(self, 
                         idx: int,
@@ -177,23 +207,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
                         parametric_model: ParametricModel
                         ) -> Tuple[np.ndarray, np.ndarray, PreGeneratedSampleValues]:
         '''Generate a single training sample.'''
-
-        # NOTE: We can generate more samples than poses, just start from beginning.
-        pose: np.ndarray = self.poses[idx % self.num_poses]
-
-        shape: np.ndarray = normal_sample_shape_numpy(
-            mean_params=self.mean_shape,
-            std_vector=self.delta_betas_std_vector)
-
-        cam_t: np.ndarray = augment_cam_t_numpy(
-            self.mean_cam_t,
-            xy_std=self.cfg.TRAIN.SYNTH_DATA.AUGMENT.CAM.XY_STD,
-            delta_z_range=self.cfg.TRAIN.SYNTH_DATA.AUGMENT.CAM.DELTA_Z_RANGE)
-
-        style_vector: np.ndarray = normal_sample_style_numpy(
-            num_garment_classes=GarmentClasses.NUM_CLASSES,
-            mean_params=self.mean_style,
-            std_vector=self.delta_style_std_vector)
+        pose, shape, style_vector, cam_t = self.generate_random_params(idx)
 
         print(f'Sample #{idx} ({gender}):')
         print(f'\tPose: {pose}')
@@ -206,14 +220,11 @@ class SurrealDataPreGenerator(DataPreGenerator):
             shape=shape,
             style_vector=style_vector
         )
-
-        # TODO: Use Visualizer object instead to get RGB and masks.
         rgb_img, seg_maps = self.renderer(
             smpl_output_dict,
             garment_classes=parametric_model.garment_classes,
             cam_t=cam_t
         )
-
         sample_values = PreGeneratedSampleValues(
             pose=pose,
             shape=shape,
@@ -222,7 +233,6 @@ class SurrealDataPreGenerator(DataPreGenerator):
             cam_t=cam_t,
             joints=smpl_output_dict['upper'].joints
         )
-
         return rgb_img, seg_maps, sample_values
     
     @staticmethod

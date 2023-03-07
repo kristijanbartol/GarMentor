@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 import torch
 import numpy as np
 import cv2
@@ -7,12 +7,7 @@ from configs.const import (
     DEFAULT_FOCAL_LENGTH,
     IMG_WH
 )
-from vis.colors import (
-    KPT_COLORS,
-    LCOLOR,
-    RCOLOR
-)
-from vis.visualizers import Visualizer2D
+from models.smpl_official import easy_create_smpl_model
 from utils.cam_utils import perspective_project
 from utils.label_conversions import (
     COCO_START_IDXS,
@@ -20,20 +15,34 @@ from utils.label_conversions import (
     COCO_LR,
     ALL_JOINTS_TO_COCO_MAP
 )
+from vis.colors import (
+    KPT_COLORS,
+    LCOLOR,
+    RCOLOR
+)
+from vis.visualizers.common import Visualizer2D
 
 
 class KeypointsVisualizer(Visualizer2D):
 
     def __init__(
             self, 
-            device: str, 
+            device: str = 'cpu', 
             img_wh: int = 256,
-            backgrounds_dir_path: str = None
+            gender: Optional[str] = None,
+            backgrounds_dir_path: Optional[str] = None,
         ) -> None:
         super().__init__(backgrounds_dir_path)
 
         self.device = device
         self.img_wh = img_wh
+
+        self.smpl_model = None
+        if gender is not None:
+            self.smpl_model = easy_create_smpl_model(
+                gender=gender,
+                device=device
+            )
 
     def batched_vis_heatmaps(
             self,
@@ -71,7 +80,7 @@ class KeypointsVisualizer(Visualizer2D):
             heatmap: np.ndarray
     ) -> np.ndarray:
         '''Visualize a colored heatmap based on given heatmap in Numpy.'''
-        colored_heatmap = np.zeros(3, self.img_wh, self.img_wh)
+        colored_heatmap = np.zeros((3, self.img_wh, self.img_wh))
         for color_idx, color_key in enumerate(KPT_COLORS):
             heatmap = np.stack((heatmap[color_idx],) * 3, dim=1)
             heatmap[0] *= KPT_COLORS[color_key][0]
@@ -87,12 +96,19 @@ class KeypointsVisualizer(Visualizer2D):
     ) -> np.ndarray:
         '''Visualize a colored image of keypoints, given coordinates.'''
         if back_img is None:
-            back_img = np.zeros(3, self.img_wh, self.img_wh)
-            
+            back_img = np.zeros((3, self.img_wh, self.img_wh))
+        back_img = back_img.transpose((1, 2, 0)).astype(np.uint8).copy()
+
         for idx, color_key in enumerate(KPT_COLORS):
-            kpt = kpts[idx]
-            color = KPT_COLORS[color_key]
-            cv2.circle(back_img, kpt, 3, color, 3)
+            kpt: Tuple[int, int] = [int(x) for x in kpts[idx]]
+            color: Tuple[int, int, int] = KPT_COLORS[color_key]
+            cv2.circle(
+                img=back_img, 
+                center=kpt, 
+                radius=3, 
+                color=color, 
+                thickness=3
+            )
         return back_img
 
     def _add_skeleton(
@@ -101,11 +117,17 @@ class KeypointsVisualizer(Visualizer2D):
             pose_img: np.ndarray
     ) -> np.ndarray:
         '''Add line connections between the joints (COCO-specific).'''
-        for line_idx, start_idx in COCO_START_IDXS:
-            start_kpt = kpts[start_idx]
-            end_kpt = kpts[COCO_END_IDXS[line_idx]]
+        for line_idx, start_idx in enumerate(COCO_START_IDXS):
+            start_kpt: Tuple[int, int] = [int(x) for x in kpts[start_idx]]
+            end_kpt: Tuple[int, int] = [int(x) for x in kpts[COCO_END_IDXS[line_idx]]]
             color = LCOLOR if COCO_LR[line_idx] else RCOLOR
-            cv2.line(pose_img, start_kpt, end_kpt, color, 2) 
+            cv2.line(
+                img=pose_img, 
+                pt1=start_kpt, 
+                pt2=end_kpt, 
+                color=color, 
+                thickness=2
+            ) 
         return pose_img
 
     def vis(self,
@@ -148,20 +170,27 @@ class KeypointsVisualizer(Visualizer2D):
             self,
             pose: np.ndarray,
             shape: np.ndarray,
-            glob_orient: Optional[np.ndarray] = None,
             cam_t: Optional[np.ndarray] = None,
+            gender: Optional[str] = None,
             back_img: Optional[np.ndarray] = None,
             skeleton: bool = True
     ) -> np.ndarray:
         '''Conveniently visualize pose from the parameters of the body.'''
-        if glob_orient is None:
-            glob_orient = self.default_glob_orient
+        if self.smpl_model is not None:
+            smpl_model = self.smpl_model
+        else:
+            if gender is None:
+                print('WARNING: Gender unspecified, setting male.')
+                gender = 'male'
+            smpl_model = easy_create_smpl_model(
+                gender=gender,
+                device=self.device
+            )
 
         joints_3d = self.create_body(
             pose=pose,
             shape=shape,
-            glob_orient=glob_orient,
-            smpl_model=self.smpl_model
+            smpl_model=smpl_model
         ).joints.detach().cpu().numpy()[0, ALL_JOINTS_TO_COCO_MAP]
 
         return self.vis_from_3d_keypoints(

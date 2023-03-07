@@ -8,7 +8,7 @@ from math import floor, ceil
 import imageio
 from torch.utils.data import Dataset
 
-from data.generate.clothed_surreal import SurrealDataPreGenerator, DataPreGenerator
+from data.generate.pregenerator import SurrealDataPreGenerator, DataPreGenerator
 from utils.garment_classes import GarmentClasses
     
     

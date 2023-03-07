@@ -129,7 +129,7 @@ def perspective_project(
     projected_points = points / np.expand_dims(points[:, -1], axis=-1)
 
     # Apply camera intrinsics
-    projected_points = np.einsum('bij,bkj->bki', cam_K, projected_points)
+    projected_points = np.einsum('ij,kj->ki', cam_K, projected_points)
 
     return projected_points[:, :-1]
 

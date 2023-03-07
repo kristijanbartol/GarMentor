@@ -2,9 +2,8 @@ from typing import Union, Tuple, Optional
 import torch
 import numpy as np
 
-from models.smpl_official import SMPL
+from models.smpl_official import easy_create_smpl_model
 from rendering.body_renderer import BodyRenderer
-from utils.convert_arrays import to_tensors
 from vis.visualizers.common import Visualizer2D
 
 
@@ -13,8 +12,8 @@ class BodyVisualizer(Visualizer2D):
     def __init__(
             self, 
             device: str,
-            backgrounds_dir_path: str = None,
-            smpl_model: SMPL = None
+            gender: Optional[str] = None,
+            backgrounds_dir_path: str = None
         ) -> None:
         super().__init__(backgrounds_dir_path)
 
@@ -23,7 +22,11 @@ class BodyVisualizer(Visualizer2D):
             device=self.device,
             batch_size=1
         )
-        self.smpl_model = smpl_model
+        if gender is not None:
+            self.smpl_model = easy_create_smpl_model(
+                gender=gender,
+                device=device
+            )
 
     def vis(
         self,
@@ -42,19 +45,26 @@ class BodyVisualizer(Visualizer2D):
             self,
             pose: Union[np.ndarray, torch.Tensor],
             shape: Union[np.ndarray, torch.Tensor],
-            glob_orient: Union[np.ndarray, torch.Tensor] = None,
-            cam_t: Optional[np.ndarray] = None
+            cam_t: Optional[Union[np.ndarray, torch.Tensor]] = None,
+            gender: Optional[str] = None
     ) -> Union[Tuple[np.ndarray, np.ndarray],
                Tuple[torch.Tensor, torch.Tensor]]:
         '''First run the SMPL body model to get verts and then render.'''
-        if glob_orient is None:
-            glob_orient = self.default_glob_orient
+        if self.smpl_model is not None:
+            smpl_model = self.smpl_model
+        else:
+            if gender is None:
+                print('WARNING: Gender unspecified, setting male.')
+                gender = 'male'
+            smpl_model = easy_create_smpl_model(
+                gender=gender,
+                device=self.device
+            )
 
         body_vertices: np.ndarray = self.create_body(
             pose=pose,
             shape=shape,
-            glob_orient=glob_orient,
-            smpl_model=self.smpl_model
+            smpl_model=smpl_model
         ).vertices
 
         return self.vis(

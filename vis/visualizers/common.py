@@ -9,13 +9,10 @@ try:
 except ImportError:
     from smplx.utils import SMPLOutput
 
-from configs.const import (
-    DEFAULT_GLOB_ORIENT,
-    MEAN_CAM_T
-)
+from configs.const import MEAN_CAM_T
 from data.datasets.off_the_fly_train_datasets import SurrealTrainDataset
 from models.smpl_official import SMPL
-from utils.convert_arrays import to_tensors
+from utils.convert_arrays import to_smpl_model_params
 from utils.image_utils import add_rgb_background
 
 from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
@@ -65,7 +62,6 @@ class Visualizer2D(Visualizer):
         add 2D background image using `Visualizer2D.add_background`. 
     '''
 
-    default_glob_orient = torch.Tensor(DEFAULT_GLOB_ORIENT)
     default_cam_t = np.array(MEAN_CAM_T)
 
     def __init__(
@@ -87,16 +83,16 @@ class Visualizer2D(Visualizer):
     def create_body(
             pose: np.ndarray,
             shape: np.ndarray,
-            glob_orient: np.ndarray,
             smpl_model: SMPL
     ) -> SMPLOutput:
-        pose, shape, glob_orient = to_tensors(
-            arrays=[pose, shape, glob_orient]
+        pose_rotmat, glob_rotmat, shape = to_smpl_model_params(
+            pose=pose, 
+            shape=shape
         )
         return smpl_model(
-            body_pose=pose,
-            global_orient=glob_orient,
+            body_pose=pose_rotmat,
             betas=shape,
+            global_orient=glob_rotmat,
             pose2rot=False
         )
 
@@ -138,6 +134,7 @@ class Visualizer3D(Visualizer):
     def __init__(self):
         super().__init__()
 
+    # TODO: Make this method common for all Visualizers!
     @abstractmethod
     def save_vis(
             self,
