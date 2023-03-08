@@ -140,6 +140,7 @@ data/*.jpg
 data/textures/
 notebooks/data/
 output/
+tests/functional/out/
 
 # Dependencies
 torch-trust-ncg/

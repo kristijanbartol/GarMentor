@@ -9,7 +9,7 @@ import time
 from trimesh import Trimesh
 
 from metrics.eval_metrics_tracker import EvalMetricsTracker
-from rendering.body_renderer import BodyRenderer
+from rendering.body import BodyRenderer
 from utils.cam_utils import orthographic_project_torch
 from utils.mesh_utils import concatenate_meshes
 from utils.rigid_transform_utils import rot6d_to_rotmat, aa_rotate_translate_points_pytorch3d, aa_rotate_rotmats

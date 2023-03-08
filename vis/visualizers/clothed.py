@@ -2,9 +2,9 @@ from typing import Tuple, Optional
 import numpy as np
 
 from models.parametric_model import ParametricModel
-from rendering.clothed_renderer import ClothedRenderer
+from rendering.clothed import ClothedRenderer
 from utils.garment_classes import GarmentClasses
-from utils.convert_arrays import to_tensors
+from utils.convert_arrays import to_torch
 from vis.visualizers.common import Visualizer2D
 
 from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
@@ -77,7 +77,7 @@ class ClothedVisualizer(Visualizer2D):
             always expects Numpy arrays because visualizing TailorNet 
             will not be required in training loop, for now.
         '''
-        pose, shape, style_vector = to_tensors(
+        pose, shape, style_vector = to_torch(
             arrays=[pose, shape, style_vector]
         )
         smpl_output_dict = self.parametric_model.run(

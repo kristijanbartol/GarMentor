@@ -3,7 +3,7 @@ from typing import Dict, Tuple, List
 import numpy as np
 
 from data.mesh_managers.colored_garments import ColoredGarmentsMeshManager
-from rendering.renderer import Renderer
+from rendering.common import Renderer
 from utils.garment_classes import GarmentClasses
 
 from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput

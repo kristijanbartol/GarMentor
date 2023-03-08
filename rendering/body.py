@@ -4,7 +4,7 @@ import torch
 import numpy as np
 
 from data.mesh_managers.body import BodyMeshManager
-from rendering.renderer import Renderer
+from rendering.common import Renderer
 
 
 class BodyRenderer(Renderer):
@@ -23,7 +23,7 @@ class BodyRenderer(Renderer):
             **kwargs
         ) -> None:
         ''' The body renderer constructor.'''
-        super().__init__(*args, **kwargs)
+        super().__init__(device=device, *args, **kwargs)
         self.mesh_manager = BodyMeshManager(device)
     
     def _extract_seg_map(
@@ -40,15 +40,14 @@ class BodyRenderer(Renderer):
 
     def forward(
             self, 
-            body_verts: np.ndarray,
+            verts: torch.Tensor,
             *args,
             **kwargs
-        ) -> Union[Tuple[np.ndarray, np.ndarray],
-                   Tuple[torch.Tensor, torch.Tensor]]:
+        ) -> Tuple[torch.Tensor, torch.Tensor]:
         '''Render RGB images of clothed meshes, single-colored piece-wise.'''
         self._process_optional_arguments(*args, **kwargs)
         
-        body_mesh = self._prepare_body_mesh(body_verts)
+        body_mesh = self.mesh_manager.create_mesh_torch(verts)
         fragments = self.rasterizer(
             body_mesh, 
             cameras=self.cameras
@@ -58,9 +57,6 @@ class BodyRenderer(Renderer):
             body_mesh, 
             lights=self.lights_rgb_render
         )[:, :, :, :3]
-
-        if type(body_verts) == np.ndarray:
-            rgb_img = rgb_img[0].cpu().numpy()
             
         seg_map = self._extract_seg_map(rgb_img)
         return rgb_img, seg_map

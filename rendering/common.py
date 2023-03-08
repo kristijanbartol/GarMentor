@@ -91,8 +91,10 @@ class Renderer(nn.Module):
 
         # Cameras - pre-defined here but can be specified in forward 
         # pass if cameras will vary (e.g. random cameras).
-        assert(projection_type in ['perspective', 'orthographic'], 
-            print('Invalid projection type:', projection_type))
+        if projection_type not in ['perspective', 'orthographic']: 
+            print('Invalid projection type:', projection_type)
+            print('Setting to: perspective')
+            projection_type = 'perspective'
         print('\nRenderer projection type:', projection_type)
         self.projection_type = projection_type
         if cam_R is None:
@@ -165,15 +167,12 @@ class Renderer(nn.Module):
             blend_params=self.blend_params
         )
 
-        self.body_faces_numpy = BODY_FACES
-        self.body_faces_torch = torch.from_numpy(BODY_FACES)
         self.to(device)
 
     def to(self, device):
         '''Move tensors to specified device.'''
         self.rasterizer.to(device)
         self.rgb_shader.to(device)
-        self.body_faces_torch.to(device)
 
     def _update_lights_settings(
             self, 

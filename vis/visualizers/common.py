@@ -2,6 +2,7 @@ from abc import abstractmethod
 from typing import Union, Tuple, Optional
 import torch
 import numpy as np
+from PIL import Image
 from psbody.mesh import Mesh
 
 try:
@@ -52,6 +53,14 @@ class Visualizer(object):
                      Tuple[torch.Tensor, torch.Tensor]],    
                Tuple[np.ndarray, np.ndarray],               # ClothedVisualizer
                np.ndarray]: ...                             # KeypointsVisualizer
+
+    @abstractmethod
+    def save_vis(
+            self,
+            vis_object: Union[Tuple[Mesh, Mesh, Mesh],  # Visualizer3D
+                        np.ndarray],                    # Visualizer2D
+            save_path: str
+    ) -> None: ...
 
 
 class Visualizer2D(Visualizer):
@@ -120,6 +129,14 @@ class Visualizer2D(Visualizer):
                 ' Returning the original image.')
         return rgb_img
 
+    def save_vis(
+            self,
+            img: np.ndarray,
+            save_path: str
+    ) -> None:
+        img = Image.fromarray(img.astype(np.uint8))
+        img.save(save_path)
+
 
 class Visualizer3D(Visualizer):
 
@@ -134,10 +151,13 @@ class Visualizer3D(Visualizer):
     def __init__(self):
         super().__init__()
 
-    # TODO: Make this method common for all Visualizers!
-    @abstractmethod
     def save_vis(
             self,
             meshes: Tuple[Mesh, Mesh, Mesh],
             rel_path: str
-    ) -> None: ...
+    ) -> None:
+        '''Save the visualization of 3D meshes to disk (only way to observe).'''
+        self.mesh_manager.save_meshes(
+            meshes=meshes,
+            rel_path=rel_path
+        )

@@ -3,7 +3,8 @@ import torch
 import numpy as np
 
 from models.smpl_official import easy_create_smpl_model
-from rendering.body_renderer import BodyRenderer
+from rendering.body import BodyRenderer
+from utils.convert_arrays import to_numpy
 from vis.visualizers.common import Visualizer2D
 
 
@@ -22,6 +23,8 @@ class BodyVisualizer(Visualizer2D):
             device=self.device,
             batch_size=1
         )
+        
+        self.smpl_model = None
         if gender is not None:
             self.smpl_model = easy_create_smpl_model(
                 gender=gender,
@@ -61,13 +64,17 @@ class BodyVisualizer(Visualizer2D):
                 device=self.device
             )
 
-        body_vertices: np.ndarray = self.create_body(
+        body_verts: torch.Tensor = self.create_body(
             pose=pose,
             shape=shape,
             smpl_model=smpl_model
         ).vertices
 
-        return self.vis(
-            verts=body_vertices,
+        body_rgb, body_mask = self.vis(
+            verts=body_verts,
             cam_t=cam_t
         )
+        if type(pose) == np.ndarray:
+            body_rgb, body_mask = to_numpy(body_rgb, body_mask)
+
+        return body_rgb, body_mask

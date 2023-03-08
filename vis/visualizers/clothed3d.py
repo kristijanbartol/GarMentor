@@ -5,7 +5,7 @@ from psbody.mesh import Mesh
 from data.mesh_managers.textured_garments import TexturedGarmentsMeshManager
 from models.parametric_model import ParametricModel
 from utils.garment_classes import GarmentClasses
-from utils.convert_arrays import to_tensors
+from utils.convert_arrays import to_torch
 from vis.visualizers.common import Visualizer3D
 
 from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
@@ -36,7 +36,7 @@ class ClothedVisualizer3D(Visualizer3D):
             upper_class, 
             lower_class
         )
-        self.textured_mesh_manager = TexturedGarmentsMeshManager(save_maps_to_disk=True)
+        self.mesh_manager = TexturedGarmentsMeshManager(save_maps_to_disk=True)
         self.parametric_model = ParametricModel(
             gender=gender, 
             garment_classes=self.garment_classes
@@ -46,10 +46,10 @@ class ClothedVisualizer3D(Visualizer3D):
             smpl_output_dict: SMPL4GarmentOutput
         ) -> Tuple[Mesh, Mesh, Mesh]:
         ''' Visualize clothed mesh(es), given SMPL4GarmentOutput info.'''
-        meshes = self.textured_mesh_manager.create_meshes(
+        meshes = self.mesh_manager.create_meshes(
             smpl_output_dict=smpl_output_dict
         )
-        meshes = self.textured_mesh_manager.texture_meshes(
+        meshes = self.mesh_manager.texture_meshes(
             meshes=meshes,
             garment_classes=self.garment_classes
         )
@@ -66,7 +66,7 @@ class ClothedVisualizer3D(Visualizer3D):
             style_vector: np.ndarray,
         ) -> Tuple[Mesh, Mesh, Mesh]:
         ''' Visualize clothed mesh(es), given pose, shape, and style params.'''
-        pose, shape, style_vector = to_tensors(
+        pose, shape, style_vector = to_torch(
             arrays=[pose, shape, style_vector]
         )
         smpl_output_dict = self.parametric_model.run(
@@ -79,15 +79,4 @@ class ClothedVisualizer3D(Visualizer3D):
             meshes[0],  # body mesh
             meshes[1],  # upper garment mesh
             meshes[2]   # lower garment mesh
-        )
-
-    def save_vis(
-            self,
-            meshes: Tuple[Mesh, Mesh, Mesh],
-            rel_path: str
-    ) -> None:
-        '''Save the visualization of 3D meshes to disk (only way to observe).'''
-        self.textured_mesh_manager.save_meshes(
-            meshes=meshes,
-            rel_path=rel_path
         )

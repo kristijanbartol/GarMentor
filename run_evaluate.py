@@ -17,7 +17,7 @@ from models.poseMF_shapeGaussian_net import PoseMFShapeGaussianNet
 from models.canny_edge_detector import CannyEdgeDetector
 from models.parametric_model import ParametricModel
 from evaluate.evaluate_poseMF_shapeGaussian_net import evaluate_pose_MF_shapeGaussian_net
-from rendering.body_renderer import BodyRenderer
+from rendering.body import BodyRenderer
 from utils.garment_classes import GarmentClasses
 from vis.logger import VisLogger
 

@@ -5,9 +5,9 @@ import numpy as np
 from utils.rigid_transform_utils import pose_to_rotmat
 
 
-def to_tensors(
+def to_torch(
         *arrays: Tuple[np.ndarray, ...]
-    ) -> Tuple[np.ndarray, ...]:
+    ) -> Tuple[torch.Tensor, ...]:
     '''Convert from np.arrays to torch.Tensors using torch.as_tensor.'''
     tensors = []
     for array in arrays:
@@ -15,6 +15,18 @@ def to_tensors(
             array = torch.as_tensor(array)
         tensors.append(array)
     return tensors
+
+
+def to_numpy(
+        *tensors: Tuple[torch.Tensor, ...]
+    ) -> Tuple[np.ndarray, ...]:
+    '''Convert from torch.Tensors to np.ndarrays.'''
+    arrays = []
+    for tensor in tensors:
+        if type(tensor) != torch.Tensor:
+            tensor = tensor.cpu().detach().numpy()[0]
+        arrays.append(tensor)
+    return arrays
 
 
 def to_float_arrays(
@@ -54,6 +66,6 @@ def to_smpl_model_params(
     '''Prepare pose- and shape-derived parameters for SMPL run.'''
     pose, shape = to_float_arrays(pose, shape)
     pose, shape = expand_dims_arrays(pose, shape)
-    pose, shape = to_tensors(pose, shape)
+    pose, shape = to_torch(pose, shape)
     glob_rotmat, pose_rotmat = pose_to_rotmat(pose)
     return glob_rotmat, pose_rotmat, shape

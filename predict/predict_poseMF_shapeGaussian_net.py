@@ -10,8 +10,8 @@ import imageio
 
 from predict.predict_hrnet import predict_hrnet
 
-from rendering.body_renderer import BodyRenderer
-from rendering.clothed_renderer import ClothedRenderer
+from rendering.body import BodyRenderer
+from rendering.clothed import ClothedRenderer
 
 from utils.image_utils import batch_add_rgb_background, batch_crop_pytorch_affine, batch_crop_opencv_affine
 from utils.label_conversions import convert_2Djoints_to_gaussian_heatmaps_torch

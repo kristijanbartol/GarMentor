@@ -1,33 +1,15 @@
-from typing import List, Dict, Tuple, Union
-from abc import abstractmethod
-from os.path import join
-from glob import glob
-from psbody.mesh import Mesh
+from typing import Union
 from pytorch3d.structures import Meshes
 from pytorch3d.renderer import Textures
-from PIL import Image
 import numpy as np
-from random import randint
 import torch
-import os
-from tqdm import tqdm
 
-from data.const import (
-    BODY_FACES,
-    MGN_CLASSES,
-    GARMENT_CLASSES,
-    MGN_DATASET,
-    UV_MAPS_PATH
-)
+from data.const import BODY_FACES
 from data.mesh_managers.common import (
-     MeshManager,
-     random_pallete_color
+    MeshManager,
+    random_pallete_color
 )
-from utils.garment_classes import GarmentClasses
-from utils.mesh_utils import concatenate_meshes
-from vis.colors import GarmentColors, BodyColors, norm_color
-
-from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
+from vis.colors import BodyColors
 
 
 class BodyMeshManager(MeshManager):
@@ -36,54 +18,54 @@ class BodyMeshManager(MeshManager):
             self,
             device: str = 'cpu'
         ) -> None:
-        super().__init__(self)
+        super().__init__()
         self.device = device
+        self.faces = torch.from_numpy(
+            BODY_FACES.astype(np.int32)).unsqueeze(0).to(device)
 
-    def _create_mesh_numpy(
+    def create_mesh_numpy(
+            self,
             verts: np.ndarray,
             device: str = 'cpu'
-        ) -> Meshes:
-        body_colors = np.ones_like(body_verts) * \
-            _random_pallete_color(BodyColors)
+    ) -> Meshes:
+        '''Numpy version of body mesh preparaation.'''
+        colors = np.ones_like(verts) * \
+            random_pallete_color(BodyColors)
         
-        body_verts = torch.from_numpy(
-            body_verts).float().unsqueeze(0).to(device)
-        body_faces = torch.from_numpy(
-            BODY_FACES.astype(np.int32)).unsqueeze(0).to(device)
-        body_colors = torch.from_numpy(
-            body_colors).float().unsqueeze(0).to(device)
+        verts = torch.from_numpy(verts).float().unsqueeze(0).to(device)
+        
+        colors = torch.from_numpy(
+            colors).float().unsqueeze(0).to(device)
         
         return Meshes(
-            verts=body_verts,
-            faces=body_faces,
-            textures=Textures(verts_rgb=body_colors)
+            verts=verts,
+            faces=self.faces,
+            textures=Textures(verts_rgb=colors)
         )
 
-    def _create_mesh_torch(
+    def create_mesh_torch(
                 self, 
-                body_verts: torch.Tensor
-            ) -> Meshes:
-            '''Torch version of body mesh preparation.'''
-            body_colors = (torch.ones_like(body_verts) * \
-                torch.tensor(BodyColors.WHITE_SKIN)).float().to(self.device)
-            
-            return Meshes(
-                verts=body_verts,
-                faces=self.body_faces_torch,
-                textures=Textures(verts_rgb=body_colors)
-            )
+                verts: torch.Tensor
+    ) -> Meshes:
+        '''Torch version of body mesh preparation.'''
+        color_pallete = torch.tensor(
+            BodyColors.WHITE_SKIN.value, 
+            dtype=torch.float32
+        )
+        colors = (torch.ones_like(verts) * color_pallete).float().to(self.device)
+        
+        return Meshes(
+            verts=verts,
+            faces=self.faces,
+            textures=Textures(verts_rgb=colors)
+        )
 
     def create_meshes(
         self,
-        body_verts: Union[np.ndarray, torch.Tensor]
+        verts: Union[np.ndarray, torch.Tensor]
     ) -> Meshes:
         ''' Extract trimesh Meshes for the body mesh.'''
-        if type(body_verts) == np.ndarray:
-            self._prepare_body_mesh_numpy(body_verts)
+        if type(verts) == np.ndarray:
+            self.create_mesh_numpy(verts)
         else:
-            self._prepare_body_mesh_torch(body_verts)
-
-    def save_meshes(
-            self,
-            meshes: List[Mesh]
-    ) -> None: ...
+            self.create_mesh_torch(verts)
