@@ -51,7 +51,7 @@ class PoseMFShapeGaussianNet(nn.Module):
 
         self.register_buffer('init_glob', init_glob)
         self.num_cam_params = 3
-        init_cam = torch.tensor([0.9, 0.0, 0.0]).float()  # Initialise weak-perspective camera scale at 0.9
+        init_cam = torch.tensor(self.config.WP_CAM).float()  # Initialise weak-perspective camera scale at 0.9
         self.register_buffer('init_cam', init_cam)
 
         # ResNet Image Encoder

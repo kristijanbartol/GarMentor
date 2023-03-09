@@ -8,7 +8,6 @@ from torch.distributions import Normal
 
 from models.resnet import resnet18, resnet50
 from utils.garment_classes import GarmentClasses
-
 from utils.rigid_transform_utils import rotmat_to_rot6d
 
 
@@ -41,25 +40,25 @@ class FullyParametricNet(nn.Module):
         self.num_pose_params = self.num_joints * 3 * 3  # 3x3 matrix parameter for MF distribution for each joint.
 
         # Number of shape, glob and cam parameters + sensible initial estimates for weak-perspective camera and global rotation
-        self.num_shape_params = self.config.MODEL.NUM_SMPL_BETAS
-        self.num_style_params = self.config.MODEL.NUM_STYLE_PARAMS
+        self.num_shape_params = self.config.NUM_SMPL_BETAS
+        self.num_style_params = self.config.NUM_STYLE_PARAMS
         self.num_garment_classes = GarmentClasses.NUM_CLASSES
         self.num_glob_params = 6
         init_glob = rotmat_to_rot6d(torch.eye(3)[None, :].float())
 
         self.register_buffer('init_glob', init_glob)
         self.num_cam_params = 3
-        init_cam = torch.tensor([0.9, 0.0, 0.0]).float()  # Initialise weak-perspective camera scale at 0.9
+        init_cam = torch.tensor(self.config.WP_CAM).float()  # Initialise weak-perspective camera scale at 0.9
         self.register_buffer('init_cam', init_cam)
 
         # ResNet Image Encoder
-        if self.config.MODEL.NUM_RESNET_LAYERS == 18:
-            self.image_encoder = resnet18(in_channels=self.config.MODEL.NUM_IN_CHANNELS,
+        if self.config.NUM_RESNET_LAYERS == 18:
+            self.image_encoder = resnet18(in_channels=self.config.NUM_IN_CHANNELS,
                                           pretrained=False)
             num_image_features = 512
             fc1_dim = 512
-        elif self.config.MODEL.NUM_RESNET_LAYERS == 50:
-            self.image_encoder = resnet50(in_channels=self.config.MODEL.NUM_IN_CHANNELS,
+        elif self.config.NUM_RESNET_LAYERS == 50:
+            self.image_encoder = resnet50(in_channels=self.config.NUM_IN_CHANNELS,
                                           pretrained=False)
             num_image_features = 2048
             fc1_dim = 1024
@@ -83,17 +82,17 @@ class FullyParametricNet(nn.Module):
             self.num_style_params * self.num_garment_classes * 2 + \
             self.num_glob_params +                                 \
             self.num_cam_params,
-            self.config.MODEL.EMBED_DIM
+            self.config.EMBED_DIM
         )
 
         # FC Pose networks for each joint
         self.fc_pose = nn.ModuleList()
         for joint in range(self.num_joints):
             num_parents = len(self.parents_dict[joint])
-            input_dim = self.config.MODEL.EMBED_DIM + num_parents * (9 + 3 + 9)  # (passing (U, S, UV.T) for each parent to fc_pose - these have shapes (3x3), (3,), (3x3)
-            self.fc_pose.append(nn.Sequential(nn.Linear(input_dim, self.config.MODEL.EMBED_DIM // 2),
+            input_dim = self.config.EMBED_DIM + num_parents * (9 + 3 + 9)  # (passing (U, S, UV.T) for each parent to fc_pose - these have shapes (3x3), (3,), (3x3)
+            self.fc_pose.append(nn.Sequential(nn.Linear(input_dim, self.config.EMBED_DIM // 2),
                                               self.activation,
-                                              nn.Linear(self.config.MODEL.EMBED_DIM // 2, 9)))
+                                              nn.Linear(self.config.EMBED_DIM // 2, 9)))
 
     def forward(self, input, input_feats=None):
         """
@@ -158,8 +157,8 @@ class FullyParametricNet(nn.Module):
             else:
                 joint_F = fc_joint(embed).view(-1, 3, 3)  # (bsize, 3, 3)
 
-            if self.config.MODEL.DELTA_I:
-                joint_F = joint_F + self.config.MODEL.DELTA_I_WEIGHT * torch.eye(3, device=device)[None, :, :].expand_as(joint_F)
+            if self.config.DELTA_I:
+                joint_F = joint_F + self.config.DELTA_I_WEIGHT * torch.eye(3, device=device)[None, :, :].expand_as(joint_F)
 
             joint_U, joint_S, joint_V = torch.svd(joint_F.cpu())  # (bsize, 3, 3), (bsize, 3), (bsize, 3, 3)
             # I found that SVD is faster on CPU than GPU, but YMMV.

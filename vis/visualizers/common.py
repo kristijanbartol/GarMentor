@@ -71,8 +71,6 @@ class Visualizer2D(Visualizer):
         add 2D background image using `Visualizer2D.add_background`. 
     '''
 
-    default_cam_t = np.array(MEAN_CAM_T)
-
     def __init__(
             self,
             backgrounds_dir_path: str = None

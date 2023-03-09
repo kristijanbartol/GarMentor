@@ -141,6 +141,8 @@ data/textures/
 notebooks/data/
 output/
 tests/functional/out/
+tests/functional/data/
+tests/functional/*.png
 
 # Dependencies
 torch-trust-ncg/

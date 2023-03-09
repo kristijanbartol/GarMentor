@@ -11,7 +11,7 @@ def to_torch(
     '''Convert from np.arrays to torch.Tensors using torch.as_tensor.'''
     tensors = []
     for array in arrays:
-        if type(array) != torch.Tensor:
+        if type(array) == np.ndarray:
             array = torch.as_tensor(array)
         tensors.append(array)
     return tensors
@@ -23,7 +23,7 @@ def to_numpy(
     '''Convert from torch.Tensors to np.ndarrays.'''
     arrays = []
     for tensor in tensors:
-        if type(tensor) != torch.Tensor:
+        if type(tensor) == torch.Tensor:
             tensor = tensor.cpu().detach().numpy()[0]
         arrays.append(tensor)
     return arrays

@@ -6,6 +6,14 @@ from typing import Optional
 import torch
 import numpy as np
 
+from configs.const import (
+    FOCAL_LENGTH,
+    IMG_WH,
+    MEAN_CAM_T,
+    WP_CAM
+)
+from utils.joints2d_utils import undo_keypoint_normalisation
+
 
 def orthographic_project_torch(points3D, cam_params):
     """
@@ -82,18 +90,24 @@ def get_intrinsics_matrix(
 
 
 def orthographic_project(
-        points3D: np.ndarray, 
-        cam_params: np.ndarray
+        points: np.ndarray, 
+        wp_params: np.ndarray,
+        cam_t: Optional[np.ndarray] = None
     ) -> np.ndarray:
-    ''' Scaled orthographic projection (i.e. weak perspective projection).
+    """ 
+    Scaled orthographic projection (i.e. weak perspective projection).
 
-        Parameters:
-        -----------
-            points3D: (N, 3) batch of 3D point sets.
-            cam_params: (3,) batch of weak-perspective camera parameters 
-                               (scale, trans x, trans y).
-    '''
-    return cam_params[None, [0]] * (points3D[:, :2] + cam_params[None, 1:])
+    Parameters:
+    -----------
+        points: (N, 3) batch of 3D point sets.
+        wp_params: (3,) weak-perspective camera parameters 
+                        (scale, trans x, trans y).
+        cam_t: (3,) optional translation of 3D points.
+    """
+    points = wp_params[None, [0]] * (points[:, :2] + wp_params[None, 1:])
+    if cam_t is not None:
+        points += np.expand_dims(cam_t, axis=0)
+    return points
 
 
 def perspective_project(
@@ -104,34 +118,66 @@ def perspective_project(
         focal_length: Optional[np.ndarray] = None,
         img_wh: Optional[np.ndarray] = None
     ) -> np.ndarray:
-    ''' Computes the perspective projection of a set of points in torch.
+    """
+    Computes the perspective projection of a set of points in torch.
     
-        Parameters:
-        -----------
-            points (N, 3): 3D points
-            rotation (3, 3): Camera rotation
-            translation (3,): Camera translation
-            Either
-            cam_K (3, 3): Camera intrinsics matrix
-            Or
-            focal_length scalar: Focal length
-            camera_center (2,): Camera center
-    '''
+    Parameters:
+    -----------
+        points (N, 3): 3D points
+        rotation (3, 3): Camera rotation
+        translation (3,): Camera translation
+        Either
+        cam_K (3, 3): Camera intrinsics matrix
+        Or
+        focal_length scalar: Focal length
+    """
     if cam_K is None:
         cam_K = get_intrinsics_matrix(img_wh, img_wh, focal_length)
 
     # Transform points
     if rotation is not None:
-        points = np.einsum('bij,bkj->bki', rotation, points)
+        points = np.einsum('ij,kj->ki', rotation, points)
     points = points + np.expand_dims(translation, axis=0)
 
     # Apply perspective distortion
     projected_points = points / np.expand_dims(points[:, -1], axis=-1)
 
     # Apply camera intrinsics
-    projected_points = np.einsum('ij,kj->ki', cam_K, projected_points)
+    projected_points = np.einsum('ij,kj->ik', cam_K, projected_points)
 
     return projected_points[:, :-1]
+
+
+def project_points(
+        points: np.ndarray,
+        projection_type: str,
+        cam_t: Optional[np.ndarray] = None,
+        wp_params: Optional[np.ndarray] = np.array(WP_CAM),
+        focal_length: Optional[float] = FOCAL_LENGTH,
+        img_wh: Optional[int] = IMG_WH
+    ) -> np.ndarray:
+    """
+    Project 3D points to 2D image, given camera parameters.
+    """
+    if projection_type == 'perspective':
+        points = perspective_project(
+            points=points,
+            rotation=None,
+            translation=cam_t,
+            cam_K=None,
+            focal_length=focal_length,
+            img_wh=img_wh
+        )
+    else:
+        points = orthographic_project(
+            points=points,
+            wp_params=wp_params
+        )
+        points = undo_keypoint_normalisation(
+            normalised_keypoints=points,
+            img_wh=img_wh
+        )
+    return points
 
 
 def convert_weak_perspective_to_camera_translation(cam_wp, focal_length, resolution):

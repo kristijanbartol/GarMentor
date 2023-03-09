@@ -19,7 +19,7 @@ if __name__ == '__main__':
     )
 
     body_visualizer = BodyVisualizer(device='cpu')
-    body_visualizer.vis_from_params(
+    body_img, body_mask = body_visualizer.vis_from_params(
         pose=pose,
         shape=shape,
         cam_t=cam_t,

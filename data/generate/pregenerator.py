@@ -178,9 +178,6 @@ class DataPreGenerator(object):
             xy_std=self.cfg.TRAIN.SYNTH_DATA.AUGMENT.CAM.XY_STD,
             delta_z_range=self.cfg.TRAIN.SYNTH_DATA.AUGMENT.CAM.DELTA_Z_RANGE
         )
-        pose[0] = 0.
-        pose[1] = 0.
-        pose[2] = 0. 
         return (
             pose,
             shape,

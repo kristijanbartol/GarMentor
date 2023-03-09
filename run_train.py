@@ -8,6 +8,7 @@ import _thread as thread
 import visdom as vis
 
 from models.poseMF_shapeGaussian_net import PoseMFShapeGaussianNet
+from models.fully_parametric_net import FullyParametricNet
 from models.smpl_official import SMPL
 from models.canny_edge_detector import CannyEdgeDetector
 
@@ -86,6 +87,8 @@ def run_train(device,
 
     # 3D shape and pose distribution predictor
     # TODO: Use FullyParametriccNet instead of PoseMFShapeGaussianNet.
+    #pose_shape_model = FullyParametricNet(smpl_parents=smpl_model.parents.tolist(),
+    #                                          config=pose_shape_cfg.MODEL).to(device)
     pose_shape_model = PoseMFShapeGaussianNet(smpl_parents=smpl_model.parents.tolist(),
                                               config=pose_shape_cfg).to(device)
 

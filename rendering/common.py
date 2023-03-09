@@ -3,28 +3,41 @@ import torch.nn as nn
 import torch
 import numpy as np
 
+from configs.const import (
+    MEAN_CAM_T,
+    IMG_WH,
+    LIGHT_T,
+    LIGHT_AMBIENT_COLOR,
+    LIGHT_DIFFUSE_COLOR,
+    LIGHT_SPECULAR_COLOR,
+    BACKGROUND_COLOR,
+    ORTOGRAPHIC_SCALE
+)
 from pytorch3d.renderer import (
     FoVOrthographicCameras,
     PointLights,
     RasterizationSettings,
     MeshRasterizer,
     HardPhongShader,
-    BlendParams)
-
-from data.const import BODY_FACES
+    BlendParams
+)
 
 
 class Renderer(nn.Module):
+
+    zero_rotation = [[1., 0., 0.],
+                    [0., 1., 0.],
+                    [0., 0., 1.]]
 
     def __init__(
             self,
             device: str,
             batch_size: int,
-            img_wh: int = 256,
+            img_wh: int = IMG_WH,
             cam_t: Optional[torch.Tensor] = None,
             cam_R: Optional[torch.Tensor] = None,
             projection_type: str = 'perspective',
-            orthographic_scale: float = 0.9,
+            orthographic_scale: float = ORTOGRAPHIC_SCALE,
             blur_radius: float = 0.0,
             faces_per_pixel: int = 1,
             bin_size: int = None,
@@ -32,11 +45,11 @@ class Renderer(nn.Module):
             perspective_correct: bool = False,
             cull_backfaces: bool = False,
             clip_barycentric_coords: bool = None,
-            light_t: Tuple[float] = ((0.0, 0.0, -2.0),),
-            light_ambient_color: Tuple[float] = ((0.5, 0.5, 0.5),),
-            light_diffuse_color: Tuple[float] = ((0.3, 0.3, 0.3),),
-            light_specular_color: Tuple[float] = ((0.2, 0.2, 0.2),),
-            background_color: Tuple[float] = (0.0, 0.0, 0.0)
+            light_t: Tuple[float] = LIGHT_T,
+            light_ambient_color: Tuple[float] = LIGHT_AMBIENT_COLOR,
+            light_diffuse_color: Tuple[float] = LIGHT_DIFFUSE_COLOR,
+            light_specular_color: Tuple[float] = LIGHT_SPECULAR_COLOR,
+            background_color: Tuple[float] = BACKGROUND_COLOR
         ) -> None:
         ''' The body renderer constructor.
 
@@ -98,22 +111,11 @@ class Renderer(nn.Module):
         print('\nRenderer projection type:', projection_type)
         self.projection_type = projection_type
         if cam_R is None:
-            # Rotating 180° about z-axis to make pytorch3d camera convention same 
-            # as what I've been using so far in my perspective_project_torch/NMR/pyrender.
-            # (Actually pyrender also has a rotation defined in the 
-            # renderer to make it same as NMR.)
-            cam_R = torch.tensor([[-1., 0., 0.],
-                                    [0., -1., 0.],
-                                    [0., 0., 1.]], device=device).float()
+            cam_R = torch.tensor(self.zero_rotation, device=device).float()
             cam_R = cam_R[None, :, :].expand(batch_size, -1, -1)
         if cam_t is None:
-            cam_t = torch.tensor([0., 0.2, 2.5]).float().to(device)
+            cam_t = torch.tensor(MEAN_CAM_T).float().to(device)
             cam_t = cam_t[None, :].expand(batch_size, -1)
-        # Pytorch3D camera is rotated 180° about z-axis to match my 
-        # perspective_project_torch/NMR's projection convention.
-        # So, need to also rotate the given camera translation 
-        # (implemented below as elementwise-mul).
-        cam_t = cam_t * torch.tensor([-1., -1., 1.], device=cam_t.device).float()
         
         self.cameras = FoVOrthographicCameras(
             device=device,
@@ -133,13 +135,6 @@ class Renderer(nn.Module):
             ambient_color=light_ambient_color,
             diffuse_color=light_diffuse_color,
             specular_color=light_specular_color
-        )
-        # Lights for IUV render - don't want lighting to affect the rendered image.
-        self.lights_iuv_render = PointLights(
-            device=device,
-            ambient_color=[[1, 1, 1]],
-            diffuse_color=[[0, 0, 0]],
-            specular_color=[[0, 0, 0]]
         )
 
         # Rasterizer
@@ -166,7 +161,6 @@ class Renderer(nn.Module):
             lights=self.lights_rgb_render, 
             blend_params=self.blend_params
         )
-
         self.to(device)
 
     def to(self, device):
@@ -192,9 +186,7 @@ class Renderer(nn.Module):
         ) -> None:
         '''Update camera translation, focal length, or lights settings.'''
         if cam_t is not None:
-            cam_t = torch.from_numpy(cam_t).float().unsqueeze(0).to(self.device)
-            self.cameras.T = cam_t * torch.tensor(
-                [-1., -1., 1.], device=self.device).float()
+            self.cameras.T = torch.from_numpy(cam_t).float().unsqueeze(0).to(self.device)
         if orthographic_scale is not None and self.projection_type == 'orthographic':
             self.cameras.focal_length = orthographic_scale * (self.img_wh / 2.0)
         if lights_rgb_settings is not None and self.render_rgb:
