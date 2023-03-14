@@ -2,7 +2,10 @@ from typing import Union, Tuple, Optional
 import torch
 import numpy as np
 
-from models.smpl_official import easy_create_smpl_model
+from models.smpl_official import (
+    easy_create_smpl_model,
+    SMPL
+)
 from rendering.body import BodyRenderer
 from utils.convert_arrays import to_numpy
 from vis.visualizers.common import Visualizer2D
@@ -14,22 +17,38 @@ class BodyVisualizer(Visualizer2D):
             self, 
             device: str,
             gender: Optional[str] = None,
+            smpl_model: Optional[SMPL] = None,
             backgrounds_dir_path: str = None
         ) -> None:
+        """
+        Initialize BodyVisualizer class.
+
+        If smpl_model is provided, then gender argument is ignored.
+        If smpl_model is not provided, then gender argument, if
+        provided, is used to create an SMPL model. Finally, if both
+        smpl_model and gender are not provided, the SMPL model is None
+        and is expected that will be created in the visualization method.
+        """
         super().__init__(backgrounds_dir_path)
 
         self.device = device
         self.renderer = BodyRenderer(
-            device=self.device,
-            batch_size=1
+            device=self.device
         )
-        
+
         self.smpl_model = None
-        if gender is not None:
-            self.smpl_model = easy_create_smpl_model(
-                gender=gender,
-                device=device
-            )
+        model_description = 'None'
+        if smpl_model is not None:
+            self.smpl_model = smpl_model
+            model_description = f'predefined_{smpl_model.gender}'
+        else:
+            if gender is not None:
+                self.smpl_model = easy_create_smpl_model(
+                    gender=gender,
+                    device=device
+                )
+                model_description = f'new_{gender}'
+        print(f'[BodyVisualizer] Using {model_description} SMPL.')
 
     def vis(
         self,

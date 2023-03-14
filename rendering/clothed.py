@@ -81,7 +81,8 @@ class ClothedRenderer(Renderer):
 
         meshes = self.mesh_manager.create_meshes(smpl_output_dict)
         rgbs = []
-        for mesh in meshes:
+        for mesh_part, mesh in zip(['body', 'upper', 'lower'], meshes):
+            print(f'Rendering {mesh_part} mesh...')
             fragments = self.rasterizer(
                 mesh, 
                 cameras=self.cameras

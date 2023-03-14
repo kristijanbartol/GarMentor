@@ -10,8 +10,7 @@ try:
 except ImportError:
     from smplx.utils import SMPLOutput
 
-from configs.const import MEAN_CAM_T
-from data.datasets.off_the_fly_train_datasets import SurrealTrainDataset
+from data.datasets.common import get_background_paths
 from models.smpl_official import SMPL
 from utils.convert_arrays import to_smpl_model_params
 from utils.image_utils import add_rgb_background
@@ -81,7 +80,7 @@ class Visualizer2D(Visualizer):
 
         self.background_paths = None
         if backgrounds_dir_path is not None:
-            self.backgrounds_paths = SurrealTrainDataset._get_background_paths(
+            self.backgrounds_paths = get_background_paths(
                 backgrounds_dir_path=backgrounds_dir_path,
                 num_backgrounds=1000
             )
@@ -92,14 +91,14 @@ class Visualizer2D(Visualizer):
             shape: np.ndarray,
             smpl_model: SMPL
     ) -> SMPLOutput:
-        pose_rotmat, glob_rotmat, shape = to_smpl_model_params(
+        glob_rotmat, pose_rotmat, shape = to_smpl_model_params(
             pose=pose, 
             shape=shape
         )
         return smpl_model(
+            global_orient=glob_rotmat,
             body_pose=pose_rotmat,
             betas=shape,
-            global_orient=glob_rotmat,
             pose2rot=False
         )
 

@@ -24,9 +24,10 @@ class ColoredGarmentsMeshManager(MeshManager):
     '''
 
     def __init__(self):
-        super().__init__(self)
+        super().__init__()
 
     def create_meshes(
+            self,
             smpl_output_dict: Dict[str, SMPL4GarmentOutput],
             device: str = 'cpu'
     ) -> List[Meshes]:

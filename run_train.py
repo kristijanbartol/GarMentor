@@ -91,12 +91,15 @@ def run_train(device,
     #                                          config=pose_shape_cfg.MODEL).to(device)
     pose_shape_model = PoseMFShapeGaussianNet(smpl_parents=smpl_model.parents.tolist(),
                                               config=pose_shape_cfg).to(device)
-
-    # Pytorch3D renderer for synthetic data generation
-    body_renderer = BodyRenderer(device=device, batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE)
     
     # Visualizer class to log the training progress.
-    vis_logger = VisLogger(visdom=visdom, renderer=body_renderer) if visdom is not None else None
+    vis_logger = None
+    if visdom is not None:
+        vis_logger = VisLogger(
+            device=device,
+            visdom=visdom, 
+            smpl_model=smpl_model
+        )
 
     # ------------------------- Loss Function + Optimiser -------------------------
     criterion = PoseMFShapeGaussianLoss(loss_config=pose_shape_cfg.LOSS.STAGE1,

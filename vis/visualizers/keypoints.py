@@ -3,12 +3,10 @@ import torch
 import numpy as np
 import cv2
 
-from configs.const import (
-    FOCAL_LENGTH,
-    IMG_WH,
-    WP_CAM
+from models.smpl_official import (
+    easy_create_smpl_model,
+    SMPL
 )
-from models.smpl_official import easy_create_smpl_model
 from utils.cam_utils import project_points
 from utils.label_conversions import (
     COCO_START_IDXS,
@@ -33,9 +31,19 @@ class KeypointsVisualizer(Visualizer2D):
             device: str = 'cpu', 
             img_wh: int = 256,
             gender: Optional[str] = None,
+            smpl_model: Optional[SMPL] = None,
             backgrounds_dir_path: Optional[str] = None,
             projection_type: Optional[str] = None
         ) -> None:
+        """
+        Initialize KeypointsVisualizer class.
+
+        If smpl_model is provided, then gender argument is ignored.
+        If smpl_model is not provided, then gender argument, if
+        provided, is used to create an SMPL model. Finally, if both
+        smpl_model and gender are not provided, the SMPL model is None
+        and is expected that will be created in the visualization method.
+        """
         super().__init__(backgrounds_dir_path)
 
         self.device = device
@@ -47,14 +55,21 @@ class KeypointsVisualizer(Visualizer2D):
             else:
                 print('WARNING: Projection type invalid. Keeping '\
                       f'{self.default_projection_type}.')
-        print(f'Keypoint visualizer projection type: {self.projection_type}')
+        print(f'[KeypointVisualizer] Projection: {self.projection_type}')
 
         self.smpl_model = None
-        if gender is not None:
-            self.smpl_model = easy_create_smpl_model(
-                gender=gender,
-                device=device
-            )
+        model_description = 'None'
+        if smpl_model is not None:
+            self.smpl_model = smpl_model
+            model_description = f'predefined_{smpl_model.gender}'
+        else:
+            if gender is not None:
+                self.smpl_model = easy_create_smpl_model(
+                    gender=gender,
+                    device=device
+                )
+                model_description = f'new_{gender}'
+        print(f'[KeypointVisualizer] Using {model_description} SMPL.')
 
     def batched_vis_heatmaps(
             self,
@@ -64,7 +79,8 @@ class KeypointsVisualizer(Visualizer2D):
         """
         Visualize a number of colored heatmaps, given the batch of keypoints.
         """
-        colored_heatmaps = torch.zeros(num_heatmaps, 3, self.img_wh, self.img_wh).to(self.device)
+        colored_heatmaps = torch.zeros(
+            num_heatmaps, 3, self.img_wh, self.img_wh).to(self.device)
         for color_idx, color_key in enumerate(KPT_COLORS):
             heatmaps = torch.stack((heatmaps[:num_heatmaps, color_idx],) * 3, dim=1)
             color_tensor = torch.tensor(KPT_COLORS[color_key])

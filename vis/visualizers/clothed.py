@@ -4,7 +4,6 @@ import numpy as np
 from models.parametric_model import ParametricModel
 from rendering.clothed import ClothedRenderer
 from utils.garment_classes import GarmentClasses
-from utils.convert_arrays import to_torch
 from vis.visualizers.common import Visualizer2D
 
 from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
@@ -24,29 +23,39 @@ class ClothedVisualizer(Visualizer2D):
 
     def __init__(
             self, 
-            gender: str,
-            upper_class: str,
-            lower_class: str,
             device: str,
+            gender: str,
+            upper_class: Optional[str] = None,
+            lower_class: Optional[str] = None,
+            garment_classes: Optional[GarmentClasses] = None,
             backgrounds_dir_path: str = None,
             img_wh=256
         ) -> None:
-        ''' Initialize the visualizer using parameter specification.'''
+        """
+        Initialize the ClothedVisualizer class.
+
+        Either garment_classes object or upper&lower class should be 
+        provided as arguments. The ClothedVisualizer contains
+        ClothedRenderer, which makes it more convenient for the user not
+        to think about the rendering details.
+        """
         super().__init__(backgrounds_dir_path)
 
-        _garment_classes = GarmentClasses(
-            upper_class, 
-            lower_class
-        )
+        if garment_classes is None:
+            assert(upper_class is not None and lower_class is not None)
+            self.garment_classes = GarmentClasses(
+                upper_class, 
+                lower_class
+            )
+        else:
+            self.garment_classes = garment_classes
+
         self.parametric_model = ParametricModel(
             gender=gender, 
-            garment_classes=_garment_classes
+            garment_classes=self.garment_classes
         )
         self.device = device
-        self.renderer = ClothedRenderer(
-            device=self.device,
-            batch_size=1
-        )
+        self.renderer = ClothedRenderer(device=self.device)
         self.img_wh = img_wh
 
     def vis(self,
@@ -67,7 +76,7 @@ class ClothedVisualizer(Visualizer2D):
             shape: np.ndarray, 
             style_vector: np.ndarray,
             cam_t: Optional[np.ndarray] = None
-        ) -> Tuple[np.ndarray, np.ndarray]:
+        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         ''' Visualize clothed mesh(es).
         
             First, the parametric model is ran to obtain the verts.
@@ -77,9 +86,6 @@ class ClothedVisualizer(Visualizer2D):
             always expects Numpy arrays because visualizing TailorNet 
             will not be required in training loop, for now.
         '''
-        pose, shape, style_vector = to_torch(
-            arrays=[pose, shape, style_vector]
-        )
         smpl_output_dict = self.parametric_model.run(
             pose=pose,
             shape=shape,
@@ -90,4 +96,8 @@ class ClothedVisualizer(Visualizer2D):
             self.parametric_model.garment_classes,
             cam_t
         )
-        return rgb_img, seg_maps
+        return (
+            rgb_img, 
+            seg_maps,
+            smpl_output_dict['upper'].joints
+        )

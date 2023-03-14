@@ -8,7 +8,11 @@ from math import floor, ceil
 import imageio
 from torch.utils.data import Dataset
 
-from data.generate.pregenerator import SurrealDataPreGenerator, DataPreGenerator
+from data.generate.pregenerator import (
+    SurrealDataPreGenerator, 
+    DataPreGenerator
+)
+from data.datasets.common import get_background_paths
 from utils.garment_classes import GarmentClasses
     
     
@@ -125,7 +129,7 @@ class SurrealTrainDataset(TrainDataset):
             rgb_imgs_dirname=self.IMG_DIRNAME,
             slice_list=data_split_slices_list
         )
-        self.backgrounds_paths = self._get_background_paths(
+        self.backgrounds_paths = get_background_paths(
             backgrounds_dir_path=backgrounds_dir_path,
             num_backgrounds=10000
         )
@@ -209,18 +213,6 @@ class SurrealTrainDataset(TrainDataset):
                 rgb_img_path = os.path.join(rgb_imgs_dir, f)
                 rgb_img_paths.append(rgb_img_path)
         return rgb_img_paths
-    
-    @staticmethod
-    def _get_background_paths(backgrounds_dir_path: str, 
-                          num_backgrounds: int = -1) -> List[str]:
-        print('Loading background paths...')
-        backgrounds_paths = []
-        for f in tqdm(sorted(os.listdir(backgrounds_dir_path)[:num_backgrounds])):
-            if f.endswith('.jpg'):
-                backgrounds_paths.append(
-                    os.path.join(backgrounds_dir_path, f)
-                )
-        return backgrounds_paths
 
     def __len__(self) -> int:
         '''Get dataset length (used by DataLoader).'''

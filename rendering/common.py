@@ -5,15 +5,18 @@ import numpy as np
 
 from configs.const import (
     MEAN_CAM_T,
+    CAM_DIST,
+    MEAN_CAM_Y_OFFSET,
     IMG_WH,
     LIGHT_T,
     LIGHT_AMBIENT_COLOR,
     LIGHT_DIFFUSE_COLOR,
     LIGHT_SPECULAR_COLOR,
     BACKGROUND_COLOR,
-    ORTOGRAPHIC_SCALE
+    ORTHOGRAPHIC_SCALE
 )
 from pytorch3d.renderer import (
+    look_at_view_transform,
     FoVOrthographicCameras,
     PointLights,
     RasterizationSettings,
@@ -25,19 +28,26 @@ from pytorch3d.renderer import (
 
 class Renderer(nn.Module):
 
-    zero_rotation = [[1., 0., 0.],
-                    [0., 1., 0.],
-                    [0., 0., 1.]]
+    default_cam_R, default_cam_t = look_at_view_transform(
+        dist=CAM_DIST,
+        elev=0,
+        azim=0,
+        degrees=True
+    )
+    default_cam_t[:, 1] += MEAN_CAM_Y_OFFSET
+
+    assert(default_cam_t[:, 0] == MEAN_CAM_T[0])
+    assert(default_cam_t[:, 1] == MEAN_CAM_T[1])
+    assert(default_cam_t[:, 2] == MEAN_CAM_T[2])
 
     def __init__(
             self,
             device: str,
-            batch_size: int,
             img_wh: int = IMG_WH,
             cam_t: Optional[torch.Tensor] = None,
             cam_R: Optional[torch.Tensor] = None,
             projection_type: str = 'perspective',
-            orthographic_scale: float = ORTOGRAPHIC_SCALE,
+            orthographic_scale: float = ORTHOGRAPHIC_SCALE,
             blur_radius: float = 0.0,
             faces_per_pixel: int = 1,
             bin_size: int = None,
@@ -110,12 +120,9 @@ class Renderer(nn.Module):
             projection_type = 'perspective'
         print('\nRenderer projection type:', projection_type)
         self.projection_type = projection_type
-        if cam_R is None:
-            cam_R = torch.tensor(self.zero_rotation, device=device).float()
-            cam_R = cam_R[None, :, :].expand(batch_size, -1, -1)
-        if cam_t is None:
-            cam_t = torch.tensor(MEAN_CAM_T).float().to(device)
-            cam_t = cam_t[None, :].expand(batch_size, -1)
+
+        cam_R = self.default_cam_R if cam_R is None else cam_R
+        cam_t = self.default_cam_t if cam_t is None else cam_t
         
         self.cameras = FoVOrthographicCameras(
             device=device,

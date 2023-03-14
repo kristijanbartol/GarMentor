@@ -13,14 +13,13 @@ sys.path.append(os.path.dirname(_module_dir))
 
 from configs import paths
 from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
-from models.parametric_model import ParametricModel
-from rendering.clothed import ClothedRenderer
 from utils.augmentation.cam_augmentation import augment_cam_t_numpy
 from utils.augmentation.smpl_augmentation import (
     normal_sample_shape_numpy,
     normal_sample_style_numpy
 )
 from utils.garment_classes import GarmentClasses
+from vis.visualizers.clothed import ClothedVisualizer
 
 
 @dataclass
@@ -196,15 +195,11 @@ class SurrealDataPreGenerator(DataPreGenerator):
     def __init__(self):
         '''Initialize superclass and create clothed renderer.'''
         super().__init__()
-        self.renderer = ClothedRenderer(
-            device='cuda:0',
-            batch_size=1
-        )
 
     def generate_sample(self, 
                         idx: int,
                         gender: str,
-                        parametric_model: ParametricModel
+                        clothed_visualizer: ClothedVisualizer
                         ) -> Tuple[np.ndarray, np.ndarray, PreGeneratedSampleValues]:
         '''Generate a single training sample.'''
         pose, shape, style_vector, cam_t = self.generate_random_params(idx)
@@ -215,23 +210,19 @@ class SurrealDataPreGenerator(DataPreGenerator):
         print(f'\tCam T: {cam_t}')
         print(f'\tStyle: {style_vector}')
 
-        smpl_output_dict = parametric_model.run(
+        rgb_img, seg_maps, joints_3d = clothed_visualizer.vis_from_params(
             pose=pose,
             shape=shape,
-            style_vector=style_vector
-        )
-        rgb_img, seg_maps = self.renderer(
-            smpl_output_dict,
-            garment_classes=parametric_model.garment_classes,
-            cam_t=cam_t
+            style_vector=style_vector,
+            cam_t=cam_t     # TODO: Might remove cam_t as a parameter here.
         )
         sample_values = PreGeneratedSampleValues(
             pose=pose,
             shape=shape,
             style_vector=style_vector,
-            garment_labels=parametric_model.garment_classes.labels_vector,
+            garment_labels=clothed_visualizer.garment_classes.labels_vector,
             cam_t=cam_t,
-            joints=smpl_output_dict['upper'].joints
+            joints=joints_3d
         )
         return rgb_img, seg_maps, sample_values
     
@@ -324,8 +315,8 @@ class SurrealDataPreGenerator(DataPreGenerator):
         '''(Pre-)generate the whole dataset.'''
 
         garment_classes = GarmentClasses(upper_class, lower_class)
-        parametric_model = ParametricModel(
-            gender=gender, 
+        clothed_visualizer = ClothedVisualizer(
+            gender=gender,
             garment_classes=garment_classes
         )
         dataset_dir = self.dataset_path_template.format(
@@ -349,7 +340,7 @@ class SurrealDataPreGenerator(DataPreGenerator):
             rgb_img, seg_maps, sample_values = self.generate_sample(
                 idx=pose_idx, 
                 gender=gender, 
-                parametric_model=parametric_model)
+                clothed_visualizer=clothed_visualizer)
             self._save_sample(
                 dataset_dir=dataset_dir, 
                 sample_idx=pose_idx, 
