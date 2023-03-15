@@ -8,6 +8,7 @@ except ImportError:
 from smplx.lbs import vertices2joints
 
 from configs import paths
+from configs.const import NUM_SMPL_BETAS
 
 
 class SMPL(_SMPL):
@@ -39,3 +40,14 @@ class SMPL(_SMPL):
                             betas=smpl_output.betas,
                             full_pose=smpl_output.full_pose)
         return output
+
+
+def easy_create_smpl_model(
+        gender: str,
+        device: str
+) -> SMPL:
+    return SMPL(
+        paths.SMPL,
+        num_betas=NUM_SMPL_BETAS,
+        gender=gender
+    ).to(device)

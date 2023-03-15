@@ -1,17 +1,13 @@
 import os
 import sys
 import pickle
-import random
 import numpy as np
-from typing import Set, List
 from os import path as osp
-import pandas as pd
 from tqdm import tqdm
-
-from psbody.mesh import Mesh
 
 sys.path.append('/garmentor/')
 
+from data.mesh_managers.textured_garments import TexturedGarmentsMeshManager
 from models.parametric_model import ParametricModel
 from models.smpl_conversions import smplx2smpl
 from utils.augmentation.smpl_augmentation import normal_sample_style_numpy
@@ -21,86 +17,9 @@ from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
 from data.const import (
     GARMENTOR_DIR,
     SUBJECT_OBJ_SAVEDIR,
-    UV_MAPS_PATH,
     MGN_DATASET,
-    AGORA_DIR,
-    CAM_DIR,
     SCANS_DIR
 )
-
-
-def texture_meshes(meshes: list, texture_paths: list, garment_tag: list, uv_maps_pth: str):
-    '''
-    Texture the [body, upper garment, lower garment] meshes from list meshes
-    with textures from texture_paths -- mesh can be None if no mesh is available
-    Arguments:
-        meshes: list of 3 psbody Mesh classes for the body, upper garment and lower garment.
-                a mesh can be None if you don't want to texture that part of mesh
-        texture_paths: list of 3 paths to texture images for body, upper garment and lower garment
-        garment_tag: list of 2 garment labels for the upper garment and lower garment
-        uv_maps_pth: folder path where the uv maps are stored for each garment type
-    Returns:
-        textured_meshes: list of 3 textured meshes from the input
-    '''
-
-    body_mesh = meshes[0]
-    ug_mesh = meshes[1]
-    lg_mesh = meshes[2]
-
-    # load pre-defined uv maps
-    general_vt = np.load(f'{uv_maps_pth}/general_vt.npy')
-
-    # texture body
-    if body_mesh is not None:
-        body_ft = np.load(f'{uv_maps_pth}/body_ft.npy')
-        
-        body_mesh.vt = general_vt
-        body_mesh.ft = body_ft
-        body_mesh.set_texture_image(texture_paths[0])
-
-    # texture upper garment
-    if ug_mesh is not None:
-        
-        ug_tag = garment_tag[0]
-        ug_ft = np.load(f'{uv_maps_pth}/{ug_tag}_ft.npy')
-
-        ug_mesh.vt = general_vt
-        ug_mesh.ft = ug_ft
-        ug_mesh.set_texture_image(texture_paths[1])
-
-    # texture lower garment
-    if lg_mesh is not None:
-
-        lg_tag = garment_tag[1]
-        lg_ft = np.load(f'{uv_maps_pth}/{lg_tag}_ft.npy')
-
-        lg_mesh.vt = general_vt
-        lg_mesh.ft = lg_ft
-        lg_mesh.set_texture_image(texture_paths[2])
-
-
-    return [body_mesh, ug_mesh, lg_mesh]
-
-
-def __infer_subjects_for_scene(cam_file_directory: str, scene_name: str, verbosity: int = 0) -> Set[str]:
-    """For the given scene, returns a list that contains the (relative) paths to all non-kid subjects that appear in this scene.
-    Currently unused.
-    """
-    cam_files = [file for file in os.listdir(cam_file_directory)  if osp.splitext(file)[1] == '.pkl']
-    data = []
-    for cam_file in cam_files:
-        df = pd.read_pickle(cam_file).reset_index()
-        for idx, row in df.iterrows():
-            if scene_name in row.imgPath:
-                data.append(row)
-    if verbosity > 0:
-        print(f"Found {len(data)} images for scene {scene_name}")
-    unique_smplx_subjects = set()
-    for entry in data:
-        unique_smplx_subjects.update([entry.gt_smplx_path[i] for i in range(len(entry.gt_smplx_path)) if not entry.kid[i]])
-    if verbosity > 0:
-        print(f"Found {len(unique_smplx_subjects)} unique subjects for scene {scene_name}")
-    return unique_smplx_subjects
 
 
 def _is_already_processed(output_dir: str, pickle_fpath: str) -> bool:
@@ -119,7 +38,6 @@ def _is_already_processed(output_dir: str, pickle_fpath: str) -> bool:
         if not osp.isfile(osp.join(output_dir, file)):    # e.g. /data/garmentor/agora/subjects/shirt-pant/trainset_3dpeople_adults_bfh/10004_w_Amaya_0_0-body.jpg
             return False
     return True
-
 
 def _save_style_parameters(
     style_upper: np.ndarray,
@@ -177,24 +95,29 @@ if __name__ == '__main__':
 
     UPPER_GARMENT_TYPE = "t-shirt"
     LOWER_GARMENT_TYPE = "short-pant"
-    SUBJECT_GARMENT_SUBDIR = f"{UPPER_GARMENT_TYPE}_{LOWER_GARMENT_TYPE}"
+
+    garment_classes = GarmentClasses(
+        upper_class=UPPER_GARMENT_TYPE,
+        lower_class=LOWER_GARMENT_TYPE
+    )
+    subject_garment_subdir = str(garment_classes)
 
     parametric_models = {
-        'male': ParametricModel(gender='male', 
-                                garment_classes=GarmentClasses(
-                                upper_class=UPPER_GARMENT_TYPE,
-                                lower_class=LOWER_GARMENT_TYPE)
-                                ),
-        'female': ParametricModel(gender='female',
-                                garment_classes=GarmentClasses(
-                                upper_class=UPPER_GARMENT_TYPE,
-                                lower_class=LOWER_GARMENT_TYPE)
-                                )   
+        'male': ParametricModel(
+            gender='male', 
+            garment_classes=garment_classes
+        ),
+        'female': ParametricModel(
+            gender='female',
+            garment_classes=garment_classes
+        )
     }
     
     texture_dirpaths = [
         os.path.join(MGN_DATASET, x) for x in os.listdir(MGN_DATASET)
     ]
+
+    textured_mesh_manager = TexturedGarmentsMeshManager(store_maps_to_disk=True)
     
     if not os.path.exists(GARMENTOR_DIR):
         os.makedirs(GARMENTOR_DIR)
@@ -211,12 +134,11 @@ if __name__ == '__main__':
 
             mesh_dir = os.path.join(
                 SUBJECT_OBJ_SAVEDIR,
-                SUBJECT_GARMENT_SUBDIR,
+                subject_garment_subdir,
                 scan_dir
             )
             os.makedirs(mesh_dir, exist_ok=True)
-            mesh_basename = osp.splitext(pkl_fname)[0]
-            mesh_basepath = os.path.join(mesh_dir, mesh_basename)          
+            mesh_basename = osp.splitext(pkl_fname)[0]      
 
             # Check if this subject (with the current garment combination) is
             # already present in the output directory
@@ -271,7 +193,7 @@ if __name__ == '__main__':
                 style_lower,
                 osp.join(
                     SUBJECT_OBJ_SAVEDIR,
-                    SUBJECT_GARMENT_SUBDIR
+                    subject_garment_subdir
                 ),
                 scan_dir,
                 mesh_basename
@@ -282,81 +204,19 @@ if __name__ == '__main__':
                 shape=beta,
                 style_vector=style_vector
             )
-
-            body_mesh = Mesh(
-                v=smpl_output_dict['upper'].body_verts, 
-                f=smpl_output_dict['upper'].body_faces
+            meshes = textured_mesh_manager.create_meshes(
+                smpl_output_dict=smpl_output_dict
             )
-            upper_mesh = Mesh(
-                v=smpl_output_dict['upper'].garment_verts, 
-                f=smpl_output_dict['upper'].garment_faces
+            textured_meshes = textured_mesh_manager.texture_meshes(
+                meshes=meshes,
+                garment_classes=garment_classes
             )
-            lower_mesh = Mesh(
-                v=smpl_output_dict['lower'].garment_verts, 
-                f=smpl_output_dict['lower'].garment_faces
+            mesh_basepath = os.path.join(mesh_dir, mesh_basename)
+            textured_mesh_manager.save_meshes(
+                meshes=textured_meshes,
+                rel_path=mesh_basepath
             )
-            
-            random_texture_dirpath = \
-                texture_dirpaths[random.randint(0, len(texture_dirpaths) - 1)]
-            
-            textured_meshes = texture_meshes(
-                meshes=[
-                    body_mesh, 
-                    upper_mesh, 
-                    lower_mesh
-                ], 
-                texture_paths=[
-                    f'{random_texture_dirpath}/body_tex.jpg',
-                    f'{random_texture_dirpath}/multi_tex.jpg',
-                    f'{random_texture_dirpath}/multi_tex.jpg'
-                ], 
-                garment_tag=[UPPER_GARMENT_TYPE, LOWER_GARMENT_TYPE],
-                uv_maps_pth=UV_MAPS_PATH
-            )
-
-            textured_meshes[0].write_obj(f'{mesh_basepath}-body.obj')
-            os.replace(
-                f"{mesh_basepath}-body.obj",
-                f"{mesh_basepath}-body_buffer.obj"
-            )
-            textured_meshes[1].write_obj(f'{mesh_basepath}-upper.obj')
-            os.replace(
-                f"{mesh_basepath}-upper.obj",
-                f"{mesh_basepath}-upper_buffer.obj"
-            )
-            textured_meshes[2].write_obj(f'{mesh_basepath}-lower.obj')
-            os.replace(
-                f"{mesh_basepath}-lower.obj",
-                f"{mesh_basepath}-lower_buffer.obj"
-            )
-
-            # modify obj files to support material in blender
-            # by default, psbody mesh's write_obj() function does not utilize
-            # the `usemtl` keyword, which results in blender not showing the
-            # material
-            for mesh_type in ["body", "upper", "lower"]:
-                obj_fpath = f"{mesh_basepath}-{mesh_type}_buffer.obj"
-                content = ""
-                with open(obj_fpath, "r") as obj_file:
-                    first_face = True
-                    usemtl_encountered = False
-                    for line in obj_file:
-                        if not usemtl_encountered and \
-                            line.strip().split(' ')[0] == 'usemtl':
-                            usemtl_encountered = True
-                        if first_face and line.strip().split(' ')[0] == 'f':
-                            first_face = False
-                            if not usemtl_encountered:
-                                content += \
-                                    f"usemtl {mesh_basename}-{mesh_type}\n"
-                                usemtl_encountered = True
-                        content += line
-                with open(obj_fpath, "w") as obj_file:
-                    obj_file.write(content)
-                os.replace(
-                    f"{mesh_basepath}-{mesh_type}_buffer.obj",
-                    f"{mesh_basepath}-{mesh_type}.obj"
-                )
+            textured_mesh_manager.add_usemtl(mesh_basepath)
 
     if len(invalid_subjects) > 0:
         print(
@@ -365,7 +225,7 @@ if __name__ == '__main__':
         with open(
             os.path.join(
                 SUBJECT_OBJ_SAVEDIR,
-                SUBJECT_GARMENT_SUBDIR,
+                subject_garment_subdir,
                 "invalid_subjects.txt"
             ),
             "w"

@@ -3,12 +3,18 @@ import numpy as np
 from tqdm import tqdm
 import os
 import torch
-import cv2
 from math import floor, ceil
 import imageio
 from torch.utils.data import Dataset
 
-from data.generate_clothed_surreal import SurrealDataPreGenerator, DataPreGenerator
+from data.generate.pregenerator import (
+    SurrealDataPreGenerator, 
+    DataPreGenerator
+)
+from data.datasets.common import (
+    get_background_paths,
+    load_background
+)
 from utils.garment_classes import GarmentClasses
     
     
@@ -125,7 +131,7 @@ class SurrealTrainDataset(TrainDataset):
             rgb_imgs_dirname=self.IMG_DIRNAME,
             slice_list=data_split_slices_list
         )
-        self.backgrounds_paths = self._get_background_paths(
+        self.backgrounds_paths = get_background_paths(
             backgrounds_dir_path=backgrounds_dir_path,
             num_backgrounds=10000
         )
@@ -209,39 +215,18 @@ class SurrealTrainDataset(TrainDataset):
                 rgb_img_path = os.path.join(rgb_imgs_dir, f)
                 rgb_img_paths.append(rgb_img_path)
         return rgb_img_paths
-    
-    @staticmethod
-    def _get_background_paths(backgrounds_dir_path: str, 
-                          num_backgrounds: int = -1) -> List[str]:
-        print('Loading background paths...')
-        backgrounds_paths = []
-        for f in tqdm(sorted(os.listdir(backgrounds_dir_path)[:num_backgrounds])):
-            if f.endswith('.jpg'):
-                backgrounds_paths.append(
-                    os.path.join(backgrounds_dir_path, f)
-                )
-        return backgrounds_paths
 
     def __len__(self) -> int:
         '''Get dataset length (used by DataLoader).'''
 
         return len(self.values)
 
-    def _load_background(self, num_samples: int = 1) -> np.ndarray:
-        '''Load random backgrounds. Adapted from the original HierProb3D code.'''
-
-        bg_samples = []
-        for _ in range(num_samples):
-            bg_idx = torch.randint(low=0, high=len(self.backgrounds_paths), 
-                size=(1,)).item()
-            bg_path = self.backgrounds_paths[bg_idx]
-            background = cv2.cvtColor(cv2.imread(bg_path), cv2.COLOR_BGR2RGB)
-            background = cv2.resize(background, (self.img_wh, self.img_wh), 
-                interpolation=cv2.INTER_LINEAR)
-            background = background.transpose(2, 0, 1)
-            bg_samples.append(background)
-        bg_samples = np.stack(bg_samples, axis=0).squeeze()
-        return torch.from_numpy(bg_samples / 255.).float()
+    def _load_background(self) -> np.ndarray:
+        '''Protected method for loading random background.'''
+        return load_background(
+            self.backgrounds_paths,
+            self.img_wh
+        )
 
     @staticmethod
     def _to_tensor(value: np.ndarray, 

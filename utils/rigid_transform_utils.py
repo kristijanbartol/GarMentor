@@ -1,6 +1,8 @@
+from typing import Tuple
 import cv2
 import torch
 import numpy as np
+from smplx.lbs import batch_rodrigues
 from torch.nn import functional as F
 try:
     from pytorch3d.transforms.so3 import so3_log_map, so3_exponential_map
@@ -152,3 +154,14 @@ def quat_to_rotmat_numpy(quat):
                        2 * wz + 2 * xy, w2 - x2 + y2 - z2, 2 * yz - 2 * wx,
                        2 * xz - 2 * wy, 2 * wx + 2 * yz, w2 - x2 - y2 + z2], axis=1).reshape(B, 3, 3)
     return rotMat
+
+
+def pose_to_rotmat(pose: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    target_pose_rotmats = batch_rodrigues(
+        pose.contiguous().view(-1, 3)
+    ).view(-1, 24, 3, 3)
+
+    target_glob_rotmats = target_pose_rotmats[:, 0, :, :].unsqueeze(axis=1)
+    target_pose_rotmats = target_pose_rotmats[:, 1:, :, :]
+
+    return target_glob_rotmats, target_pose_rotmats
