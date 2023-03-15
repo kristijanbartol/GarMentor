@@ -1,6 +1,30 @@
 from enum import Enum
 
 
+KPT_COLORS = {
+    'red': (255, 0, 0),                 # 0
+    'lime': (0, 255, 0),                # 1
+    'blue': (0, 0, 255),                # 2
+    'yellow': (255, 255, 0),            # 3
+    'cyan': (0, 255, 255),              # 4
+    'magenta': (255, 0, 255),           # 5
+    'silver': (192, 192, 192),          # 6
+    'maroon': (128, 0, 0),              # 7
+    'green': (0, 128, 0),               # 8
+    'purple': (128, 0, 128),            # 9
+    'wheat': (245, 222, 179),           # 10
+    'deeppink': (255, 20, 147),         # 11
+    'white': (255, 255, 255),           # 12
+    'indigo': (75, 0, 130),             # 13
+    'midnightblue': (25, 25, 112),      # 14
+    'lightskyblue': (135, 206, 250),    # 15
+    'orange': (255, 165, 0)             # 16
+}
+
+LCOLOR = KPT_COLORS['red']
+RCOLOR = KPT_COLORS['blue']
+
+
 class Colors(Enum):
     pass
 
@@ -46,12 +70,8 @@ class BodyColors(Colors):
     OTHER_SKIN2 = (156., 102., 31.)
 
 
-def N(color_value):
+def norm_color(color_value):
     return tuple(x / 255. for x in color_value)
-
-
-def A(color_value):
-    return color_value + (1.,)
 
 
 if __name__ == '__main__':

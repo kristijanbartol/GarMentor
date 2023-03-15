@@ -40,6 +40,7 @@ class ParametricModel(object):
             'upper': get_tn_runner(gender=gender, garment_class=self.classes['upper']),
             'lower': get_tn_runner(gender=gender, garment_class=self.classes['lower'])
         }
+        # TODO: Create a decorator for measuring (eval) time, instead of if blocks.
         self.eval = eval
         if eval:
             self.exec_times = {}

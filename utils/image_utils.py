@@ -1,3 +1,4 @@
+from typing import Union
 import cv2
 import numpy as np
 import torch
@@ -45,18 +46,51 @@ def convert_bbox_centre_hw_to_corners(centre, height, width):
     return np.array([x1, y1, x2, y2])
 
 
-def batch_add_rgb_background(backgrounds,
+def _batch_add_rgb_background(backgrounds,
                              rgb,
                              seg):
-    """
-    :param backgrounds: (bs, 3, wh, wh)
-    :param rgb: (bs, 3, wh, wh)
-    :param iuv: (bs, wh, wh)
-    :return: rgb_with_background: (bs, 3, wh, wh)
-    """
+    ''' Add background for torch arguments.
+
+        Parameters
+        ----------
+        :param backgrounds: (bs, 3, wh, wh)
+        :param rgb: (bs, 3, wh, wh)
+        :param iuv: (bs, wh, wh)
+        :return: rgb_with_background: (bs, 3, wh, wh)
+    '''
     background_pixels = seg[:, None, :, :] == 0  # Body pixels are > 0 and out of frame pixels are -1
     rgb_with_background = rgb * (torch.logical_not(background_pixels)) + backgrounds * background_pixels
     return rgb_with_background
+
+
+def _numpy_add_rgb_background(
+        backgrounds: np.ndarray,
+        rgb: np.ndarray,
+        seg: np.ndarray
+    ) -> np.ndarray:
+    ''' Add background for Numpy arguments.
+
+        Parameters
+        ----------
+        :param backgrounds: (3, wh, wh)
+        :param rgb: (3, wh, wh)
+        :param iuv: (wh, wh)
+        :return: rgb_with_background: (3, wh, wh)
+    '''
+    background_pixels = seg[None, :, :] == 0  # Body pixels are > 0 and out of frame pixels are -1
+    rgb_with_background = rgb * (np.logical_not(background_pixels)) + backgrounds * background_pixels
+    return rgb_with_background
+
+
+def add_rgb_background(
+        *args,
+        **kwargs
+    ) -> Union[np.ndarray, torch.Tensor]:
+    '''Add RGB background "behind" the rendered person.'''
+    if type(kwargs[0]) == torch.Tensor:
+        return _batch_add_rgb_background(*args, **kwargs)
+    else:
+        return _numpy_add_rgb_background(*args, **kwargs)
 
 
 def batch_crop_opencv_affine(output_wh,

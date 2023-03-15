@@ -1,6 +1,6 @@
 import os
-from data.off_the_fly_train_datasets import SurrealTrainDataset
-from renderers.surreal_renderer import SurrealRenderer
+from data.datasets.off_the_fly_train_datasets import SurrealTrainDataset
+from rendering.body import BodyRenderer
 import torch
 import torch.optim as optim
 import argparse
@@ -8,6 +8,7 @@ import _thread as thread
 import visdom as vis
 
 from models.poseMF_shapeGaussian_net import PoseMFShapeGaussianNet
+from models.fully_parametric_net import FullyParametricNet
 from models.smpl_official import SMPL
 from models.canny_edge_detector import CannyEdgeDetector
 
@@ -18,7 +19,7 @@ from configs import paths
 
 from train.train_network import train_poseMF_shapeGaussian_net
 
-from utils.visualize import VisLogger
+from vis.logger import VisLogger
 
 
 def run_train(device,
@@ -85,14 +86,20 @@ def run_train(device,
                       gender=gender).to(device)
 
     # 3D shape and pose distribution predictor
+    # TODO: Use FullyParametriccNet instead of PoseMFShapeGaussianNet.
+    #pose_shape_model = FullyParametricNet(smpl_parents=smpl_model.parents.tolist(),
+    #                                          config=pose_shape_cfg.MODEL).to(device)
     pose_shape_model = PoseMFShapeGaussianNet(smpl_parents=smpl_model.parents.tolist(),
                                               config=pose_shape_cfg).to(device)
-
-    # Pytorch3D renderer for synthetic data generation
-    pytorch3d_renderer = SurrealRenderer(device=device, batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE)
     
     # Visualizer class to log the training progress.
-    vis_logger = VisLogger(visdom=visdom, renderer=pytorch3d_renderer) if visdom is not None else None
+    vis_logger = None
+    if visdom is not None:
+        vis_logger = VisLogger(
+            device=device,
+            visdom=visdom, 
+            smpl_model=smpl_model
+        )
 
     # ------------------------- Loss Function + Optimiser -------------------------
     criterion = PoseMFShapeGaussianLoss(loss_config=pose_shape_cfg.LOSS.STAGE1,
@@ -144,7 +151,7 @@ if __name__ == '__main__':
     print('\nDevice: {}'.format(device))
     
     if args.vis or args.vport != 8888:
-        thread.start_new_thread(os.system, (f'visdom -p {args.vport} > /dev/null 2>&1',))
+        #thread.start_new_thread(os.system, (f'visdom -p {args.vport} > /dev/null 2>&1',))
         visdom = vis.Visdom(port=args.vport)
     else:
         visdom = None
