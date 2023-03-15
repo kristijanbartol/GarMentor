@@ -12,18 +12,91 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                //"--gender", "male",
-                //"--image_dir", "./demo/", 
-                //"--save_dir", "./output/", 
-                //"--visualise_samples", 
-                //"--visualise_uncropped", 
-                //"--pose_shape_weights", "experiments/resnet50-style-params/saved_models/epoch_095.tar"     // predict
-                //"--pose_shape_weights", "experiments/second-experiment/epoch_115.tar"     // evaluate
-                //"--pose_shape_weights", "experiments/resnet50-style-params/saved_models/epoch_095.tar"     // evaluate
-                //"--lsun_dir", "../lsun/", "--train_files_dir", "train_files/"     // copy LSUN
-                //"-E", "experiments/resnet50-coco-shape-only", "--gpu", "1"           // train
-                "-E", "experiments/tmp", "--gpu", "0", "--vport", "8889"           // train
-                ////"-G", "male", "-U", "shirt", "-L", "short-pant", "-N", "10000"      // pregenerate
+                "--gpu", "1"
+            ]
+        },
+
+        {
+            "name": "Python: Train (Debug)",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "-E", "experiments/tmp", 
+                "--gpu", "0", 
+                "--vport", "8889"
+            ]
+        },
+
+        {
+            "name": "Python: Train",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "-E", "experiments/resnet50-coco-shape-only", 
+                "--gpu", "1"
+            ]
+        },
+
+        {
+            "name": "Python: Pregenerate (TailorNet)",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "-G", "male", 
+                "-U", "shirt", 
+                "-L", "short-pant", 
+                "-N", "10000"
+            ]
+        },
+
+        {
+            "name": "Python: Copy LSUN",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--lsun_dir", "../lsun/", 
+                "--train_files_dir", "train_files/"
+            ]
+        },
+
+        {
+            "name": "Python: Predict",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--gender", "male",
+                "--image_dir", "./demo/", 
+                "--save_dir", "./output/", 
+                "--visualise_samples", 
+                "--visualise_uncropped", 
+                "--pose_shape_weights", "experiments/resnet50-style-params/saved_models/epoch_095.tar"
+            ]
+        },
+
+        {
+            "name": "Python: Evaluate",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--pose_shape_weights", "experiments/resnet50-style-params/saved_models/epoch_095.tar"
             ]
         }
     ]

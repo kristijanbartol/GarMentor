@@ -2,6 +2,7 @@ from typing import Optional, Tuple
 import torch
 import numpy as np
 import cv2
+from PIL import Image
 
 from models.smpl_official import (
     easy_create_smpl_model,
@@ -252,3 +253,12 @@ class KeypointsVisualizer(Visualizer2D):
             back_img=back_img,
             skeleton=skeleton
         )
+
+    def save_vis(
+            self,
+            img: np.ndarray,
+            save_path: str
+    ) -> None:
+        img = Image.fromarray(img.astype(np.uint8))
+        img.save(save_path)
+        print(f'Saved keypoints image: {save_path}...')

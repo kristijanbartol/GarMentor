@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 from os.path import join
 from glob import glob
 from psbody.mesh import Mesh
@@ -36,6 +36,9 @@ class TexturedGarmentsMeshManager(MeshManager):
         self._prepare_texture_maps()
 
     def _prepare_texture_maps(self) -> None:
+        """
+        Create vt body map, body and garment ft maps, and create texture images.
+        """
         if not os.path.exists(UV_MAPS_PATH) and self.save_maps_to_disk:
             os.makedirs(UV_MAPS_PATH)
         
@@ -54,20 +57,20 @@ class TexturedGarmentsMeshManager(MeshManager):
 
         _all_textures = sorted(glob(f'{MGN_DATASET}/*/multi_tex.jpg'))
         _all_segmentations = sorted(glob(f'{MGN_DATASET}/*/segmentation.png'))
-        self._generate_body_texture_from_texture(
-            texture_pth=_all_textures,
-            segmentation_pth=_all_segmentations
+        self._create_texture_images(
+            texture_paths=_all_textures,
+            segmentation_paths=_all_segmentations
         )
 
     def _create_vt_map(self, garment_dict: dict, save_to: str):
-        '''
+        """
         Create vt map for all the garments. Creates one vt map because
         all the garments share the same vt-s
         Arguments:
             save_to: save created vt map to this path
         Returns:
             saves general_vt.npy to disk
-        '''
+        """
         random_mesh_name = garment_dict['TShirtNoCoat'][0]
         loaded_mesh =  Mesh(filename=random_mesh_name)
 
@@ -82,14 +85,14 @@ class TexturedGarmentsMeshManager(MeshManager):
             garment_dict: Dict[str, str], 
             save_to: str
         ) -> None:
-        '''
+        """
         Create ft map for specific garments saved as garment_ft.npy
         Arguments:
             garment_name: one name from the garment_classes
             save_to: save created vt map to this path
         Returns:
             saves garment_ft.npy to disk
-        '''
+        """
         for garment_name in MGN_CLASSES:
             random_mesh_name = garment_dict[garment_name][0]
             loaded_mesh =  Mesh(filename=random_mesh_name)
@@ -107,14 +110,14 @@ class TexturedGarmentsMeshManager(MeshManager):
             self, 
             save_to: str
         ) -> None:
-        '''
+        """
         Create ft maps for the body using smpl fits from smpl_registered.obj
         All the maps are the same across the examples so only using one
         Arguments:
             save_to: save created vt,ft map to this path
         Returns:
             saves body_ft.npy to disk
-        '''
+        """
         
         all_bodies = glob(join(MGN_DATASET, '*', 'smpl_registered.obj'))
 
@@ -131,9 +134,9 @@ class TexturedGarmentsMeshManager(MeshManager):
             self, 
             texture_paths: List[str], 
             segmentation_paths: List[str], 
-            skin_color_pixel: List[float]
+            skin_color_pixel: Optional[List[float]] = None
         ) -> None:
-        '''
+        """
         From a mgn texture multi_tex.jpg, set all pixels that are not related to the 
         hair, shoes and skin to a skin color chosen from the hand pixel - set ad hoc to the 
         pixel 1430,1920 -- right bottom corner where hands are in texture
@@ -145,7 +148,8 @@ class TexturedGarmentsMeshManager(MeshManager):
             show_fig: show the figure in matplotlib
         Returns:
             saves a body_tex.jpg to disk in same folder as texture_pth
-        '''
+        """
+        print('Creating texture images...')
         for i in tqdm(range(len(texture_paths))):
             save_to = texture_paths[i].split('/multi_tex.jpg')[0]
             background_color = [0,0,0] # black
@@ -192,9 +196,9 @@ class TexturedGarmentsMeshManager(MeshManager):
                 self.texture_images.append(texture_image)
 
     def _get_random_texture_paths(self) -> Tuple[str, str, str]:
-        '''
+        """
         Get a random texture dirpath from the MGN dataset.
-        '''
+        """
         texture_dirpath = self.texture_dirpaths[
             np.random.randint(0,len(self.texture_dirpaths))
         ]
@@ -214,7 +218,7 @@ class TexturedGarmentsMeshManager(MeshManager):
             meshes: Tuple[Mesh, Mesh, Mesh],
             garment_classes: GarmentClasses
         ) -> List[Mesh]:
-        '''
+        """
         Texture the [body, upper garment, lower garment] meshes from list meshes
         with textures from texture_paths -- mesh can be None if no mesh is available
         
@@ -225,7 +229,7 @@ class TexturedGarmentsMeshManager(MeshManager):
                     and lower garment
         Returns:
             textured_meshes: list of 3 textured meshes from the input
-        '''
+        """
         # Load pre-defined uv maps and random texture paths.
         general_vt = np.load(f'{UV_MAPS_PATH}/general_vt.npy')
         texture_paths = self._get_random_texture_paths()
@@ -243,16 +247,17 @@ class TexturedGarmentsMeshManager(MeshManager):
 
         return meshes
 
-    def postprocess_meshes(
+    def add_usemtl(
             self,
             rel_path: str
     ) -> None:
-        ''' Modify obj files to support material in Blender.
+        """ 
+        Modify obj files to support material in Blender.
 
-            By default, psbody mesh's write_obj() function does not utilize
-            the `usemtl` keyword, which results in blender not showing the
-            material.
-        '''
+        By default, psbody mesh's write_obj() function does not utilize
+        the `usemtl` keyword, which results in blender not showing the
+        material.
+        """
         for mesh_type in ["body", "upper", "lower"]:
             obj_fpath = f"{rel_path}-{mesh_type}.obj"
             content = ""

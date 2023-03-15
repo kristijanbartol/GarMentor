@@ -44,7 +44,9 @@ def create_psbody_meshes(smpl_output_dict: SMPL4GarmentOutput
 
 class MeshManager(object):
 
-    '''An abstract mesh manager with common declaration/definitions.'''
+    """
+    An abstract mesh manager with common declaration/definitions.
+    """
 
     @abstractmethod
     def create_meshes(
@@ -55,15 +57,19 @@ class MeshManager(object):
                Union[Mesh, Meshes]
                ],
                Meshes]:
-        '''Implemented for various types for different mesh manager subclasses.'''
+        """
+        Implemented for various types for different mesh manager subclasses.
+        """
         pass
 
     def save_meshes(
             self,
             meshes: List[Mesh],
-            rel_path: str
+            save_basepath: str
     ) -> None:
-        '''Simply save the provided body and garment meshes as obj.'''
-        meshes[0].write_obj(f'{rel_path}-body.obj')
-        meshes[1].write_obj(f'{rel_path}-upper.obj')
-        meshes[2].write_obj(f'{rel_path}-lower.obj')
+        """
+        Simply save the provided body and garment meshes as obj.
+        """
+        meshes[0].write_obj(f'{save_basepath}-body.obj')
+        meshes[1].write_obj(f'{save_basepath}-upper.obj')
+        meshes[2].write_obj(f'{save_basepath}-lower.obj')

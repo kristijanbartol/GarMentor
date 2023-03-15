@@ -1,6 +1,10 @@
 from typing import Union, Tuple, Optional
 import torch
 import numpy as np
+from PIL import (
+    Image, 
+    ImageOps
+)
 
 from models.smpl_official import (
     easy_create_smpl_model,
@@ -97,3 +101,12 @@ class BodyVisualizer(Visualizer2D):
             body_rgb, body_mask = to_numpy(body_rgb, body_mask)
 
         return body_rgb, body_mask
+    
+    def save_vis(
+            self,
+            rgb_img: np.ndarray,
+            save_path: str
+    ) -> None:
+        rgb_img = ImageOps.flip(Image.fromarray(rgb_img.astype(np.uint8)))
+        rgb_img.save(save_path)
+        print(f'Saved body image: {save_path}...')

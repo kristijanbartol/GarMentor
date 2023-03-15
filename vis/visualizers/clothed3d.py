@@ -5,7 +5,6 @@ from psbody.mesh import Mesh
 from data.mesh_managers.textured_garments import TexturedGarmentsMeshManager
 from models.parametric_model import ParametricModel
 from utils.garment_classes import GarmentClasses
-from utils.convert_arrays import to_torch
 from vis.visualizers.common import Visualizer3D
 
 from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
@@ -13,16 +12,17 @@ from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
 
 class ClothedVisualizer3D(Visualizer3D):
 
-    ''' Visualize 3D clothed parametric mesh (texture-only).
+    """
+    Visualize 3D clothed parametric mesh (texture-only).
     
-        Note that this class can only produce textured meshes and not simply
-        single-colored meshes because pytorch3d.structures.Meshes are required
-        for single-color meshes, but then you can't easily properly save them
-        as obj + texture image. On the other hand, psbody.Mesh can be saved,
-        but the current functionalities do not allow creating texture maps for
-        single-color meshes. This class is intended to be used in a way that
-        it produces 3D meshes at the end which are then stored to the disk.
-    '''
+    Note that this class can only produce textured meshes and not simply
+    single-colored meshes because pytorch3d.structures.Meshes are required
+    for single-color meshes, but then you can't easily properly save them
+    as obj + texture image. On the other hand, psbody.Mesh can be saved,
+    but the current functionalities do not allow creating texture maps for
+    single-color meshes. This class is intended to be used in a way that
+    it produces 3D meshes at the end which are then stored to the disk.
+    """
 
     def __init__(
             self,
@@ -30,7 +30,9 @@ class ClothedVisualizer3D(Visualizer3D):
             upper_class: str,
             lower_class: str,
         ) -> None:
-        '''Prepare texture mesh manager and parametric model.'''
+        """
+        Prepare texture mesh manager and parametric model.
+        """
         self.gender = gender
         self.garment_classes = GarmentClasses(
             upper_class, 
@@ -45,7 +47,9 @@ class ClothedVisualizer3D(Visualizer3D):
     def vis(self,
             smpl_output_dict: SMPL4GarmentOutput
         ) -> Tuple[Mesh, Mesh, Mesh]:
-        ''' Visualize clothed mesh(es), given SMPL4GarmentOutput info.'''
+        """
+        Visualize clothed mesh(es), given SMPL4GarmentOutput info.
+        """
         meshes = self.mesh_manager.create_meshes(
             smpl_output_dict=smpl_output_dict
         )
@@ -65,10 +69,9 @@ class ClothedVisualizer3D(Visualizer3D):
             shape: np.ndarray, 
             style_vector: np.ndarray,
         ) -> Tuple[Mesh, Mesh, Mesh]:
-        ''' Visualize clothed mesh(es), given pose, shape, and style params.'''
-        pose, shape, style_vector = to_torch(
-            arrays=[pose, shape, style_vector]
-        )
+        """
+        Visualize clothed mesh(es), given pose, shape, and style params.
+        """
         smpl_output_dict = self.parametric_model.run(
             pose=pose,
             shape=shape,

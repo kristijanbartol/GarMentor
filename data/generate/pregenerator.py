@@ -245,29 +245,35 @@ class SurrealDataPreGenerator(DataPreGenerator):
         np.save(values_path, samples_values.get())
         print(f'Saved samples values to {values_path}!')
 
-    def _save_sample(self, 
-                     dataset_dir: str, 
-                     sample_idx: int, 
-                     rgb_img: np.ndarray, 
-                     seg_maps: np.ndarray, 
-                     sample_values: PreGeneratedSampleValues,
-                     samples_values: PreGeneratedValuesArray) -> None:
+    def _save_sample(
+            self, 
+            dataset_dir: str, 
+            sample_idx: int, 
+            rgb_img: np.ndarray, 
+            seg_maps: np.ndarray, 
+            sample_values: PreGeneratedSampleValues,
+            samples_values: PreGeneratedValuesArray,
+            clothed_visualizer: ClothedVisualizer
+        ) -> None:
         '''Save RGB, seg maps (disk), and the values to the array (RAM).'''
-        
         self._create_dirs(
             dataset_dir=dataset_dir,
             img_dirname=self.IMG_DIR,
-            seg_dirname=self.SEG_MAPS_DIR)
-
+            seg_dirname=self.SEG_MAPS_DIR
+        )
         if rgb_img is not None:
-            rgb_img = (rgb_img * 255).astype(np.uint8)
-            img = Image.fromarray(rgb_img)
-            img_dir = os.path.join(dataset_dir, self.IMG_DIR)
+            img_dir = os.path.join(
+                dataset_dir, 
+                self.IMG_DIR
+            )
             img_path = os.path.join(
-                img_dir, self.IMG_NAME_TEMPLATE.format(idx=sample_idx))
-            img.save(img_path)
-            print(f'Saved image: {img_path}')
-
+                img_dir, 
+                self.IMG_NAME_TEMPLATE.format(idx=sample_idx)
+            )
+            clothed_visualizer.save_vis(
+                img=rgb_img,
+                save_path=img_path
+            )
         seg_dir = os.path.join(dataset_dir, self.SEG_MAPS_DIR)
         seg_path = os.path.join(
             seg_dir, self.SEG_MAPS_NAME_TEMPLATE.format(idx=sample_idx))

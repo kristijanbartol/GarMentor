@@ -1,5 +1,9 @@
 from typing import Tuple, Optional
 import numpy as np
+from PIL import (
+    Image, 
+    ImageOps
+)
 
 from models.parametric_model import ParametricModel
 from rendering.clothed import ClothedRenderer
@@ -77,15 +81,16 @@ class ClothedVisualizer(Visualizer2D):
             style_vector: np.ndarray,
             cam_t: Optional[np.ndarray] = None
         ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        ''' Visualize clothed mesh(es).
+        """
+        Visualize clothed mesh(es).
         
-            First, the parametric model is ran to obtain the verts.
-            Then, the renderer renders the clothed meshes. The method
-            returns an RGB rendered image (without background) and the
-            mask of the person's silhouette. Note that the method 
-            always expects Numpy arrays because visualizing TailorNet 
-            will not be required in training loop, for now.
-        '''
+        First, the parametric model is ran to obtain the verts.
+        Then, the renderer renders the clothed meshes. The method
+        returns an RGB rendered image (without background) and the
+        mask of the person's silhouette. Note that the method 
+        always expects Numpy arrays because visualizing TailorNet 
+        will not be required in training loop, for now.
+        """
         smpl_output_dict = self.parametric_model.run(
             pose=pose,
             shape=shape,
@@ -101,3 +106,30 @@ class ClothedVisualizer(Visualizer2D):
             seg_maps,
             smpl_output_dict['upper'].joints
         )
+    
+    def save_vis(
+            self,
+            rgb_img: np.ndarray,
+            save_path: str
+    ) -> None:
+        """
+        Save RGB clothed image.
+        """
+        rgb_img = (rgb_img * 255).astype(np.uint8)
+        rgb_img = ImageOps.flip(Image.fromarray(rgb_img))
+        rgb_img.save(save_path)
+        print(f'Saved clothed image: {save_path}...')
+
+    def save_masks(
+            self,
+            seg_masks: np.ndarray,
+            save_path: str
+    ) -> None:
+        """
+        Save segmentation masks as a single .npz file.
+        """
+        np.savez_compressed(
+            save_path, 
+            seg_maps=seg_masks.astype(bool)
+        )
+        print(f'Saved clothing segmentation masks: {save_path}...')

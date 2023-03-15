@@ -3,7 +3,6 @@ import numpy as np
 from tqdm import tqdm
 import os
 import torch
-import cv2
 from math import floor, ceil
 import imageio
 from torch.utils.data import Dataset
@@ -12,7 +11,10 @@ from data.generate.pregenerator import (
     SurrealDataPreGenerator, 
     DataPreGenerator
 )
-from data.datasets.common import get_background_paths
+from data.datasets.common import (
+    get_background_paths,
+    load_background
+)
 from utils.garment_classes import GarmentClasses
     
     
@@ -219,29 +221,9 @@ class SurrealTrainDataset(TrainDataset):
 
         return len(self.values)
 
-    @staticmethod
-    def load_background(
-            backgrounds_paths: List[str],
-            img_wh: int,
-            num_samples: int = 1) -> np.ndarray:
-        '''Load random backgrounds. Adapted from the original HierProb3D code.'''
-
-        bg_samples = []
-        for _ in range(num_samples):
-            bg_idx = torch.randint(low=0, high=len(backgrounds_paths), 
-                size=(1,)).item()
-            bg_path = backgrounds_paths[bg_idx]
-            background = cv2.cvtColor(cv2.imread(bg_path), cv2.COLOR_BGR2RGB)
-            background = cv2.resize(background, (img_wh, img_wh), 
-                interpolation=cv2.INTER_LINEAR)
-            background = background.transpose(2, 0, 1)
-            bg_samples.append(background)
-        bg_samples = np.stack(bg_samples, axis=0).squeeze()
-        return torch.from_numpy(bg_samples / 255.).float()
-
     def _load_background(self) -> np.ndarray:
         '''Protected method for loading random background.'''
-        return self.load_background(
+        return load_background(
             self.backgrounds_paths,
             self.img_wh
         )

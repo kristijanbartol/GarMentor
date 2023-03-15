@@ -216,7 +216,7 @@ if __name__ == '__main__':
                 meshes=textured_meshes,
                 rel_path=mesh_basepath
             )
-            textured_mesh_manager.postprocess_meshes(mesh_basepath)
+            textured_mesh_manager.add_usemtl(mesh_basepath)
 
     if len(invalid_subjects) > 0:
         print(
