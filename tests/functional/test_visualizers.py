@@ -12,7 +12,7 @@ from vis.visualizers.body import BodyVisualizer
 from vis.visualizers.clothed import ClothedVisualizer
 from vis.visualizers.clothed3d import ClothedVisualizer3D
 from vis.logger import VisLogger
-from data.generate.pregenerator import DataPreGenerator
+from data.datasets.prepare.surreal.tn import DataPreGenerator
 
 
 if __name__ == '__main__':

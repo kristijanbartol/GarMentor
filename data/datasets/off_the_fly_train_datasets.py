@@ -7,9 +7,9 @@ from math import floor, ceil
 import imageio
 from torch.utils.data import Dataset
 
-from data.generate.pregenerator import (
-    SurrealDataPreGenerator, 
-    DataPreGenerator
+from data.datasets.prepare.surreal.tn import (
+    SurrealDataGenerator, 
+    DataGenerator
 )
 from data.datasets.common import (
     get_background_paths,
@@ -69,13 +69,13 @@ class TrainDataset(Dataset):
                         <SEG_MAP_1_1>
                         ...
     '''
-    DATA_ROOT_DIR = DataPreGenerator.DATA_ROOT_DIR
+    DATA_ROOT_DIR = DataGenerator.DATA_ROOT_DIR
     IMG_DIRNAME = 'rgb/'
     SEG_MAPS_DIRNAME = 'segmentations/'
 
-    IMG_NAME_TEMPLATE = DataPreGenerator.IMG_NAME_TEMPLATE
-    SEG_MAPS_NAME_TEMPLATE = DataPreGenerator.SEG_MAPS_NAME_TEMPLATE
-    VALUES_FNAME = DataPreGenerator.VALUES_FNAME
+    IMG_NAME_TEMPLATE = DataGenerator.IMG_NAME_TEMPLATE
+    SEG_MAPS_NAME_TEMPLATE = DataGenerator.SEG_MAPS_NAME_TEMPLATE
+    VALUES_FNAME = DataGenerator.VALUES_FNAME
 
 
 TRAIN = 'train'
@@ -86,7 +86,7 @@ class SurrealTrainDataset(TrainDataset):
 
     '''An instance of train dataset specific to SURREAL dataset.'''
 
-    DATASET_NAME = SurrealDataPreGenerator.DATASET_NAME
+    DATASET_NAME = SurrealDataGenerator.DATASET_NAME
 
     def __init__(self,
                  gender: str,

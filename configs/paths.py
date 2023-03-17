@@ -18,3 +18,10 @@ TRAIN_BACKGROUNDS_PATH = '/data/hierprob3d/training/lsun_backgrounds/train'
 VAL_POSES_PATH = '/data/hierprob3d/training/smpl_val_poses.npz'
 VAL_TEXTURES_PATH = '/data/hierprob3d/training/smpl_val_textures.npz'
 VAL_BACKGROUNDS_PATH = '/data/hierprob3d/training/lsun_backgrounds/val'
+
+# AGORA paths
+
+AGORA_PKL_DIR = '/data/agora/pkl/'
+AGORA_IMG_DIR = '/data/agora/full_img/'
+AGORA_RGB_DIR = '/data/garmentor/agora/rgb/'
+AGORA_VALUES_PATH = '/data/garmentor/agora/values.npy'

@@ -65,7 +65,8 @@ RUN python3.7 -m pip install --ignore-installed PyYAML \
 	visdom \
 	open3d \
 	loguru \
-	omegaconf
+	omegaconf \
+	pandas
 
 RUN python3.7 -m pip install --upgrade ipykernel
 
