@@ -23,7 +23,7 @@ from utils.joints2d_utils import (
     check_joints2d_visibility_torch, 
     undo_keypoint_normalisation
 )
-from utils.image_utils import batch_add_rgb_background
+from utils.image_utils import add_rgb_background
 from utils.augmentation.rgb_augmentation import augment_rgb
 
 
@@ -83,7 +83,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                       current_epoch=current_epoch)
 
     # Useful tensors that are re-used and can be pre-defined
-    mean_cam_t = torch.tensor(pose_shape_cfg.TRAIN.SYNTH_DATA.MEAN_CAM_T,
+    mean_cam_t = torch.Tensor(pose_shape_cfg.TRAIN.SYNTH_DATA.MEAN_CAM_T,
                               device=device, dtype=torch.float32)
     mean_cam_t = mean_cam_t[None, :].expand(pose_shape_cfg.TRAIN.BATCH_SIZE, -1)
 
@@ -134,8 +134,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     target_joints_h36m = target_smpl_output.joints[:, ALL_JOINTS_TO_H36M_MAP]
                     target_joints_h36mlsp = target_joints_h36m[:, H36M_TO_J14, :]
                     
-                    target_reposed_vertices = smpl_model(body_pose=torch.zeros_like(target_pose)[:, 3:],
-                                                         global_orient=torch.zeros_like(target_pose)[:, :3],
+                    target_reposed_vertices = smpl_model(body_pose=torch.zeros_like(target_pose)[:, 3:], #type:ignore
+                                                         global_orient=torch.zeros_like(target_pose)[:, :3], #type:ignore
                                                          betas=target_shape).vertices
 
                     # ------------ INPUT PROXY REPRESENTATION GENERATION + 2D TARGET JOINTS ------------
@@ -154,7 +154,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     # Add background rgb
                     # NOTE: The last seg map (-1) is the whole body seg map.
                     if rgb_in is not None:
-                        rgb_in = batch_add_rgb_background(backgrounds=background,
+                        rgb_in = add_rgb_background(backgrounds=background,
                                                         rgb=rgb_in,
                                                         seg=seg_maps[:, -1])
                     # Apply RGB-based render augmentations + 2D joints augmentations
@@ -169,23 +169,23 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                         edge_in = edge_detector_output['thresholded_thin_edges'] \
                             if pose_shape_cfg.DATA.EDGE_NMS else edge_detector_output['thresholded_grad_magnitude']
                     else:
-                        edge_in = torch.zeros((
+                        edge_in = torch.zeros(( #type:ignore
                             pose_shape_cfg.TRAIN.BATCH_SIZE, 
                             pose_shape_cfg.DATA.PROXY_REP_SIZE, 
                             pose_shape_cfg.DATA.PROXY_REP_SIZE)
                         )
 
                     # Compute 2D joint heatmaps
-                    heatmaps = convert_2Djoints_to_gaussian_heatmaps_torch(target_joints2d_input,
+                    heatmaps = convert_2Djoints_to_gaussian_heatmaps_torch(target_joints2d_input, #type:ignore
                                                                            pose_shape_cfg.DATA.PROXY_REP_SIZE,
                                                                            std=pose_shape_cfg.DATA.HEATMAP_GAUSSIAN_STD)
                     heatmaps = heatmaps * target_joints2d_visib[:, :, None, None]
 
                     # Concatenate edge-image and 2D joint heatmaps to create input proxy representation
                     #proxy_rep_input = torch.cat([edge_in, seg_maps, j2d_heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
-                    proxy_rep_input = torch.cat([edge_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
+                    proxy_rep_input = torch.cat([edge_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
 
-                with torch.set_grad_enabled(split == 'train'):
+                with torch.set_grad_enabled(split == 'train'): #type:ignore
                     #############################################################
                     # ---------------------- FORWARD PASS -----------------------
                     #############################################################
@@ -209,8 +209,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                                     pred_cam_wp)  # (bs, 17, 2)
                     
                     with torch.no_grad():
-                        pred_reposed_smpl_output_mean = smpl_model(body_pose=torch.zeros_like(target_pose)[:, 3:],
-                                                                   global_orient=torch.zeros_like(target_pose)[:, :3],
+                        pred_reposed_smpl_output_mean = smpl_model(body_pose=torch.zeros_like(target_pose)[:, 3:], #type:ignore
+                                                                   global_orient=torch.zeros_like(target_pose)[:, :3], #type:ignore
                                                                    betas=pred_shape_dist.loc)
                         pred_reposed_vertices_mean = pred_reposed_smpl_output_mean.vertices  # (bs, 6890, 3)
 

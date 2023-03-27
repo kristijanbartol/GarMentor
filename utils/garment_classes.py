@@ -1,5 +1,10 @@
+from typing import (
+    Dict, 
+    List, 
+    Union, 
+    Optional
+)
 import random
-from typing import Dict, List
 import numpy as np
 
 
@@ -39,22 +44,22 @@ class GarmentClasses():
 
     def _to_binary_vector(
             self, 
-            upper_garment_class: str, 
-            lower_garment_class: str
+            upper_garment_class: Union[str, None], 
+            lower_garment_class: Union[str, None]
         ) -> np.ndarray:
         """
         From upper and lower garment class string to binary labels vector.
         """
-        binary_labels_vector: List[bool] = [0] * len(self.GARMENT_CLASSES)
+        binary_labels_vector: List[bool] = [False] * len(self.GARMENT_CLASSES)
         
         if upper_garment_class is not None:
             upper_label: int = self.UPPER_GARMENT_DICT[upper_garment_class]
-            binary_labels_vector[upper_label]: bool = 1
+            binary_labels_vector[upper_label] = True
         if lower_garment_class is not None:
             lower_label: int = self.LOWER_GARMENT_DICT[lower_garment_class]
-            binary_labels_vector[lower_label]: bool = 1
+            binary_labels_vector[lower_label] = True
 
-        return np.array(binary_labels_vector, dtype=np.bool)
+        return np.array(binary_labels_vector, dtype=bool)
 
     def _generate_random_garment_classes(self) -> np.ndarray:
         """
@@ -66,10 +71,10 @@ class GarmentClasses():
             random_garment_int = random.randint(0, len(garment_classes) - 1)
             return garment_classes[random_garment_int]
 
-        upper_garment_class: str = get_random_garment_class(
+        upper_garment_class = get_random_garment_class(
             self.UPPER_GARMENT_CLASSES
         )
-        lower_garment_class: str = get_random_garment_class(
+        lower_garment_class = get_random_garment_class(
             self.LOWER_GARMENT_CLASSES
         )
 
@@ -85,8 +90,8 @@ class GarmentClasses():
 
     def __init__(
             self, 
-            upper_class: str = None, 
-            lower_class: str = None
+            upper_class: Optional[str] = None, 
+            lower_class: Optional[str] = None
         ) -> None:
         """
         If nothing is already provided, initialize random classes.
@@ -97,14 +102,14 @@ class GarmentClasses():
             self.labels_vector = self._to_binary_vector(upper_class, lower_class)
 
     @property
-    def labels(self) -> Dict[str, int]:
+    def labels(self) -> Dict[str, Union[int, None]]:
         return {
             'upper': self.upper_label,
             'lower': self.lower_label
         }
 
     @property
-    def upper_label(self) -> int:
+    def upper_label(self) -> Union[int, None]:
         """
         Returns an int representing upper garment (see `GarmentClasses.GARMENT_DICT`).
 
@@ -121,7 +126,7 @@ class GarmentClasses():
             return label_list[0]
 
     @property
-    def lower_label(self) -> int:
+    def lower_label(self) -> Union[int, None]:
         """
         Returns an int representing lower garment (see `GarmentClasses.GARMENT_DICT`).
 
@@ -138,7 +143,7 @@ class GarmentClasses():
             return label_list[0]
 
     @property
-    def classes(self) -> Dict[str, str]:
+    def classes(self) -> Dict[str, Union[str, None]]:
         """
         Returns a dictionary of upper and lower garment classes (as strings).
         """
@@ -148,7 +153,7 @@ class GarmentClasses():
         }
 
     @property
-    def upper_class(self) -> str:
+    def upper_class(self) -> Union[str, None]:
         """
         Returns an upper garment class (see `GarmentClasses.GARMENT_CLASSES`).
         """
@@ -158,7 +163,7 @@ class GarmentClasses():
             return self.GARMENT_CLASSES[self.upper_label]
 
     @property
-    def lower_class(self) -> str:
+    def lower_class(self) -> Union[str, None]:
         """
         Returns a lower garment class (see `GarmentClasses.GARMENT_CLASSES`).
         """

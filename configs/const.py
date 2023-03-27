@@ -14,3 +14,9 @@ LIGHT_AMBIENT_COLOR = ((0.5, 0.5, 0.5),)
 LIGHT_DIFFUSE_COLOR = ((0.3, 0.3, 0.3),)
 LIGHT_SPECULAR_COLOR = ((0.2, 0.2, 0.2),)
 BACKGROUND_COLOR = (0.0, 0.0, 0.0)
+
+# Constant strings
+TRAIN = 'train'
+VALID = 'valid'
+SURREAL_DATASET_NAME = 'surreal'
+AGORA_DATASET_NAME = 'agora'

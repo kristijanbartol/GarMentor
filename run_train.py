@@ -1,7 +1,8 @@
 import os
-from data.datasets.off_the_fly_train_datasets import SurrealTrainDataset
+from data.datasets.surreal import SurrealDataset
 from rendering.body import BodyRenderer
 import torch
+import torch.cuda
 import torch.optim as optim
 import argparse
 import _thread as thread
@@ -57,13 +58,13 @@ def run_train(device,
 
     print('\n', pose_shape_cfg)
     # ------------------------- Datasets -------------------------
-    train_dataset = SurrealTrainDataset(
+    train_dataset = SurrealDataset(
         gender=gender,
         data_split='train',
         train_val_ratio=0.8,
         backgrounds_dir_path=paths.TRAIN_BACKGROUNDS_PATH
     )
-    val_dataset = SurrealTrainDataset(
+    val_dataset = SurrealDataset(
         gender=gender,
         data_split='valid',
         train_val_ratio=0.8,
@@ -109,8 +110,8 @@ def run_train(device,
 
     # ------------------------- Train -------------------------
     if resume_from_epoch is not None:
-        pose_shape_model.load_state_dict(checkpoint['model_state_dict'])
-        optimiser.load_state_dict(checkpoint['optimiser_state_dict'])
+        pose_shape_model.load_state_dict(checkpoint['model_state_dict']) # type: ignore
+        optimiser.load_state_dict(checkpoint['optimiser_state_dict']) # type: ignore
 
     train_poseMF_shapeGaussian_net(pose_shape_model=pose_shape_model,
                                    pose_shape_cfg=pose_shape_cfg,

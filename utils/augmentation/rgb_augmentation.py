@@ -63,7 +63,7 @@ def random_occlude_vertical_half(rgb,
                 if joints2D is not None:
                     joints2D_to_occlude = joints2D[i, :, 0] > occlude_up_to
             if joints2D is not None:
-                joints2D_visib[i, joints2D_to_occlude] = False
+                joints2D_visib[i, joints2D_to_occlude] = False  #type:ignore
 
     return rgb, joints2D, joints2D_visib
 
@@ -71,8 +71,8 @@ def random_occlude_vertical_half(rgb,
 def random_pixel_noise_per_channel(rgb,
                                    per_channel_pixel_noise_factor=0.2):
     l, h = 1 - per_channel_pixel_noise_factor, 1 + per_channel_pixel_noise_factor
-    pixel_noise = (h - l) * torch.rand(rgb.shape[0], 3, device=rgb.device) + l
-    rgb = torch.clamp(rgb * pixel_noise[:, :, None, None], max=1.0)
+    pixel_noise = (h - l) * torch.rand(rgb.shape[0], 3, device=rgb.device) + l # type: ignore
+    rgb = torch.clamp(rgb * pixel_noise[:, :, None, None], max=1.0) # type: ignore
 
     return rgb
 

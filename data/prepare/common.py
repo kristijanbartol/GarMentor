@@ -45,9 +45,9 @@ class PreparedSampleValues:
     shape: np.ndarray                       # (10,)
     style_vector: np.ndarray                # (4, 10)
     garment_labels: np.ndarray              # (4,)
-    cam_t: np.ndarray                       # (3,)
     joints_3d: np.ndarray                   # (17, 3)
     joints_2d: Optional[np.ndarray] = None  # (17, 2)
+    cam_t: Optional[np.ndarray] = None      # (3,)
     bbox: Optional[np.ndarray] = None       # (2, 2)
 
     def __getitem__(

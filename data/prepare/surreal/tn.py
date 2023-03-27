@@ -9,12 +9,13 @@ import argparse
 _module_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(_module_dir))
 
+from configs.const import SURREAL_DATASET_NAME
 import configs.paths as paths
-from data.datasets.prepare.common import (
+from data.prepare.common import (
     PreparedSampleValues,
     PreparedValuesArray
 )
-from data.datasets.prepare.common import DataGenerator
+from data.prepare.common import DataGenerator
 from utils.garment_classes import GarmentClasses
 from vis.visualizers.clothed import ClothedVisualizer
 
@@ -25,7 +26,7 @@ class SurrealDataGenerator(DataGenerator):
     A data generation class specific to SURREAL dataset.
     """
 
-    DATASET_NAME = 'surreal'
+    DATASET_NAME = SURREAL_DATASET_NAME
     CHECKPOINT_COUNT = 100
 
     def __init__(self):
@@ -98,13 +99,13 @@ class SurrealDataGenerator(DataGenerator):
         """
         self._create_dirs(
             dataset_dir=dataset_dir,
-            img_dirname=paths.IMG_DIR,
+            img_dirname=paths.RGB_DIR,
             seg_dirname=paths.SEG_MAPS_DIR
         )
         if rgb_img is not None:
             img_dir = os.path.join(
                 dataset_dir, 
-                paths.IMG_DIR
+                paths.RGB_DIR
             )
             img_path = os.path.join(
                 img_dir, 

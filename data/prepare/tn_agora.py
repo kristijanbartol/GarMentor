@@ -38,11 +38,11 @@ import itertools
 from scipy.spatial.transform import Rotation as R
 
 import configs.paths as paths
-from data.datasets.prepare.common import (
+from data.prepare.common import (
     PreparedSampleValues,
     PreparedValuesArray
 )
-from data.datasets.prepare.common import DataGenerator
+from data.prepare.common import DataGenerator
 from utils.garment_classes import GarmentClasses
 
 
@@ -439,7 +439,7 @@ def prepare_sample(
     with open(smpl_gt_path, 'rb') as pkl_f:
         smpl_gt = pickle.load(pkl_f)
         pose_rot = smpl_gt['full_pose'][0].cpu().detach().numpy().from_matrix()
-        pose = R.as_rotvec(smpl_gt)
+        pose = R.as_rotvec(pose_rot)
         shape = smpl_gt['betas'][0].cpu().detach().numpy()
 
     garment_combination = df_row.at['garment_combinations'][jdx]
@@ -496,6 +496,7 @@ class AGORAPreparator():
             self, 
             sample_idx: int, 
             rgb_img: np.ndarray, 
+            gender: str,
             sample_values: PreparedSampleValues,
             samples_values: PreparedValuesArray,
             seg_maps: Optional[np.ndarray] = None   # NOTE: Might experiment later.
@@ -503,7 +504,7 @@ class AGORAPreparator():
         """
         Save RGB and seg maps to disk, and update the values in the array (RAM).
         """
-        img_dir = os.path.join(self.data_dir, paths.IMG_DIR)
+        img_dir = os.path.join(self.data_dir, gender, paths.RGB_DIR)
         if not os.path.exists(img_dir):
             os.makedirs(img_dir)
         img_path = os.path.join(
@@ -517,11 +518,15 @@ class AGORAPreparator():
             print(f'Saving values on checkpoint #{sample_idx}')
             DataGenerator._save_values(
                 samples_values=samples_values,
-                dataset_dir=self.data_dir
+                dataset_dir=os.path.join(
+                    self.data_dir, 
+                    gender
+                )
             )
 
     def prepare(
             self,
+            gender: str,
             df: pandas.DataFrame
         ) -> None:
         """
@@ -545,15 +550,17 @@ class AGORAPreparator():
                     if samples_counter < num_generated:
                         samples_counter += 1
                     img_crop, sample_values = prepare_sample(df.iloc[idx], jdx)
-
-                    self._save_sample(
-                        sample_idx=samples_counter, 
-                        rgb_img=img_crop, 
-                        seg_maps=None, 
-                        sample_values=sample_values,
-                        samples_values=samples_values
-                    )
-                    samples_counter += 1
+                    _gender = df.iloc[idx]['gender'][jdx]
+                    if _gender == gender:
+                        self._save_sample(
+                            sample_idx=samples_counter, 
+                            rgb_img=img_crop, 
+                            seg_maps=None, 
+                            gender=gender,
+                            sample_values=sample_values,
+                            samples_values=samples_values
+                        )
+                        samples_counter += 1
 
 
 if __name__ == '__main__':

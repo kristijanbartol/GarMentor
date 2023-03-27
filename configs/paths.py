@@ -20,8 +20,23 @@ VAL_TEXTURES_PATH = '/data/hierprob3d/training/smpl_val_textures.npz'
 VAL_BACKGROUNDS_PATH = '/data/hierprob3d/training/lsun_backgrounds/val'
 
 # Data directories
+""" 
+Train dataset abstract class containing only common constants.
+
+Folder hierarchy of the stored data.
+<DATA_ROOT_DIR>
+    {dataset_name}/
+        {gender}/
+            <PARAMS_FNAME>
+            <IMG_DIR>/
+                <IMG_NAME_1>
+                ...
+            <SEG_MAP_DIR>/
+                <SEG_MAP_1_1>
+                ...
+"""
 DATA_ROOT_DIR = '/data/garmentor/'
-IMG_DIR = 'rgb/'
+RGB_DIR = 'rgb/'
 SEG_MAPS_DIR = 'segmentations/'
 
 IMG_NAME_TEMPLATE = '{idx:05d}.png'
@@ -31,5 +46,4 @@ VALUES_FNAME = 'values.npy'
 # AGORA paths
 AGORA_PKL_DIR = '/data/agora/pkl/'
 AGORA_IMG_DIR = '/data/agora/full_img/'
-AGORA_RGB_DIR = '/data/garmentor/agora/rgb/'
 AGORA_VALUES_PATH = '/data/garmentor/agora/values.npy'
