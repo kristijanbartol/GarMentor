@@ -17,7 +17,7 @@
 #
 # Contact: ps-license@tuebingen.mpg.de
 #------------------------------------------------------------------------------
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from pandas.core.series import Series
 import argparse
 import logging
@@ -28,20 +28,16 @@ from tqdm import tqdm
 import numpy as np
 import pickle
 import torch
+import torch.cuda
 import io
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import smplx
 import itertools
-from pytorch3d.transforms import matrix_to_axis_angle
+from scipy.spatial.transform import Rotation as R
 
-from configs.paths import (
-    AGORA_IMG_DIR,
-    AGORA_PKL_DIR,
-    AGORA_RGB_DIR,
-    AGORA_VALUES_PATH
-)
+import configs.paths as paths
 from data.datasets.prepare.common import (
     PreparedSampleValues,
     PreparedValuesArray
@@ -58,121 +54,9 @@ class CPU_Unpickler(pickle.Unpickler):
 
 
 def load_model(args):
-
-    if args.modeltype == 'SMPLX' and args.pose2rot:
-        model_male = smplx.create(args.modelFolder, model_type='smplx',
-                                  gender='male',
-                                  ext='npz',
-                                  num_betas=args.numBetas, use_pca=False)
-        model_male_kid = smplx.create(args.modelFolder, model_type='smplx',
-                                      gender='male',
-                                      age='kid',
-                                      kid_template_path=args.kid_template_path,
-                                      ext='npz', use_pca=False)
-
-        model_female = smplx.create(args.modelFolder, model_type='smplx',
-                                    gender='female',
-                                    ext='npz',
-                                    num_betas=args.numBetas,
-                                    use_pca=False)
-
-        model_female_kid = smplx.create(
-            args.modelFolder,
-            model_type='smplx',
-            gender='female',
-            age='kid',
-            kid_template_path=args.kid_template_path,
-            ext='npz',
-            use_pca=False)
-
-        model_neutral = smplx.create(args.modelFolder, model_type='smplx',
-                                     gender='neutral',
-                                     ext='npz',
-                                     num_betas=args.numBetas,
-                                     use_pca=False)
-
-        model_neutral_kid = smplx.create(
-            args.modelFolder,
-            model_type='smplx',
-            gender='neutral',
-            age='kid',
-            kid_template_path=args.kid_template_path,
-            ext='npz',
-            use_pca=False)
-
-    elif args.modeltype == 'SMPLX' and not args.pose2rot:
-        # If params are in rotation matrix format then we need to use SMPLXLayer class
-        model_male = smplx.build_layer(args.modelFolder, model_type='smplx',
-                                  gender='male',
-                                  ext='npz',
-                                  num_betas=args.numBetas, use_pca=False)
-        model_male_kid = smplx.build_layer(args.modelFolder, model_type='smplx',
-                                      gender='male',
-                                      age='kid',
-                                      kid_template_path=args.kid_template_path,
-                                      ext='npz', use_pca=False)
-
-        model_female = smplx.build_layer(args.modelFolder, model_type='smplx',
-                                    gender='female',
-                                    ext='npz',
-                                    num_betas=args.numBetas,
-                                    use_pca=False)
-
-        model_female_kid = smplx.build_layer(
-            args.modelFolder,
-            model_type='smplx',
-            gender='female',
-            age='kid',
-            kid_template_path=args.kid_template_path,
-            ext='npz',
-            use_pca=False)
-
-        model_neutral = smplx.build_layer(args.modelFolder, model_type='smplx',
-                                     gender='neutral',
-                                     ext='npz',
-                                     num_betas=args.numBetas,
-                                     use_pca=False)
-
-        model_neutral_kid = smplx.build_layer(
-            args.modelFolder,
-            model_type='smplx',
-            gender='neutral',
-            age='kid',
-            kid_template_path=args.kid_template_path,
-            ext='npz',
-            use_pca=False)
-
-    elif args.modeltype == 'SMPL':
-        model_male = smplx.create(args.modelFolder, model_type='smpl',
-                                  gender='male',
-                                  ext='npz')
-        model_male_kid = smplx.create(args.modelFolder, model_type='smpl',
-                                      gender='male', age='kid',
-                                      kid_template_path=args.kid_template_path,
-                                      ext='npz')
-        model_female = smplx.create(args.modelFolder, model_type='smpl',
-                                    gender='female',
-                                    ext='npz')
-        model_female_kid = smplx.create(
-            args.modelFolder,
-            model_type='smpl',
-            gender='female',
-            age='kid',
-            kid_template_path=args.kid_template_path,
-            ext='npz')
-        model_neutral = smplx.create(args.modelFolder, model_type='smpl',
-                                     gender='neutral',
-                                     ext='npz')
-        model_neutral_kid = smplx.create(
-            args.modelFolder,
-            model_type='smpl',
-            gender='neutral',
-            age='kid',
-            kid_template_path=args.kid_template_path,
-            ext='npz')
-    else:
-        raise ValueError('Provide correct modeltype smpl/smplx')
-    return model_male, model_male_kid, model_female, model_female_kid, model_neutral, model_neutral_kid
+    return smplx.create(args.modelFolder, model_type='smpl',
+                        gender='neutral',
+                        ext='npz')
 
 
 def focalLength_mm2px(focalLength, dslr_sens, focalPoint):
@@ -206,7 +90,6 @@ def project_point(joint, RT, KKK):
 def project_2d(
         args,
         df_row,
-        i,
         jdx,
         joints3d,
         meanPose=False):
@@ -421,7 +304,7 @@ def project2d(
             if not (imgPath is None):
                 img = cv2.imread(imgPath)
                 img = img[:, :, ::-1]
-                colors = cm.tab20c(np.linspace(0, 1, 25))
+                colors = cm.tab20c(np.linspace(0, 1, 25)) # type: ignore
                 fig = plt.figure(dpi=300)
                 ax = fig.add_subplot(111)
                 if not (imgPath is None):
@@ -470,10 +353,12 @@ def get_smpl_vertices(
         if torch.is_tensor(v):
             gt[k] = v.detach().cpu().numpy()
 
-    smpl_gt = model_gt(betas=torch.tensor(gt['betas'][:, :num_betas], dtype=torch.float),
-                        global_orient=torch.tensor(gt['global_orient'], dtype=torch.float),
-                        body_pose=torch.tensor(gt['body_pose'], dtype=torch.float),
-                        transl=torch.tensor(gt['transl'], dtype=torch.float), pose2rot=pose2rot)
+    smpl_gt = model_gt(
+        betas=torch.Tensor(gt['betas'][:, :num_betas], dtype=torch.float),
+        global_orient=torch.Tensor(gt['global_orient'], dtype=torch.float),
+        body_pose=torch.Tensor(gt['body_pose'], dtype=torch.float),
+        transl=torch.Tensor(gt['transl'], dtype=torch.float), pose2rot=pose2rot
+    )
 
     return smpl_gt.joints.detach().cpu().numpy().squeeze()
 
@@ -482,11 +367,6 @@ def get_projected_joints(
         args,
         df_row,
         jdx,
-        model_male_kid_gt,
-        model_female_kid,
-        model_neutral_kid,
-        model_male_gt,
-        model_female_gt,
         model_neutral
     ):
     kid_flag = df_row.at['kid'][jdx]
@@ -501,10 +381,9 @@ def get_projected_joints(
         gt = pickle.load(open(smpl_path, 'rb'))
     else:
         gt = CPU_Unpickler(open(smpl_path, 'rb')).load()
-    gt_joints_local = get_smpl_vertices(
-        kid_flag, gt, gender, model_neutral_kid, model_neutral)
+    gt_joints_local = get_smpl_vertices(gt, model_neutral)
 
-    bounding_box, gt_joints_cam_2d, gt_joints_cam_3d = project_2d(args, df_row, jdx, gt_joints_local)
+    bounding_box, gt_joints_cam_2d, gt_joints_cam_3d = project_2d(args, df_row, jdx, gt_joints_local) # type: ignore
     return bounding_box, gt_joints_cam_2d, gt_joints_cam_3d
 
 
@@ -532,18 +411,13 @@ def get_projected_data(
     args.debug = False
     args.regenerate = False
 
-    model_male, model_male_kid, model_female, model_female_kid, model_neutral, model_neutral_kid = load_model(
+    model_neutral = load_model(
         args)
     
     return get_projected_joints(
         args, 
         df_row,
         jdx,
-        model_male_kid,
-        model_female_kid,
-        model_neutral_kid,
-        model_male,
-        model_female,
         model_neutral
     )
 
@@ -563,8 +437,9 @@ def prepare_sample(
     """
     smpl_gt_path = df_row.at['gt_path_smpl'][jdx]
     with open(smpl_gt_path, 'rb') as pkl_f:
-        smpl_gt = pickle.read(pkl_f)
-        pose = matrix_to_axis_angle(smpl_gt['full_pose'])[0].cpu().detach().numpy()
+        smpl_gt = pickle.load(pkl_f)
+        pose_rot = smpl_gt['full_pose'][0].cpu().detach().numpy().from_matrix()
+        pose = R.as_rotvec(smpl_gt)
         shape = smpl_gt['betas'][0].cpu().detach().numpy()
 
     garment_combination = df_row.at['garment_combinations'][jdx]
@@ -592,17 +467,17 @@ def prepare_sample(
         joints_2d=joints_2d,
         bbox=bbox
     )
-    img_path = os.path.join(AGORA_IMG_DIR, df_row['imgPath'])
+    img_path = os.path.join(paths.AGORA_IMG_DIR, df_row['imgPath'])
     img = cv2.imread(img_path)
-    img_crop = img[bbox[0][0]:bbox[0][1], bbox[1][0]:bbox[1][1]]
+    img_crop = img[bbox[0][0]:bbox[0][1], bbox[1][0]:bbox[1][1]] # type: ignore
 
     return img_crop, sample_values
 
 
-class AGORADataGenerator(DataGenerator):
+class AGORAPreparator():
 
     """
-    A data generation class specific to SURREAL dataset.
+    A data preparation class for ClothAGORA.
     """
 
     DATASET_NAME = 'agora'
@@ -612,37 +487,38 @@ class AGORADataGenerator(DataGenerator):
         """
         Initialize superclass and create clothed renderer.
         """
-        super().__init__()
+        self.data_dir = os.path.join(
+            paths.DATA_ROOT_DIR,
+            self.DATASET_NAME
+        )
 
     def _save_sample(
             self, 
-            dataset_dir: str, 
             sample_idx: int, 
             rgb_img: np.ndarray, 
-            seg_maps: np.ndarray, 
             sample_values: PreparedSampleValues,
-            samples_values: PreparedValuesArray
+            samples_values: PreparedValuesArray,
+            seg_maps: Optional[np.ndarray] = None   # NOTE: Might experiment later.
         ) -> None:
         """
         Save RGB and seg maps to disk, and update the values in the array (RAM).
         """
-        img_dir = os.path.join(dataset_dir, self.IMG_DIR)
+        img_dir = os.path.join(self.data_dir, paths.IMG_DIR)
         if not os.path.exists(img_dir):
             os.makedirs(img_dir)
-        if rgb_img is not None:
-            img_dir = os.path.join(
-                dataset_dir, 
-                self.IMG_DIR
-            )
-            img_path = os.path.join(
-                img_dir, 
-                self.IMG_NAME_TEMPLATE.format(idx=sample_idx)
-            )
-            cv2.imwrite(img_path, rgb_img)
+        img_path = os.path.join(
+            img_dir, 
+            paths.IMG_NAME_TEMPLATE.format(idx=sample_idx)
+        )
+        cv2.imwrite(img_path, rgb_img)
+
         samples_values.append(sample_values)
         if sample_idx % self.CHECKPOINT_COUNT == 0 and sample_idx != 0:
             print(f'Saving values on checkpoint #{sample_idx}')
-            self._save_values(samples_values, dataset_dir)
+            DataGenerator._save_values(
+                samples_values=samples_values,
+                dataset_dir=self.data_dir
+            )
 
     def prepare(
             self,
@@ -656,14 +532,10 @@ class AGORADataGenerator(DataGenerator):
         arrays are frequently updated on the disk in case the failure
         happens along the way.
         """
-        dataset_dir = os.path.join(
-            self.DATA_ROOT_DIR,
-            self.DATASET_NAME
+        samples_values, num_generated = DataGenerator._create_values_array(
+            dataset_dir=self.data_dir
         )
-        samples_values, num_generated = self._create_values_array(
-            dataset_dir=dataset_dir
-        )
-        agora_pkl_files = os.listdir(AGORA_PKL_DIR)
+        agora_pkl_files = os.listdir(paths.AGORA_PKL_DIR)
         samples_counter = 0
         for df_iter, df_path in tqdm(enumerate(agora_pkl_files)):
             logging.info(f'Preparing {df_iter}/{len(agora_pkl_files)} df...')
@@ -675,7 +547,6 @@ class AGORADataGenerator(DataGenerator):
                     img_crop, sample_values = prepare_sample(df.iloc[idx], jdx)
 
                     self._save_sample(
-                        dataset_dir=dataset_dir, 
                         sample_idx=samples_counter, 
                         rgb_img=img_crop, 
                         seg_maps=None, 
@@ -683,3 +554,7 @@ class AGORADataGenerator(DataGenerator):
                         samples_values=samples_values
                     )
                     samples_counter += 1
+
+
+if __name__ == '__main__':
+    AGORAPreparator()

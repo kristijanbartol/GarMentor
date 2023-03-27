@@ -32,7 +32,7 @@ class ClothedVisualizer(Visualizer2D):
             upper_class: Optional[str] = None,
             lower_class: Optional[str] = None,
             garment_classes: Optional[GarmentClasses] = None,
-            backgrounds_dir_path: str = None,
+            backgrounds_dir_path: Optional[str] = None,
             img_wh=256
         ) -> None:
         """
@@ -43,7 +43,10 @@ class ClothedVisualizer(Visualizer2D):
         ClothedRenderer, which makes it more convenient for the user not
         to think about the rendering details.
         """
-        super().__init__(backgrounds_dir_path)
+        super().__init__(
+            img_wh=img_wh,
+            backgrounds_dir_path=backgrounds_dir_path
+        )
 
         if garment_classes is None:
             assert(upper_class is not None and lower_class is not None)
@@ -116,8 +119,8 @@ class ClothedVisualizer(Visualizer2D):
         Save RGB clothed image.
         """
         rgb_img = (rgb_img * 255).astype(np.uint8)
-        rgb_img = ImageOps.flip(Image.fromarray(rgb_img))
-        rgb_img.save(save_path)
+        pil_img = ImageOps.flip(Image.fromarray(rgb_img))
+        pil_img.save(save_path)
         print(f'Saved clothed image: {save_path}...')
 
     def save_masks(

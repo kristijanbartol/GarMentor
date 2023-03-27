@@ -1,4 +1,4 @@
-from typing import List, Tuple, Optional
+from typing import Any, Iterator, List, Tuple, Optional, Dict, Union
 from dataclasses import dataclass, fields
 import numpy as np
 import os
@@ -41,33 +41,40 @@ class PreparedSampleValues:
     like data.
     """
 
-    pose: np.ndarray                    # (72,)
-    shape: np.ndarray                   # (10,)
-    style_vector: np.ndarray            # (4, 10)
-    garment_labels: np.ndarray          # (4,)
-    cam_t: np.ndarray                   # (3,)
-    joints_3d: np.ndarray               # (17, 3)
-    joints_2d: np.ndarray               # (17, 2)
-    bbox: np.ndarray                    # (2, 2)
+    pose: np.ndarray                        # (72,)
+    shape: np.ndarray                       # (10,)
+    style_vector: np.ndarray                # (4, 10)
+    garment_labels: np.ndarray              # (4,)
+    cam_t: np.ndarray                       # (3,)
+    joints_3d: np.ndarray                   # (17, 3)
+    joints_2d: Optional[np.ndarray] = None  # (17, 2)
+    bbox: Optional[np.ndarray] = None       # (2, 2)
 
-    def __getitem__(self, key):
+    def __getitem__(
+            self, 
+            key: str
+        ) -> np.ndarray:
         return getattr(self, key)
 
-    def get(self, key, default=None):
+    def get(
+            self, 
+            key, 
+            default=None
+        ) -> Union[Any, None]:
         return getattr(self, key, default)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return self.keys()
 
-    def keys(self):
+    def keys(self) -> Iterator[str]:
         keys = [t.name for t in fields(self)]
         return iter(keys)
 
-    def values(self):
+    def values(self) -> Iterator[Any]:
         values = [getattr(self, t.name) for t in fields(self)]
         return iter(values)
 
-    def items(self):
+    def items(self) -> Iterator[Tuple[str, Any]]:
         data = [(t.name, getattr(self, t.name)) for t in fields(self)]
         return iter(data)
 
@@ -78,7 +85,10 @@ class PreparedValuesArray():
     A class used to keep track of an array of prepared sampled values.
     """
 
-    def __init__(self, samples_dict: dict = None):
+    def __init__(
+            self, 
+            samples_dict: Optional[Dict[str, np.ndarray]] = None
+        ) -> None:
         if samples_dict is not None:
             self._samples_dict = {k: list(v) for k, v in samples_dict.items()}
             self.keys = samples_dict.keys()
@@ -86,13 +96,19 @@ class PreparedValuesArray():
             self._samples_dict = {}
             self.keys = []
 
-    def _set_dict_keys(self, sample_dict_keys: List[str]) -> None:
+    def _set_dict_keys(
+            self, 
+            sample_dict_keys: Iterator[str]
+        ) -> None:
         """
         Add 's' to key name specify plural.
         """
         self.keys = [x + 's' for x in sample_dict_keys]
 
-    def append(self, values: PreparedSampleValues) -> None:
+    def append(
+            self, 
+            values: PreparedSampleValues
+        ) -> None:
         """
         Mimics adding to list of values to an array. Saves to latent dict.
         """
@@ -103,11 +119,11 @@ class PreparedValuesArray():
         for ks, k in zip(self.keys, values.keys()):
             self._samples_dict[ks].append(values[k])
 
-    def get(self) -> dict:
+    def get(self) -> Dict[str, np.ndarray]:
         """
         Get the dictionary with all np.ndarray items.
         """
-        return_dict = {k: None for k, _ in self._samples_dict.items()}
+        return_dict = {k: np.empty(0,) for k, _ in self._samples_dict.items()}
         for ks in self.keys:
             return_dict[ks] = np.array(self._samples_dict[ks])
         return return_dict
@@ -130,18 +146,9 @@ class DataGenerator(object):
                         {idx:5d}_{garment_class}.png
     """
 
-    # TODO: Move these paths to a common path definitions file.
-    DATA_ROOT_DIR = '/data/garmentor/'
-    IMG_DIR = 'rgb/'
-    SEG_MAPS_DIR = 'segmentations/'
-
-    IMG_NAME_TEMPLATE = '{idx:05d}.png'
-    SEG_MAPS_NAME_TEMPLATE = '{idx:05d}.npz'
-    VALUES_FNAME = 'values.npy'
-
     def __init__(self):
         self.dataset_path_template = os.path.join(
-            self.DATA_ROOT_DIR,
+            paths.DATA_ROOT_DIR,
             '{dataset_name}',
             '{gender}',
             '{upper_garment_class}+{lower_garment_class}'
@@ -184,8 +191,8 @@ class DataGenerator(object):
             self.cfg.TRAIN.SYNTH_DATA.MEAN_CAM_T, 
             dtype=np.float32)
         
+    @staticmethod
     def _create_values_array(
-            self, 
             dataset_dir: str
         ) -> Tuple[PreparedValuesArray, int]:
         """
@@ -203,7 +210,7 @@ class DataGenerator(object):
         Instead, the PreparedValuesArray starts with the values that
         are already saved into a dataset file.
         """
-        values_fpath = os.path.join(dataset_dir, self.VALUES_FNAME)
+        values_fpath = os.path.join(dataset_dir, paths.VALUES_FNAME)
         if os.path.exists(values_fpath):
             samples_dict = np.load(values_fpath, allow_pickle=True).item()
             num_generated = samples_dict['poses'].shape[0]
@@ -215,15 +222,15 @@ class DataGenerator(object):
             num_generated = 0
         return samples_values, num_generated
     
+    @staticmethod
     def _save_values(
-            self, 
             samples_values: PreparedValuesArray, 
             dataset_dir: str
         ) -> None:
         """
         Save all sample values as a dictionary of numpy arrays.
         """
-        values_path = os.path.join(dataset_dir, self.VALUES_FNAME)
+        values_path = os.path.join(dataset_dir, paths.VALUES_FNAME)
         np.save(values_path, samples_values.get())
         print(f'Saved samples values to {values_path}!')
         

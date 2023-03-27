@@ -64,7 +64,7 @@ class MeshManager(object):
 
     def save_meshes(
             self,
-            meshes: List[Mesh],
+            meshes: Tuple[Mesh, Mesh, Mesh],
             save_basepath: str
     ) -> None:
         """

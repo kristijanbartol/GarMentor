@@ -1,6 +1,7 @@
 from typing import Tuple
 import numpy as np
 import torch
+import torch.cuda
 import os
 import sys
 import argparse
@@ -8,6 +9,7 @@ import argparse
 _module_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(_module_dir))
 
+import configs.paths as paths
 from data.datasets.prepare.common import (
     PreparedSampleValues,
     PreparedValuesArray
@@ -60,7 +62,7 @@ class SurrealDataGenerator(DataGenerator):
             style_vector=style_vector,
             garment_labels=clothed_visualizer.garment_classes.labels_vector,
             cam_t=cam_t,
-            joints=joints_3d
+            joints_3d=joints_3d
         )
         return rgb_img, seg_maps, sample_values
     
@@ -96,25 +98,25 @@ class SurrealDataGenerator(DataGenerator):
         """
         self._create_dirs(
             dataset_dir=dataset_dir,
-            img_dirname=self.IMG_DIR,
-            seg_dirname=self.SEG_MAPS_DIR
+            img_dirname=paths.IMG_DIR,
+            seg_dirname=paths.SEG_MAPS_DIR
         )
         if rgb_img is not None:
             img_dir = os.path.join(
                 dataset_dir, 
-                self.IMG_DIR
+                paths.IMG_DIR
             )
             img_path = os.path.join(
                 img_dir, 
-                self.IMG_NAME_TEMPLATE.format(idx=sample_idx)
+                paths.IMG_NAME_TEMPLATE.format(idx=sample_idx)
             )
             clothed_visualizer.save_vis(
-                img=rgb_img,
+                rgb_img=rgb_img,
                 save_path=img_path
             )
-        seg_dir = os.path.join(dataset_dir, self.SEG_MAPS_DIR)
+        seg_dir = os.path.join(dataset_dir, paths.SEG_MAPS_DIR)
         seg_path = os.path.join(
-            seg_dir, self.SEG_MAPS_NAME_TEMPLATE.format(idx=sample_idx))
+            seg_dir, paths.SEG_MAPS_NAME_TEMPLATE.format(idx=sample_idx))
         clothed_visualizer.save_masks(
             seg_masks=seg_maps,
             save_path=seg_path
@@ -142,7 +144,7 @@ class SurrealDataGenerator(DataGenerator):
         Instead, the PreparedValuesArray starts with the values that
         are already saved into a dataset file.
         """
-        values_fpath = os.path.join(dataset_dir, self.VALUES_FNAME)
+        values_fpath = os.path.join(dataset_dir, paths.VALUES_FNAME)
         if os.path.exists(values_fpath):
             samples_dict = np.load(values_fpath, allow_pickle=True).item()
             num_generated = samples_dict['poses'].shape[0]
@@ -189,6 +191,7 @@ class SurrealDataGenerator(DataGenerator):
 
         garment_classes = GarmentClasses(upper_class, lower_class)
         clothed_visualizer = ClothedVisualizer(
+            device='cuda:0',
             gender=gender,
             garment_classes=garment_classes
         )
@@ -220,7 +223,8 @@ class SurrealDataGenerator(DataGenerator):
                 rgb_img=rgb_img, 
                 seg_maps=seg_maps, 
                 sample_values=sample_values,
-                samples_values=samples_values
+                samples_values=samples_values,
+                clothed_visualizer=clothed_visualizer
             )
         torch.cuda.empty_cache()
 

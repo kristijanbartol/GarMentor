@@ -19,8 +19,16 @@ VAL_POSES_PATH = '/data/hierprob3d/training/smpl_val_poses.npz'
 VAL_TEXTURES_PATH = '/data/hierprob3d/training/smpl_val_textures.npz'
 VAL_BACKGROUNDS_PATH = '/data/hierprob3d/training/lsun_backgrounds/val'
 
-# AGORA paths
+# Data directories
+DATA_ROOT_DIR = '/data/garmentor/'
+IMG_DIR = 'rgb/'
+SEG_MAPS_DIR = 'segmentations/'
 
+IMG_NAME_TEMPLATE = '{idx:05d}.png'
+SEG_MAPS_NAME_TEMPLATE = '{idx:05d}.npz'
+VALUES_FNAME = 'values.npy'
+
+# AGORA paths
 AGORA_PKL_DIR = '/data/agora/pkl/'
 AGORA_IMG_DIR = '/data/agora/full_img/'
 AGORA_RGB_DIR = '/data/garmentor/agora/rgb/'
