@@ -15,6 +15,10 @@ import logging
 import torch
 import torch.nn as nn
 
+import configs.paths as paths
+from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
+from configs.pose2D_hrnet_config import get_pose2D_hrnet_cfg_defaults
+
 
 BN_MOMENTUM = 0.1
 logger = logging.getLogger(__name__)
@@ -493,6 +497,7 @@ class PoseHighResolutionNet(nn.Module):
             raise ValueError('{} is not exist!'.format(pretrained))
 
 
+'''
 def get_pose_net(cfg, is_train, **kwargs):
     model = PoseHighResolutionNet(cfg, **kwargs)
 
@@ -500,3 +505,15 @@ def get_pose_net(cfg, is_train, **kwargs):
         model.init_weights(cfg['MODEL']['PRETRAINED'])
 
     return model
+'''
+
+
+def get_pretrained_detector():
+    kpt_hrnet_cfg = get_pose2D_hrnet_cfg_defaults()
+    hrnet_checkpoint = torch.load(paths.HRNET_PATH, map_location='cuda:0')
+    pose2D_hrnet_cfg = get_pose2D_hrnet_cfg_defaults()
+    hrnet_model = PoseHighResolutionNet(pose2D_hrnet_cfg)
+    hrnet_model.load_state_dict(hrnet_checkpoint, strict=False)
+    print('\nLoaded HRNet weights from', paths.HRNET_PATH)
+    hrnet_model.eval()
+    return hrnet_model, kpt_hrnet_cfg

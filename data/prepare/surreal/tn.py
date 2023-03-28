@@ -35,11 +35,12 @@ class SurrealDataGenerator(DataGenerator):
         """
         super().__init__()
 
-    def generate_sample(self, 
-                        idx: int,
-                        gender: str,
-                        clothed_visualizer: ClothedVisualizer
-                        ) -> Tuple[np.ndarray, np.ndarray, PreparedSampleValues]:
+    def generate_sample(
+            self, 
+            idx: int,
+            gender: str,
+            clothed_visualizer: ClothedVisualizer
+        ) -> Tuple[np.ndarray, np.ndarray, PreparedSampleValues]:
         """
         Generate a single training sample.
         """
@@ -57,13 +58,17 @@ class SurrealDataGenerator(DataGenerator):
             style_vector=style_vector,
             cam_t=cam_t     # TODO: Might remove cam_t as a parameter here.
         )
+        joints_2d, joints_conf = self._estimate_2d_joints(rgb_img)
         sample_values = PreparedSampleValues(
             pose=pose,
             shape=shape,
             style_vector=style_vector,
             garment_labels=clothed_visualizer.garment_classes.labels_vector,
+            joints_3d=joints_3d,
+            joints_conf=joints_conf,
+            joints_2d=joints_2d,
             cam_t=cam_t,
-            joints_3d=joints_3d
+            bbox=None
         )
         return rgb_img, seg_maps, sample_values
     

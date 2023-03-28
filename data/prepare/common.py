@@ -2,10 +2,11 @@ from typing import Any, Iterator, List, Tuple, Optional, Dict, Union
 from dataclasses import dataclass, fields
 import numpy as np
 import os
+import torch
 from random import randrange
 
 from configs import paths
-from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
+from configs.const import BBOX_SCALE_FACTOR
 from utils.augmentation.cam_augmentation import augment_cam_t_numpy
 from utils.augmentation.smpl_augmentation import (
     normal_sample_shape_numpy,
@@ -46,6 +47,7 @@ class PreparedSampleValues:
     style_vector: np.ndarray                # (4, 10)
     garment_labels: np.ndarray              # (4,)
     joints_3d: np.ndarray                   # (17, 3)
+    joints_conf: np.ndarray                 # (17,)
     joints_2d: Optional[np.ndarray] = None  # (17, 2)
     cam_t: Optional[np.ndarray] = None      # (3,)
     bbox: Optional[np.ndarray] = None       # (2, 2)
@@ -157,6 +159,8 @@ class DataGenerator(object):
         self._init_useful_arrays()
         self.poses = self._load_poses()
         self.num_poses = self.poses.shape[0]
+        # TODO (kbartol): The detector should be moved to GPU and ran there.
+        self.kpt_model, self.kpt_cfg = self._get_kpt_model(self.cfg)
 
     def _load_poses(self) -> np.ndarray:
         """

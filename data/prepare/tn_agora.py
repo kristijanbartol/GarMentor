@@ -422,58 +422,6 @@ def get_projected_data(
     )
 
 
-def prepare_sample(
-        df_row: Series, 
-        jdx: int
-    ) -> Tuple[np.ndarray, PreparedSampleValues]:
-    """
-    Create an array of prepared values, which consists of:
-    - pose parameters
-    - shape parameters
-    - style vector
-    - garment labels
-    - camera translations (dummy value for AGORA-like data)
-    - 3D joints
-    """
-    smpl_gt_path = df_row.at['gt_path_smpl'][jdx]
-    with open(smpl_gt_path, 'rb') as pkl_f:
-        smpl_gt = pickle.load(pkl_f)
-        pose_rot = smpl_gt['full_pose'][0].cpu().detach().numpy().from_matrix()
-        pose = R.as_rotvec(pose_rot)
-        shape = smpl_gt['betas'][0].cpu().detach().numpy()
-
-    garment_combination = df_row.at['garment_combinations'][jdx]
-    garment_styles = df_row.at['garment_styles'][jdx]
-    garment_classes = GarmentClasses(
-        upper_class=garment_combination['upper'],
-        lower_class=garment_combination['lower']
-    )
-    style_vector = garment_classes.to_style_vector(
-        upper_style=garment_styles['upper'],
-        lower_style=garment_styles['lower']
-    )
-    cam_t = np.zeros(shape=(3,), dtype=np.float32)
-    bbox, joints_2d, joints_3d = get_projected_data(
-        df_row=df_row,
-        jdx=jdx
-    )
-    sample_values = PreparedSampleValues(
-        pose=pose,
-        shape=shape,
-        style_vector=style_vector,
-        garment_labels=garment_classes.labels_vector,
-        cam_t=cam_t,
-        joints_3d=joints_3d,
-        joints_2d=joints_2d,
-        bbox=bbox
-    )
-    img_path = os.path.join(paths.AGORA_IMG_DIR, df_row['imgPath'])
-    img = cv2.imread(img_path)
-    img_crop = img[bbox[0][0]:bbox[0][1], bbox[1][0]:bbox[1][1]] # type: ignore
-
-    return img_crop, sample_values
-
-
 class AGORAPreparator():
 
     """
@@ -524,6 +472,61 @@ class AGORAPreparator():
                 )
             )
 
+    def prepare_sample(
+            self,
+            df_row: Series, 
+            jdx: int
+        ) -> Tuple[np.ndarray, PreparedSampleValues]:
+        """
+        Create an array of prepared values, which consists of:
+        - pose parameters
+        - shape parameters
+        - style vector
+        - garment labels
+        - camera translations (dummy value for AGORA-like data)
+        - 3D joints
+        """
+        smpl_gt_path = df_row.at['gt_path_smpl'][jdx]
+        with open(smpl_gt_path, 'rb') as pkl_f:
+            smpl_gt = pickle.load(pkl_f)
+            pose_rot = smpl_gt['full_pose'][0].cpu().detach().numpy().from_matrix()
+            pose = R.as_rotvec(pose_rot)
+            shape = smpl_gt['betas'][0].cpu().detach().numpy()
+
+        garment_combination = df_row.at['garment_combinations'][jdx]
+        garment_styles = df_row.at['garment_styles'][jdx]
+        garment_classes = GarmentClasses(
+            upper_class=garment_combination['upper'],
+            lower_class=garment_combination['lower']
+        )
+        style_vector = garment_classes.to_style_vector(
+            upper_style=garment_styles['upper'],
+            lower_style=garment_styles['lower']
+        )
+        cam_t = np.zeros(shape=(3,), dtype=np.float32)
+        bbox, joints_2d, joints_3d = get_projected_data(
+            df_row=df_row,
+            jdx=jdx
+        )
+        img_path = os.path.join(paths.AGORA_IMG_DIR, df_row['imgPath'])
+        img = cv2.imread(img_path)
+        img_crop = img[bbox[0][0]:bbox[0][1], bbox[1][0]:bbox[1][1]] # type: ignore
+
+        # NOTE: The crop in case of using 2D detector might be bigger as the
+        #       detector anyways produces its own crop.
+        joints_2d, joints_conf = self._estimate_2d_joints(img_crop)
+        sample_values = PreparedSampleValues(
+            pose=pose,
+            shape=shape,
+            style_vector=style_vector,
+            garment_labels=garment_classes.labels_vector,
+            cam_t=cam_t,
+            joints_3d=joints_3d,
+            joints_2d=joints_2d,
+            bbox=bbox
+        )
+        return img_crop, sample_values
+
     def prepare(
             self,
             gender: str,
@@ -549,7 +552,10 @@ class AGORAPreparator():
                 for jdx in range(len(df.iloc[idx]['isValid'])):
                     if samples_counter < num_generated:
                         samples_counter += 1
-                    img_crop, sample_values = prepare_sample(df.iloc[idx], jdx)
+                    img_crop, sample_values = self.prepare_sample(
+                        df_row=df.iloc[idx], 
+                        jdx=jdx
+                    )
                     _gender = df.iloc[idx]['gender'][jdx]
                     if _gender == gender:
                         self._save_sample(

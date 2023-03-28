@@ -19,6 +19,9 @@ VAL_POSES_PATH = '/data/hierprob3d/training/smpl_val_poses.npz'
 VAL_TEXTURES_PATH = '/data/hierprob3d/training/smpl_val_textures.npz'
 VAL_BACKGROUNDS_PATH = '/data/hierprob3d/training/lsun_backgrounds/val'
 
+# 2D keypoint detector path
+HRNET_PATH = '/data/hierprob3d/pose_hrnet_w48_384x288.pth'
+
 # Data directories
 """ 
 Train dataset abstract class containing only common constants.

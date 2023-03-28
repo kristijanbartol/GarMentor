@@ -1,6 +1,8 @@
+from typing import Dict
 import torch
 from torchvision import transforms
 
+from configs.const import BBOX_SCALE_FACTOR
 from utils.image_utils import convert_bbox_corners_to_centre_hw_torch, batch_crop_pytorch_affine
 
 
@@ -71,13 +73,13 @@ def predict_hrnet(hrnet_model,
                 pred_width = all_pred_widths[0]
             except IndexError:
                 print("Could not find person bounding box - using entire image!")
-                pred_centre = torch.tensor(image.shape[1:], device=image.device, dtype=torch.float32) * 0.5
-                pred_height = torch.tensor(image_height, device=image.device, dtype=torch.float32)
-                pred_width = torch.tensor(image_width, device=image.device, dtype=torch.float32)
+                pred_centre = torch.Tensor(image.shape[1:], device=image.device, dtype=torch.float32) * 0.5
+                pred_height = torch.Tensor(image_height, device=image.device, dtype=torch.float32)
+                pred_width = torch.Tensor(image_width, device=image.device, dtype=torch.float32)
     else:
-        pred_centre = torch.tensor(image.shape[1:], device=image.device, dtype=torch.float32) * 0.5
-        pred_height = torch.tensor(image_height, device=image.device, dtype=torch.float32)
-        pred_width = torch.tensor(image_width, device=image.device, dtype=torch.float32)
+        pred_centre = torch.Tensor(image.shape[1:], device=image.device, dtype=torch.float32) * 0.5
+        pred_height = torch.Tensor(image_height, device=image.device, dtype=torch.float32)
+        pred_width = torch.Tensor(image_width, device=image.device, dtype=torch.float32)
 
     # Convert box to be same aspect ratio as HrNet input
     aspect_ratio = float(hrnet_config.MODEL.IMAGE_SIZE[1]) / float(hrnet_config.MODEL.IMAGE_SIZE[0])
@@ -116,4 +118,15 @@ def predict_hrnet(hrnet_model,
     return output
 
 
+def estimate_2d_pose(
+        self,
+        rgb_img: np.ndarray
+    ) -> Dict[str, np.ndarray]:
+    return predict_hrnet(
+        hrnet_model=self.kpt_model,
+        hrnet_config=self.kpt_cfg,
+        object_detect_model=None,
+        image=rgb_img,
+        bbox_scale_factor=BBOX_SCALE_FACTOR
+    )
 
