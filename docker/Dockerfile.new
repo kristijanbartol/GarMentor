@@ -1,7 +1,8 @@
 FROM pytorch/pytorch:1.11.0-cuda11.3-cudnn8-devel
 
 # needed to allow apt update
-RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
+#RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
+RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys A4B469963BF863CC
 
 RUN apt update && apt install -y git \
     ninja-build \
