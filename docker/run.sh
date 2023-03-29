@@ -1,8 +1,8 @@
 #!/bin/bash
 
 if [[ "$USER" == "kristijan" ]]; then
-	REPO_DIR=/media/kristijan/kristijan-hdd-ex/garmentor/
-	BASE_DATA_DIR=/media/kristijan/kristijan-hdd-ex/datasets/
+	REPO_DIR=/media/kristijan/garmentor/
+	BASE_DATA_DIR=/media/kristijan/data/
 	PW3D_DIR=${BASE_DATA_DIR}/3dpw/
 	SSP3D_DIR=${BASE_DATA_DIR}/SSP-3D/
 	TAILORNET_DATA_DIR=${BASE_DATA_DIR}/tailornet

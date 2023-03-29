@@ -2,7 +2,10 @@ from typing import Dict
 import torch
 from torchvision import transforms
 
-from configs.const import BBOX_SCALE_FACTOR
+from configs.const import (
+    BBOX_SCALE_FACTOR,
+    OBJECT_DETECT_THRESHOLD
+)
 from utils.image_utils import convert_bbox_corners_to_centre_hw_torch, batch_crop_pytorch_affine
 
 
@@ -36,8 +39,8 @@ def predict_hrnet(hrnet_model,
                   hrnet_config,
                   image,
                   object_detect_model=None,
-                  object_detect_threshold=0.8,
-                  bbox_scale_factor=1.2):
+                  object_detect_threshold=OBJECT_DETECT_THRESHOLD,
+                  bbox_scale_factor=BBOX_SCALE_FACTOR):
     """
     :param hrnet_model:
     :param object_detect_model:
@@ -73,13 +76,13 @@ def predict_hrnet(hrnet_model,
                 pred_width = all_pred_widths[0]
             except IndexError:
                 print("Could not find person bounding box - using entire image!")
-                pred_centre = torch.Tensor(image.shape[1:], device=image.device, dtype=torch.float32) * 0.5
-                pred_height = torch.Tensor(image_height, device=image.device, dtype=torch.float32)
-                pred_width = torch.Tensor(image_width, device=image.device, dtype=torch.float32)
-    else:
-        pred_centre = torch.Tensor(image.shape[1:], device=image.device, dtype=torch.float32) * 0.5
-        pred_height = torch.Tensor(image_height, device=image.device, dtype=torch.float32)
-        pred_width = torch.Tensor(image_width, device=image.device, dtype=torch.float32)
+                pred_centre = torch.Tensor(image.shape[1:], device=image.device, dtype=torch.float32) * 0.5 # type: ignore
+                pred_height = torch.Tensor(image_height, device=image.device, dtype=torch.float32) # type: ignore
+                pred_width = torch.Tensor(image_width, device=image.device, dtype=torch.float32) # type: ignore
+    else: 
+        pred_centre = torch.Tensor(image.shape[1:], device=image.device, dtype=torch.float32) * 0.5 # type: ignore
+        pred_height = torch.Tensor(image_height, device=image.device, dtype=torch.float32) # type: ignore
+        pred_width = torch.Tensor(image_width, device=image.device, dtype=torch.float32) # type: ignore
 
     # Convert box to be same aspect ratio as HrNet input
     aspect_ratio = float(hrnet_config.MODEL.IMAGE_SIZE[1]) / float(hrnet_config.MODEL.IMAGE_SIZE[0])
@@ -116,17 +119,3 @@ def predict_hrnet(hrnet_model,
               'bbox_width': pred_width}
 
     return output
-
-
-def estimate_2d_pose(
-        self,
-        rgb_img: np.ndarray
-    ) -> Dict[str, np.ndarray]:
-    return predict_hrnet(
-        hrnet_model=self.kpt_model,
-        hrnet_config=self.kpt_cfg,
-        object_detect_model=None,
-        image=rgb_img,
-        bbox_scale_factor=BBOX_SCALE_FACTOR
-    )
-

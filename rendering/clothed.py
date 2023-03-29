@@ -1,5 +1,5 @@
 from typing import Dict, Tuple, List
-
+import torch
 import numpy as np
 
 from data.mesh_managers.colored_garments import ColoredGarmentsMeshManager
@@ -75,7 +75,7 @@ class ClothedRenderer(Renderer):
             garment_classes: GarmentClasses,
             *args,
             **kwargs
-        ) -> Tuple[np.ndarray, np.ndarray]:
+        ) -> Tuple[torch.Tensor, np.ndarray]:
         '''Render RGB images of clothed meshes, single-colored piece-wise.'''
         self._process_optional_arguments(*args, **kwargs)
 
@@ -92,7 +92,7 @@ class ClothedRenderer(Renderer):
                 mesh, 
                 lights=self.lights_rgb_render
             )[:, :, :, :3]
-            rgbs.append(rgb_image[0].cpu().numpy())
+            rgbs.append(rgb_image)
             
         seg_maps = self._extract_seg_maps(rgbs)
         feature_maps = self._organize_seg_maps(seg_maps, garment_classes)

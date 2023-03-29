@@ -1,4 +1,9 @@
-from typing import Tuple, Optional
+from typing import (
+    Tuple, 
+    Optional, 
+    Union
+)
+from torch import Tensor
 import numpy as np
 from PIL import (
     Image, 
@@ -61,6 +66,7 @@ class ClothedVisualizer(Visualizer2D):
             gender=gender, 
             garment_classes=self.garment_classes
         )
+        assert(device != 'cpu')
         self.device = device
         self.renderer = ClothedRenderer(device=self.device)
         self.img_wh = img_wh
@@ -82,8 +88,9 @@ class ClothedVisualizer(Visualizer2D):
             pose: np.ndarray, 
             shape: np.ndarray, 
             style_vector: np.ndarray,
-            cam_t: Optional[np.ndarray] = None
-        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+            cam_t: Optional[np.ndarray] = None,
+            keep_gpu: Optional[bool] = False
+        ) -> Tuple[Union[np.ndarray, Tensor], np.ndarray, np.ndarray]:
         """
         Visualize clothed mesh(es).
         
@@ -104,6 +111,9 @@ class ClothedVisualizer(Visualizer2D):
             self.parametric_model.garment_classes,
             cam_t
         )
+        if not keep_gpu:
+            rgb_img = rgb_img[0].cpu().numpy()
+
         return (
             rgb_img, 
             seg_maps,

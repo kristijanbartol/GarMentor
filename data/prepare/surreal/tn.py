@@ -1,6 +1,7 @@
-from typing import Tuple
+from typing import Tuple, Union
 import numpy as np
 import torch
+from torch import Tensor
 import torch.cuda
 import os
 import sys
@@ -16,6 +17,7 @@ from data.prepare.common import (
     PreparedValuesArray
 )
 from data.prepare.common import DataGenerator
+from predict.predict_hrnet import predict_hrnet
 from utils.garment_classes import GarmentClasses
 from vis.visualizers.clothed import ClothedVisualizer
 
@@ -29,11 +31,18 @@ class SurrealDataGenerator(DataGenerator):
     DATASET_NAME = SURREAL_DATASET_NAME
     CHECKPOINT_COUNT = 100
 
-    def __init__(self):
+    def __init__(
+            self,
+            device='cuda:0',
+            preextract_kpt=False
+        ) -> None:
         """
         Initialize superclass and create clothed renderer.
         """
-        super().__init__()
+        assert((device != 'cpu' and preextract_kpt) or \
+            (device == 'cpu' and not preextract_kpt))
+        super().__init__(preextract_kpt=preextract_kpt)
+        self.device = device
 
     def generate_sample(
             self, 
@@ -56,21 +65,33 @@ class SurrealDataGenerator(DataGenerator):
             pose=pose,
             shape=shape,
             style_vector=style_vector,
-            cam_t=cam_t     # TODO: Might remove cam_t as a parameter here.
+            cam_t=cam_t,     # TODO: Might remove cam_t as a parameter here.
+            keep_gpu=True
         )
-        joints_2d, joints_conf = self._estimate_2d_joints(rgb_img)
+        if self.kpt_model is not None:
+            hrnet_dict = predict_hrnet(
+                hrnet_model=self.kpt_model,
+                hrnet_config=self.kpt_cfg,
+                image=rgb_img
+            )
+            rgb_img = rgb_img[0].cpu().numpy()
+        
         sample_values = PreparedSampleValues(
             pose=pose,
             shape=shape,
             style_vector=style_vector,
             garment_labels=clothed_visualizer.garment_classes.labels_vector,
             joints_3d=joints_3d,
-            joints_conf=joints_conf,
-            joints_2d=joints_2d,
+            joints_conf=hrnet_dict['joints2Dconfs'], #type:ignore
+            joints_2d=hrnet_dict['joints2D'], #type:ignore
             cam_t=cam_t,
             bbox=None
         )
-        return rgb_img, seg_maps, sample_values
+        return (
+            rgb_img, #type:ignore
+            seg_maps, 
+            sample_values
+        )
     
     @staticmethod
     def _create_dirs(
@@ -197,7 +218,7 @@ class SurrealDataGenerator(DataGenerator):
 
         garment_classes = GarmentClasses(upper_class, lower_class)
         clothed_visualizer = ClothedVisualizer(
-            device='cuda:0',
+            device=self.device,
             gender=gender,
             garment_classes=garment_classes
         )
@@ -222,7 +243,8 @@ class SurrealDataGenerator(DataGenerator):
             rgb_img, seg_maps, sample_values = self.generate_sample(
                 idx=pose_idx, 
                 gender=gender, 
-                clothed_visualizer=clothed_visualizer)
+                clothed_visualizer=clothed_visualizer
+            )
             self._save_sample(
                 dataset_dir=dataset_dir, 
                 sample_idx=pose_idx, 

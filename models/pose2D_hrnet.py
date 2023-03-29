@@ -16,7 +16,6 @@ import torch
 import torch.nn as nn
 
 import configs.paths as paths
-from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
 from configs.pose2D_hrnet_config import get_pose2D_hrnet_cfg_defaults
 
 

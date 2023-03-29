@@ -7,6 +7,9 @@ from random import randrange
 
 from configs import paths
 from configs.const import BBOX_SCALE_FACTOR
+from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
+from models.pose2D_hrnet import get_pretrained_detector
+from predict.predict_hrnet import predict_hrnet
 from utils.augmentation.cam_augmentation import augment_cam_t_numpy
 from utils.augmentation.smpl_augmentation import (
     normal_sample_shape_numpy,
@@ -148,7 +151,10 @@ class DataGenerator(object):
                         {idx:5d}_{garment_class}.png
     """
 
-    def __init__(self):
+    def __init__(
+            self,
+            preextract_kpt=False
+        ):
         self.dataset_path_template = os.path.join(
             paths.DATA_ROOT_DIR,
             '{dataset_name}',
@@ -159,8 +165,8 @@ class DataGenerator(object):
         self._init_useful_arrays()
         self.poses = self._load_poses()
         self.num_poses = self.poses.shape[0]
-        # TODO (kbartol): The detector should be moved to GPU and ran there.
-        self.kpt_model, self.kpt_cfg = self._get_kpt_model(self.cfg)
+        if preextract_kpt:
+            self.kpt_model, self.kpt_cfg = get_pretrained_detector()
 
     def _load_poses(self) -> np.ndarray:
         """
@@ -225,6 +231,16 @@ class DataGenerator(object):
             samples_values = PreparedValuesArray()
             num_generated = 0
         return samples_values, num_generated
+
+    def _predict_joints(
+            self,
+            rgb_tensor: torch.Tensor
+        ) -> Dict[str, torch.Tensor]:
+        return predict_hrnet(
+            hrnet_model=self.kpt_model,
+            hrnet_config=self.kpt_cfg,
+            image=rgb_tensor
+        )
     
     @staticmethod
     def _save_values(

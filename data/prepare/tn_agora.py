@@ -17,7 +17,7 @@
 #
 # Contact: ps-license@tuebingen.mpg.de
 #------------------------------------------------------------------------------
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
 from pandas.core.series import Series
 import argparse
 import logging
@@ -43,6 +43,7 @@ from data.prepare.common import (
     PreparedValuesArray
 )
 from data.prepare.common import DataGenerator
+from predict.predict_hrnet import predict_hrnet
 from utils.garment_classes import GarmentClasses
 
 
@@ -92,7 +93,8 @@ def project_2d(
         df_row,
         jdx,
         joints3d,
-        meanPose=False):
+        meanPose=False
+    ) -> Tuple[Union[np.ndarray, None], Union[np.ndarray, None], Union[np.ndarray, None]]:
 
     dslr_sens_width = 36
     dslr_sens_height = 20.25
@@ -109,7 +111,7 @@ def project_2d(
     imgPath = os.path.join(imgBase, df_row['imgPath'])
     if not os.path.exists(imgPath):
         logging.error('Image not found: %s' % imgPath)
-        return None, None
+        return None, None, None
     if 'hdri' in imgPath:
         ground_plane = [0, 0, 0]
         scene3d = False
@@ -354,10 +356,10 @@ def get_smpl_vertices(
             gt[k] = v.detach().cpu().numpy()
 
     smpl_gt = model_gt(
-        betas=torch.Tensor(gt['betas'][:, :num_betas], dtype=torch.float),
-        global_orient=torch.Tensor(gt['global_orient'], dtype=torch.float),
-        body_pose=torch.Tensor(gt['body_pose'], dtype=torch.float),
-        transl=torch.Tensor(gt['transl'], dtype=torch.float), pose2rot=pose2rot
+        betas=torch.Tensor(gt['betas'][:, :num_betas], dtype=torch.float), #type:ignore
+        global_orient=torch.Tensor(gt['global_orient'], dtype=torch.float), #type:ignore
+        body_pose=torch.Tensor(gt['body_pose'], dtype=torch.float), #type:ignore
+        transl=torch.Tensor(gt['transl'], dtype=torch.float), pose2rot=pose2rot #type:ignore
     )
 
     return smpl_gt.joints.detach().cpu().numpy().squeeze()
@@ -368,7 +370,7 @@ def get_projected_joints(
         df_row,
         jdx,
         model_neutral
-    ):
+    ) -> Tuple[Union[np.ndarray, None], Union[np.ndarray, None], Union[np.ndarray, None]]:
     kid_flag = df_row.at['kid'][jdx]
     gender = df_row.at['gender'][jdx]
 
@@ -390,7 +392,7 @@ def get_projected_joints(
 def get_projected_data(
         df_row: Series,
         jdx: int
-    ):
+    ) -> Tuple[Union[np.ndarray, None], Union[np.ndarray, None], Union[np.ndarray, None]]:
     #gt_paths = 'data/Cam'
     gt_paths = ['data/Cam_julien/ground_truth.pkl']
     #img_folder = 'data/images_3840x2160/'
@@ -422,7 +424,7 @@ def get_projected_data(
     )
 
 
-class AGORAPreparator():
+class AGORAPreparator(DataGenerator):
 
     """
     A data preparation class for ClothAGORA.
@@ -431,10 +433,18 @@ class AGORAPreparator():
     DATASET_NAME = 'agora'
     CHECKPOINT_COUNT = 100
 
-    def __init__(self):
+    def __init__(
+            self,
+            device='cuda:0',
+            preextract_kpt=False
+        ) -> None:
         """
         Initialize superclass and create clothed renderer.
         """
+        assert((device != 'cpu' and preextract_kpt) or \
+            (device == 'cpu' and not preextract_kpt))
+        super().__init__(preextract_kpt=preextract_kpt)
+        self.device = device
         self.data_dir = os.path.join(
             paths.DATA_ROOT_DIR,
             self.DATASET_NAME
@@ -514,15 +524,23 @@ class AGORAPreparator():
 
         # NOTE: The crop in case of using 2D detector might be bigger as the
         #       detector anyways produces its own crop.
-        joints_2d, joints_conf = self._estimate_2d_joints(img_crop)
+        joints_conf = np.ones(joints_2d.shape[0]) #type:ignore
+        if self.kpt_model is not None:
+            img_crop = torch.from_numpy(img).float().to(self.device)
+            joints_2d, joints_conf = self._predict_joints(
+                rgb_tensor=img_crop
+            )
+            img_crop = img_crop[0].cpu().numpy()
+
         sample_values = PreparedSampleValues(
             pose=pose,
             shape=shape,
             style_vector=style_vector,
             garment_labels=garment_classes.labels_vector,
             cam_t=cam_t,
-            joints_3d=joints_3d,
-            joints_2d=joints_2d,
+            joints_3d=joints_3d, #type:ignore
+            joints_conf=joints_conf, #type:ignore
+            joints_2d=joints_2d, #type:ignore
             bbox=bbox
         )
         return img_crop, sample_values
