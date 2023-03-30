@@ -47,10 +47,16 @@ RUN pip install --ignore-installed PyYAML \
 	loguru \
 	omegaconf \
 	pickle5 \
-	pandas
+	pandas \
+	mxnet-mkl==1.6.0
 
-# pytorch3d prebuilt wheel
-RUN pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py38_cu113_pyt1110/download.html
+RUN conda install pytorch=1.13.0 torchvision pytorch-cuda=11.6 -c pytorch -c nvidia
+
+RUN conda install -c fvcore -c iopath -c conda-forge fvcore iopath 
+
+RUN conda install -c bottler nvidiacub
+
+RUN conda install pytorch3d -c pytorch3d
 
 # psbody.mesh installation
 RUN mkdir /git && cd /git && git clone https://github.com/MPI-IS/mesh && cd mesh && make all
@@ -62,6 +68,8 @@ RUN cd /git && git clone https://github.com/vchoutas/torch-trust-ncg.git && cd t
 RUN cd /git && git clone https://github.com/vchoutas/smplx && cd smplx && git reset --hard 5fa20519735cceda19afed0beeabd53caef711cd && cd tools && \
 	sed -i "/body_data = / s/pickle.load(body_file)/pickle.load(body_file, encoding='latin1')/" clean_ch.py && \
 	sed -i "s/iteritems/items/g" clean_ch.py
+
+RUN pip install numpy==1.23.1
 
 RUN mkdir -p /garmentor
 
