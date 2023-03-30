@@ -6,7 +6,8 @@ from configs.const import (
     IMG_WH,
     NUM_SMPL_BETAS,
     WP_CAM,
-    BBOX_SCALE_FACTOR
+    BBOX_SCALE_FACTOR,
+    OBJECT_DETECT_THRESHOLD
 )
 
 _C = CfgNode()

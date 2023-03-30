@@ -151,3 +151,6 @@ torch-trust-ncg/
 
 # Pretrained - original
 model_files/poseMF_shapeGaussian_net_weights.tar
+
+# Temporary
+git_token

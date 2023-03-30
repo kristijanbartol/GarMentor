@@ -7,8 +7,7 @@ import os
 import sys
 import argparse
 
-_module_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(_module_dir))
+sys.path.append('/garmentor')
 
 from configs.const import SURREAL_DATASET_NAME
 import configs.paths as paths
