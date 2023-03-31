@@ -441,8 +441,6 @@ class AGORAPreparator(DataGenerator):
         """
         Initialize superclass and create clothed renderer.
         """
-        assert((device != 'cpu' and preextract_kpt) or \
-            (device == 'cpu' and not preextract_kpt))
         super().__init__(preextract_kpt=preextract_kpt)
         self.device = device
         self.data_dir = os.path.join(
@@ -514,20 +512,22 @@ class AGORAPreparator(DataGenerator):
             lower_style=garment_styles['lower']
         )
         cam_t = np.zeros(shape=(3,), dtype=np.float32)
-        bbox, joints_2d, joints_3d = get_projected_data(
+        crop_coord, joints_2d, joints_3d = get_projected_data(
             df_row=df_row,
             jdx=jdx
         )
         img_path = os.path.join(paths.AGORA_IMG_DIR, df_row['imgPath'])
         img = cv2.imread(img_path)
-        img_crop = img[bbox[0][0]:bbox[0][1], bbox[1][0]:bbox[1][1]] # type: ignore
+        img_crop = img[crop_coord[0][0]:crop_coord[0][1], # type: ignore
+                       crop_coord[1][0]:crop_coord[1][1]] # type: ignore
 
         # NOTE: The crop in case of using 2D detector might be bigger as the
         #       detector anyways produces its own crop.
+        bbox = None
         joints_conf = np.ones(joints_2d.shape[0]) #type:ignore
-        if self.kpt_model is not None:
+        if self.preextract_kpt:
             img_crop = torch.from_numpy(img).float().to(self.device)
-            joints_2d, joints_conf = self._predict_joints(
+            joints_2d, joints_conf, bbox = self._predict_joints(
                 rgb_tensor=img_crop
             )
             img_crop = img_crop[0].cpu().numpy()
@@ -541,7 +541,7 @@ class AGORAPreparator(DataGenerator):
             joints_3d=joints_3d, #type:ignore
             joints_conf=joints_conf, #type:ignore
             joints_2d=joints_2d, #type:ignore
-            bbox=bbox
+            bbox=bbox #type:ignore
         )
         return img_crop, sample_values
 

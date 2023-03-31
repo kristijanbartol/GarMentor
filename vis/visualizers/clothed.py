@@ -88,9 +88,8 @@ class ClothedVisualizer(Visualizer2D):
             pose: np.ndarray, 
             shape: np.ndarray, 
             style_vector: np.ndarray,
-            cam_t: Optional[np.ndarray] = None,
-            keep_gpu: Optional[bool] = False
-        ) -> Tuple[Union[np.ndarray, Tensor], np.ndarray, np.ndarray]:
+            cam_t: Optional[np.ndarray] = None
+        ) -> Tuple[Tensor, np.ndarray, np.ndarray]:
         """
         Visualize clothed mesh(es).
         
@@ -107,13 +106,11 @@ class ClothedVisualizer(Visualizer2D):
             style_vector=style_vector
         )
         rgb_img, seg_maps = self.renderer(
-            smpl_output_dict,
-            self.parametric_model.garment_classes,
-            cam_t
+            smpl_output_dict=smpl_output_dict,
+            garment_classes=self.parametric_model.garment_classes,
+            cam_t=cam_t,
+            device=self.device
         )
-        if not keep_gpu:
-            rgb_img = rgb_img[0].cpu().numpy()
-
         return (
             rgb_img, 
             seg_maps,

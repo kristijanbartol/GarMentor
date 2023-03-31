@@ -1,5 +1,6 @@
 from typing import Dict
 import torch
+import numpy as np
 from torchvision import transforms
 
 from configs.const import (
@@ -111,11 +112,12 @@ def predict_hrnet(hrnet_model,
     # Rescale 2D joint locations back to HRNet input size
     pred_joints2D *= hrnet_config.MODEL.IMAGE_SIZE[0] / hrnet_config.MODEL.HEATMAP_SIZE[0]
 
+    bbox = np.array([[pred_centre - pred_width/2, pred_centre + pred_width/2], 
+                     [pred_centre - pred_height/2, pred_centre + pred_height/2]], dtype=np.float32)
+
     output = {'joints2D': pred_joints2D[0],
               'joints2Dconfs': pred_joints2Dconfs[0],
               'cropped_image': image,
-              'bbox_centre': pred_centre,
-              'bbox_height': pred_height,
-              'bbox_width': pred_width}
+              'bbox': bbox}
 
     return output

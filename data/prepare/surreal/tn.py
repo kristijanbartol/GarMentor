@@ -32,16 +32,13 @@ class SurrealDataGenerator(DataGenerator):
 
     def __init__(
             self,
-            device='cuda:0',
             preextract_kpt=False
         ) -> None:
         """
         Initialize superclass and create clothed renderer.
         """
-        assert((device != 'cpu' and preextract_kpt) or \
-            (device == 'cpu' and not preextract_kpt))
         super().__init__(preextract_kpt=preextract_kpt)
-        self.device = device
+        self.device = 'cuda:0'
 
     def generate_sample(
             self, 
@@ -65,15 +62,15 @@ class SurrealDataGenerator(DataGenerator):
             shape=shape,
             style_vector=style_vector,
             cam_t=cam_t,     # TODO: Might remove cam_t as a parameter here.
-            keep_gpu=True
         )
-        if self.kpt_model is not None:
-            hrnet_dict = predict_hrnet(
-                hrnet_model=self.kpt_model,
-                hrnet_config=self.kpt_cfg,
-                image=rgb_img
+        bbox = None
+        joints_2d = None
+        joints_conf = np.ones(joints_3d.shape[0])
+        if self.preextract_kpt:
+            joints_2d, joints_conf, bbox = self._predict_joints(
+                rgb_tensor=rgb_img
             )
-            rgb_img = rgb_img[0].cpu().numpy()
+        rgb_img = rgb_img[0].cpu().numpy()
         
         sample_values = PreparedSampleValues(
             pose=pose,
@@ -81,13 +78,13 @@ class SurrealDataGenerator(DataGenerator):
             style_vector=style_vector,
             garment_labels=clothed_visualizer.garment_classes.labels_vector,
             joints_3d=joints_3d,
-            joints_conf=hrnet_dict['joints2Dconfs'], #type:ignore
-            joints_2d=hrnet_dict['joints2D'], #type:ignore
+            joints_conf=joints_conf,
+            joints_2d=joints_2d,
             cam_t=cam_t,
-            bbox=None
+            bbox=bbox
         )
         return (
-            rgb_img, #type:ignore
+            rgb_img,
             seg_maps, 
             sample_values
         )
@@ -266,9 +263,13 @@ if __name__ == '__main__':
                         help='Lower class string.')
     parser.add_argument('--num_samples', '-N', type=int, default=None,
                         help='Number of samples to have for the class after the generation is done.')
+    parser.add_argument('--preextract', dest='preextract', action='store_true', 
+                        help='Whether to pre-extract 2D joint using HRNet pose detector.')
     args = parser.parse_args()
     
-    surreal_generator = SurrealDataGenerator()
+    surreal_generator = SurrealDataGenerator(
+        preextract_kpt=args.preextract
+    )
     surreal_generator.generate(
         gender=args.gender,
         upper_class=args.upper_class,

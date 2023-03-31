@@ -165,6 +165,7 @@ class DataGenerator(object):
         self._init_useful_arrays()
         self.poses = self._load_poses()
         self.num_poses = self.poses.shape[0]
+        self.preextract_kpt = preextract_kpt
         if preextract_kpt:
             self.kpt_model, self.kpt_cfg = get_pretrained_detector()
 
@@ -235,11 +236,16 @@ class DataGenerator(object):
     def _predict_joints(
             self,
             rgb_tensor: torch.Tensor
-        ) -> Dict[str, torch.Tensor]:
-        return predict_hrnet(
+        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        hrnet_output = predict_hrnet(
             hrnet_model=self.kpt_model,
             hrnet_config=self.kpt_cfg,
             image=rgb_tensor
+        )
+        return (
+            hrnet_output['joints2D'].cpu().numpy(),
+            hrnet_output['joints2Dconfs'].cpu().numpy(),
+            hrnet_output['bbox']
         )
     
     @staticmethod
