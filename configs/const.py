@@ -25,3 +25,6 @@ TRAIN = 'train'
 VALID = 'valid'
 SURREAL_DATASET_NAME = 'surreal'
 AGORA_DATASET_NAME = 'agora'
+
+AGORA_HEIGHT = 2160
+AGORA_WIDTH = 3840

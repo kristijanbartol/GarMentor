@@ -17,7 +17,14 @@
 #
 # Contact: ps-license@tuebingen.mpg.de
 #------------------------------------------------------------------------------
-from typing import List, Tuple, Optional, Union
+from typing import (
+    Tuple, 
+    Optional, 
+    Union, 
+    Iterator, 
+    Any
+)
+from dataclasses import dataclass, fields
 from pandas.core.series import Series
 import argparse
 import logging
@@ -37,12 +44,17 @@ import smplx
 import itertools
 from scipy.spatial.transform import Rotation as R
 
+from configs.const import (
+    AGORA_HEIGHT,
+    AGORA_WIDTH
+)
 import configs.paths as paths
 from data.prepare.common import (
     PreparedSampleValues,
     PreparedValuesArray
 )
 from data.prepare.common import DataGenerator
+from models.smpl_official import easy_create_smpl_model
 from predict.predict_hrnet import predict_hrnet
 from utils.garment_classes import GarmentClasses
 
@@ -54,10 +66,13 @@ class CPU_Unpickler(pickle.Unpickler):
         else: return super().find_class(module, name)
 
 
-def load_model(args):
-    return smplx.create(args.modelFolder, model_type='smpl',
-                        gender='neutral',
-                        ext='npz')
+def load_model(model_folder: str):
+    return smplx.create(
+        model_path=model_folder, 
+        model_type='smpl',
+        gender='neutral',
+        ext='npz'
+    )
 
 
 def focalLength_mm2px(focalLength, dslr_sens, focalPoint):
@@ -89,66 +104,53 @@ def project_point(joint, RT, KKK):
 
 
 def project_2d(
-        args,
+        img_name,
+        debug,
         df_row,
         jdx,
-        joints3d,
-        meanPose=False
+        joints3d
     ) -> Tuple[Union[np.ndarray, None], Union[np.ndarray, None], Union[np.ndarray, None]]:
 
     dslr_sens_width = 36
     dslr_sens_height = 20.25
-    imgWidth = args.imgWidth
-    imgHeight = args.imgHeight
-    debug_path = args.debug_path
-    imgBase = args.imgFolder
-    imgName = df_row['imgPath']
-    if imgWidth == 1280 and '_1280x720.png' not in imgName:
-        #If 1280x720 images are used then image name needs to be updated
-        imgName = imgName.replace('.png','_1280x720.png')
-        df_row['imgPath']=imgName
 
-    imgPath = os.path.join(imgBase, df_row['imgPath'])
-    if not os.path.exists(imgPath):
-        logging.error('Image not found: %s' % imgPath)
-        return None, None, None
-    if 'hdri' in imgPath:
+    img_path = os.path.join(paths.AGORA_RGB_DIR_PATH, img_name)
+    if 'hdri' in img_path:
         ground_plane = [0, 0, 0]
         scene3d = False
         focalLength = 50
         camPosWorld = [0, 0, 170]
         camYaw = 0
         camPitch = 0
-
-    elif 'cam00' in imgPath:
+    elif 'cam00' in img_path:
         ground_plane = [0, 0, 0]
         scene3d = True
         focalLength = 18
         camPosWorld = [400, -275, 265]
         camYaw = 135
         camPitch = 30
-    elif 'cam01' in imgPath:
+    elif 'cam01' in img_path:
         ground_plane = [0, 0, 0]
         scene3d = True
         focalLength = 18
         camPosWorld = [400, 225, 265]
         camYaw = -135
         camPitch = 30
-    elif 'cam02' in imgPath:
+    elif 'cam02' in img_path:
         ground_plane = [0, 0, 0]
         scene3d = True
         focalLength = 18
         camPosWorld = [-490, 170, 265]
         camYaw = -45
         camPitch = 30
-    elif 'cam03' in imgPath:
+    elif 'cam03' in img_path:
         ground_plane = [0, 0, 0]
         scene3d = True
         focalLength = 18
         camPosWorld = [-490, -275, 265]
         camYaw = 45
         camPitch = 30
-    elif 'ag2' in imgPath:
+    elif 'ag2' in img_path:
         ground_plane = [0, 0, 0]
         scene3d = False
         focalLength = 28
@@ -166,29 +168,29 @@ def project_2d(
         camYaw = df_row['camYaw']
         camPitch = 0
 
-    if meanPose:
-        yawSMPL = 0
-        trans3d = [0, 0, 0]
-    else:
-        yawSMPL = df_row['Yaw'][jdx]
-        trans3d = [df_row['X'][jdx],
-                   df_row['Y'][jdx],
-                   df_row['Z'][jdx]]
+    yawSMPL = df_row['Yaw'][jdx]
+    trans3d = [df_row['X'][jdx],
+                df_row['Y'][jdx],
+                df_row['Z'][jdx]]
 
-    bounding_box, gt2d, gt3d_camCoord = project2d(joints3d, focalLength=focalLength, scene3d=scene3d,
-                                    trans3d=trans3d,
-                                    dslr_sens_width=dslr_sens_width,
-                                    dslr_sens_height=dslr_sens_height,
-                                    camPosWorld=camPosWorld,
-                                    cy=imgHeight / 2,
-                                    cx=imgWidth / 2,
-                                    imgPath=imgPath,
-                                    yawSMPL=yawSMPL,
-                                    ground_plane=ground_plane,
-                                    debug_path=debug_path,
-                                    debug=args.debug,
-                                    jdx=jdx,
-                                    meanPose=meanPose, camPitch=camPitch, camYaw=camYaw)
+    bounding_box, gt2d, gt3d_camCoord = project2d(
+        joints3d=joints3d, 
+        focalLength=focalLength, 
+        scene3d=scene3d,
+        trans3d=trans3d,
+        dslr_sens_width=dslr_sens_width,
+        dslr_sens_height=dslr_sens_height,
+        camPosWorld=camPosWorld,
+        cy=AGORA_HEIGHT / 2,
+        cx=AGORA_WIDTH / 2,
+        imgPath=img_path,
+        yawSMPL=yawSMPL,
+        ground_plane=ground_plane,
+        debug=debug,
+        jdx=jdx,
+        camPitch=camPitch, 
+        camYaw=camYaw
+    )
     return bounding_box, gt2d, gt3d_camCoord
 
 
@@ -229,7 +231,7 @@ def extract_bounding_box(joints_2d: np.ndarray) -> np.ndarray:
 
 
 def project2d(
-        j3d,
+        joints3d,
         focalLength,
         scene3d,
         trans3d,
@@ -238,15 +240,14 @@ def project2d(
         camPosWorld,
         cy,
         cx,
-        imgPath,
+        img_path,
         yawSMPL,
         ground_plane,
-        debug_path,
         debug=False,
         jdx=-1,
-        meanPose=False,
         camPitch=0,
-        camYaw=0):
+        camYaw=0
+    ):
 
     focalLength_x = focalLength_mm2px(focalLength, dslr_sens_width, cx)
     focalLength_y = focalLength_mm2px(focalLength, dslr_sens_height, cy)
@@ -267,16 +268,12 @@ def project2d(
         camPosWorld = unreal2cv2(np.reshape(camPosWorld, (1, 3)))
 
     # get points in camera coordinate system
-    j3d = smpl2opencv(j3d)
+    j3d = smpl2opencv(joints3d)
 
     # scans have a 90deg rotation, but for mean pose from vposer there is no
     # such rotation
-    if meanPose:
-        rotMat, _ = cv2.Rodrigues(
-            np.array([[0, (yawSMPL) / 180 * np.pi, 0]], dtype=float))
-    else:
-        rotMat, _ = cv2.Rodrigues(
-            np.array([[0, ((yawSMPL - 90) / 180) * np.pi, 0]], dtype=float))
+    rotMat, _ = cv2.Rodrigues(
+        np.array([[0, ((yawSMPL - 90) / 180) * np.pi, 0]], dtype=float))
 
     j3d = np.matmul(rotMat, j3d.T).T
     j3d = j3d + trans3d
@@ -299,17 +296,15 @@ def project2d(
 
     if debug:
         import matplotlib.cm as cm
-        if not os.path.exists(debug_path):
-            os.makedirs(debug_path)
 
         if len(j2d) < 200:  # No rendering for verts
-            if not (imgPath is None):
-                img = cv2.imread(imgPath)
+            if not (img_path is None):
+                img = cv2.imread(img_path)
                 img = img[:, :, ::-1]
                 colors = cm.tab20c(np.linspace(0, 1, 25)) # type: ignore
                 fig = plt.figure(dpi=300)
                 ax = fig.add_subplot(111)
-                if not (imgPath is None):
+                if not (img_path is None):
                     ax.imshow(img)
                 for i in range(22):
                     ax.scatter(j2d[i, 0], j2d[i, 1], c=colors[i], s=0.1)
@@ -323,12 +318,12 @@ def project2d(
                     )
                     ax.add_patch(rect)
 
-                if not (imgPath is None):
-                    savename = imgPath.split('/')[-1]
+                if not (img_path is None):
+                    savename = img_path.split('/')[-1]
                     savename = savename.replace('.pkl', '.jpg')
                     plt.savefig(
                         os.path.join(
-                            debug_path,
+                            paths.AGORA_DEBUG_DIR_PATH,
                             'image' +
                             str(jdx) +
                             savename))
@@ -365,63 +360,91 @@ def get_smpl_vertices(
     return smpl_gt.joints.detach().cpu().numpy().squeeze()
 
 
-def get_projected_joints(
-        args,
-        df_row,
-        jdx,
-        model_neutral
-    ) -> Tuple[Union[np.ndarray, None], Union[np.ndarray, None], Union[np.ndarray, None]]:
-    kid_flag = df_row.at['kid'][jdx]
-    gender = df_row.at['gender'][jdx]
+@dataclass
+class AgoraCoordinates:
 
-    smpl_path = os.path.join(
-        args.gt_model_path,
-        df_row.at['gt_path_smpl'][jdx]).replace(
-        '.obj',
-        '.pkl')
-    if torch.cuda.is_available():
-        gt = pickle.load(open(smpl_path, 'rb'))
-    else:
-        gt = CPU_Unpickler(open(smpl_path, 'rb')).load()
-    gt_joints_local = get_smpl_vertices(gt, model_neutral)
+    """
+    An AGORA camera class (structure).
+    """
 
-    bounding_box, gt_joints_cam_2d, gt_joints_cam_3d = project_2d(args, df_row, jdx, gt_joints_local) # type: ignore
-    return bounding_box, gt_joints_cam_2d, gt_joints_cam_3d
+    cam_x: float                      
+    cam_y: float
+    cam_z: float
+    cam_yaw: float
+    trans_x: float
+    trans_y: float
+    trans_z: float
 
+    def __getitem__(
+            self, 
+            key: str
+        ) -> np.ndarray:
+        return getattr(self, key)
 
-def get_projected_data(
-        df_row: Series,
-        jdx: int
-    ) -> Tuple[Union[np.ndarray, None], Union[np.ndarray, None], Union[np.ndarray, None]]:
-    #gt_paths = 'data/Cam'
-    gt_paths = ['data/Cam_julien/ground_truth.pkl']
-    #img_folder = 'data/images_3840x2160/'
-    img_folder = 'data/images_julien/'
+    def get(
+            self, 
+            key, 
+            default=None
+        ) -> Union[Any, None]:
+        return getattr(self, key, default)
 
-    # Parse arguments to mimic the command line arguments.
-    args = argparse.Namespace()
-    args.modelFolder = 'data/model/'
-    args.debug_path = 'data/debug_images/'
-    args.numBetas = 10
-    args.imgHeight = 2160
-    args.imgWidth = 3840
-    args.imgFolder = img_folder
-    args.gt_paths = gt_paths
-    args.modeltype = 'SMPL'
-    args.kid_template_path = 'data/smpl_kid_template.npy'
-    args.gt_model_path = 'data/GT_fits'
-    args.debug = False
-    args.regenerate = False
+    def __iter__(self) -> Iterator[str]:
+        return self.keys()
 
-    model_neutral = load_model(
-        args)
+    def keys(self) -> Iterator[str]:
+        keys = [t.name for t in fields(self)]
+        return iter(keys)
+
+    def values(self) -> Iterator[Any]:
+        values = [getattr(self, t.name) for t in fields(self)]
+        return iter(values)
+
+    def items(self) -> Iterator[Tuple[str, Any]]:
+        data = [(t.name, getattr(self, t.name)) for t in fields(self)]
+        return iter(data)
     
-    return get_projected_joints(
-        args, 
-        df_row,
-        jdx,
-        model_neutral
-    )
+
+@dataclass
+class DfData:
+
+    """
+    A class collecting all the dataframe data.
+    """
+
+    img_name: str
+    pose: np.ndarray                      
+    shape: np.ndarray
+    garment_classes: GarmentClasses
+    style_vector: np.ndarray
+    coordinates: AgoraCoordinates
+
+    def __getitem__(
+            self, 
+            key: str
+        ) -> np.ndarray:
+        return getattr(self, key)
+
+    def get(
+            self, 
+            key, 
+            default=None
+        ) -> Union[Any, None]:
+        return getattr(self, key, default)
+
+    def __iter__(self) -> Iterator[str]:
+        return self.keys()
+
+    def keys(self) -> Iterator[str]:
+        keys = [t.name for t in fields(self)]
+        return iter(keys)
+
+    def values(self) -> Iterator[Any]:
+        values = [getattr(self, t.name) for t in fields(self)]
+        return iter(values)
+
+    def items(self) -> Iterator[Tuple[str, Any]]:
+        data = [(t.name, getattr(self, t.name)) for t in fields(self)]
+        return iter(data)
 
 
 class AGORAPreparator(DataGenerator):
@@ -447,6 +470,16 @@ class AGORAPreparator(DataGenerator):
             paths.DATA_ROOT_DIR,
             self.DATASET_NAME
         )
+        self.smpl_models = {
+            'male': easy_create_smpl_model(
+                gender='male',
+                device=device
+            ),
+            'female': easy_create_smpl_model(
+                gender='female',
+                device=device
+            )
+        }
 
     def _save_sample(
             self, 
@@ -480,6 +513,66 @@ class AGORAPreparator(DataGenerator):
                 )
             )
 
+    def _get_projected_joints(
+            self,
+            gender,
+            gt_3d_fit_path: str,
+            df_row: Series,
+            jdx: int
+        ) -> Tuple[Union[np.ndarray, None], Union[np.ndarray, None], Union[np.ndarray, None]]:
+        gt_3d_fit_path = os.path.join(
+            paths.AGORA_FITS_DIR,
+            df_row.at['gt_path_smpl'][jdx].replace('.obj', '.pkl')
+        )
+        if self.device == 'cpu':
+            gt = CPU_Unpickler(open(gt_3d_fit_path, 'rb')).load()
+        else:
+            gt = pickle.load(open(gt_3d_fit_path, 'rb'))
+        gt_joints_local = get_smpl_vertices(gt, self.smpl_model[gender])
+
+        bounding_box, gt_joints_cam_2d, gt_joints_cam_3d = project_2d(df_row, jdx, gt_joints_local) # type: ignore
+        return bounding_box, gt_joints_cam_2d, gt_joints_cam_3d
+    
+    @staticmethod
+    def _collect_df_data(
+            df_row: Series, 
+            jdx: int
+        ) -> DfData:
+        img_name = os.path.join(paths.AGORA_IMG_DIR, df_row['imgPath'])
+        smpl_gt_path = df_row.at['gt_path_smpl'][jdx]
+        with open(smpl_gt_path, 'rb') as pkl_f:
+            smpl_gt = pickle.load(pkl_f)
+        pose_rot = smpl_gt['full_pose'][0].cpu().detach().numpy().from_matrix()
+        pose = R.as_rotvec(pose_rot)
+        shape = smpl_gt['betas'][0].cpu().detach().numpy()
+
+        garment_combination = df_row.at['garment_combinations'][jdx]
+        garment_styles = df_row.at['garment_styles'][jdx]
+        garment_classes = GarmentClasses(
+            upper_class=garment_combination['upper'],
+            lower_class=garment_combination['lower']
+        )
+        style_vector = garment_classes.to_style_vector(
+            upper_style=garment_styles['upper'],
+            lower_style=garment_styles['lower']
+        )
+        coordinates = AgoraCoordinates(
+            cam_x=df_row['camX'],
+            cam_y=df_row['camY'],
+            cam_z=df_row['camZ'],
+            trans_x=df_row['X'],
+            trans_y=df_row['Y'],
+            trans_z=df_row['Z']
+        )
+        return DfData(
+            img_name=os.path.join(paths.AGORA_IMG_DIR, df_row['imgPath']),
+            pose=R.as_rotvec(pose_rot),
+            shape=smpl_gt['betas'][0].cpu().detach().numpy(),
+            garment_classes=garment_classes,
+            style_vector=style_vector,
+            coordinates=coordinates
+        )
+
     def prepare_sample(
             self,
             df_row: Series, 
@@ -494,35 +587,19 @@ class AGORAPreparator(DataGenerator):
         - camera translations (dummy value for AGORA-like data)
         - 3D joints
         """
-        smpl_gt_path = df_row.at['gt_path_smpl'][jdx]
-        with open(smpl_gt_path, 'rb') as pkl_f:
-            smpl_gt = pickle.load(pkl_f)
-            pose_rot = smpl_gt['full_pose'][0].cpu().detach().numpy().from_matrix()
-            pose = R.as_rotvec(pose_rot)
-            shape = smpl_gt['betas'][0].cpu().detach().numpy()
-
-        garment_combination = df_row.at['garment_combinations'][jdx]
-        garment_styles = df_row.at['garment_styles'][jdx]
-        garment_classes = GarmentClasses(
-            upper_class=garment_combination['upper'],
-            lower_class=garment_combination['lower']
-        )
-        style_vector = garment_classes.to_style_vector(
-            upper_style=garment_styles['upper'],
-            lower_style=garment_styles['lower']
-        )
-        cam_t = np.zeros(shape=(3,), dtype=np.float32)
-        crop_coord, joints_2d, joints_3d = get_projected_data(
+        df_data = self._collect_df_data(
+            df_row=df_row, 
+            jdx=jdx)
+        crop_coord, joints_2d, joints_3d = self._get_projected_joints(
             df_row=df_row,
             jdx=jdx
         )
-        img_path = os.path.join(paths.AGORA_IMG_DIR, df_row['imgPath'])
+        cam_t = np.zeros(shape=(3,), dtype=np.float32)
+
         img = cv2.imread(img_path)
         img_crop = img[crop_coord[0][0]:crop_coord[0][1], # type: ignore
                        crop_coord[1][0]:crop_coord[1][1]] # type: ignore
 
-        # NOTE: The crop in case of using 2D detector might be bigger as the
-        #       detector anyways produces its own crop.
         bbox = None
         joints_conf = np.ones(joints_2d.shape[0]) #type:ignore
         if self.preextract_kpt:
@@ -561,31 +638,35 @@ class AGORAPreparator(DataGenerator):
         samples_values, num_generated = DataGenerator._create_values_array(
             dataset_dir=self.data_dir
         )
-        agora_pkl_files = os.listdir(paths.AGORA_PKL_DIR)
+        scene_pkl_files = os.listdir(paths.AGORA_PKL_DIR)
         samples_counter = 0
-        for df_iter, df_path in tqdm(enumerate(agora_pkl_files)):
-            logging.info(f'Preparing {df_iter}/{len(agora_pkl_files)} df...')
+        for df_iter, df_path in tqdm(enumerate(scene_pkl_files)):
+            logging.info(f'Preparing {df_iter}/{len(scene_pkl_files)} df...')
             df = pandas.read_pickle(df_path)
             for idx in tqdm(range(len(df))):
-                for jdx in range(len(df.iloc[idx]['isValid'])):
-                    if samples_counter < num_generated:
+                for jdx, _gender in enumerate(df.iloc[idx]['gender']):
+                    if _gender != gender:
+                        continue
+                    if samples_counter < num_generated: # NOTE: To avoid regeneration.
                         samples_counter += 1
+
                     img_crop, sample_values = self.prepare_sample(
                         df_row=df.iloc[idx], 
                         jdx=jdx
                     )
-                    _gender = df.iloc[idx]['gender'][jdx]
-                    if _gender == gender:
-                        self._save_sample(
-                            sample_idx=samples_counter, 
-                            rgb_img=img_crop, 
-                            seg_maps=None, 
-                            gender=gender,
-                            sample_values=sample_values,
-                            samples_values=samples_values
-                        )
-                        samples_counter += 1
+                    self._save_sample(
+                        sample_idx=samples_counter, 
+                        rgb_img=img_crop, 
+                        seg_maps=None,  # NOTE: Might do with pretrained cloth seg.
+                        gender=gender,
+                        sample_values=sample_values,
+                        samples_values=samples_values
+                    )
+                    samples_counter += 1
 
 
 if __name__ == '__main__':
-    AGORAPreparator()
+    agora_preparator = AGORAPreparator()
+    agora_preparator.prepare(
+        gender='male'
+    )
