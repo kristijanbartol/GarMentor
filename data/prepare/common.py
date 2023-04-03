@@ -235,18 +235,24 @@ class DataGenerator(object):
 
     def _predict_joints(
             self,
+            apply_detector: bool,
             rgb_tensor: torch.Tensor
         ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        hrnet_output = predict_hrnet(
-            hrnet_model=self.kpt_model,
-            hrnet_config=self.kpt_cfg,
-            image=rgb_tensor
-        )
-        return (
-            hrnet_output['joints2D'].cpu().numpy(),
-            hrnet_output['joints2Dconfs'].cpu().numpy(),
-            hrnet_output['bbox']
-        )
+        if apply_detector:
+            print('Running pose detection...')
+            hrnet_output = predict_hrnet(
+                hrnet_model=self.kpt_model,
+                hrnet_config=self.kpt_cfg,
+                image=rgb_tensor
+            )
+            joints_2d = hrnet_output['joints2D'].detach().cpu().numpy()
+            joints_conf = hrnet_output['joints2Dconfs'].detach().cpu().numpy()
+            bbox = hrnet_output['bbox']
+        else:
+            joints_2d = None
+            joints_conf = np.ones(17,)
+            bbox = None
+        return joints_2d[:, ::-1], joints_conf, bbox # type:ignore
     
     @staticmethod
     def _save_values(

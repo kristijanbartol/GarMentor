@@ -76,7 +76,7 @@ class ClothedRenderer(Renderer):
             device: str,
             *args,
             **kwargs
-        ) -> torch.Tensor:
+        ) -> Tuple[torch.Tensor, np.ndarray]:
         '''Render RGB images of clothed meshes, single-colored piece-wise.'''
         self._process_optional_arguments(*args, **kwargs)
 
@@ -98,7 +98,7 @@ class ClothedRenderer(Renderer):
             )[:, :, :, :3]
             rgbs.append(rgb_image)
             
-        final_rgb = rgbs[-1]
+        final_rgb = rgbs[-1][0]     # NOTE: for now, non-batched rendering
         seg_maps = self._extract_seg_maps([x[0].cpu().numpy() for x in rgbs])
         feature_maps = self._organize_seg_maps(seg_maps, garment_classes)
 

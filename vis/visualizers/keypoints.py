@@ -133,8 +133,7 @@ class KeypointsVisualizer(Visualizer2D):
         Visualize a colored image of keypoints, given coordinates.
         """
         if back_img is None:
-            back_img = np.zeros((3, self.img_wh, self.img_wh))
-        back_img = back_img.transpose((1, 2, 0)).astype(np.uint8).copy()
+            back_img = np.zeros((self.img_wh, self.img_wh, 3))
 
         for idx, color_key in enumerate(KPT_COLORS):
             kpt: Tuple[int, int] = [int(x) for x in kpts[idx]]

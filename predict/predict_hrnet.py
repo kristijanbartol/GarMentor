@@ -77,31 +77,39 @@ def predict_hrnet(hrnet_model,
                 pred_width = all_pred_widths[0]
             except IndexError:
                 print("Could not find person bounding box - using entire image!")
-                pred_centre = torch.Tensor(image.shape[1:], device=image.device, dtype=torch.float32) * 0.5 # type: ignore
-                pred_height = torch.Tensor(image_height, device=image.device, dtype=torch.float32) # type: ignore
-                pred_width = torch.Tensor(image_width, device=image.device, dtype=torch.float32) # type: ignore
+                pred_centre = image.shape[1:]
+                pred_height = image_height
+                pred_width = image_width
+                pred_centre_tensor = torch.Tensor(pred_centre, device=image.device, dtype=torch.float32) * 0.5 # type: ignore
+                pred_height_tensor = torch.Tensor(pred_height, device=image.device, dtype=torch.float32) # type: ignore
+                pred_width_tensor = torch.Tensor(pred_width, device=image.device, dtype=torch.float32) # type: ignore
     else: 
-        pred_centre = torch.Tensor(image.shape[1:], device=image.device, dtype=torch.float32) * 0.5 # type: ignore
-        pred_height = torch.Tensor(image_height, device=image.device, dtype=torch.float32) # type: ignore
-        pred_width = torch.Tensor(image_width, device=image.device, dtype=torch.float32) # type: ignore
+        pred_centre = np.array(image.shape[1:]) * 0.5
+        pred_height = image_height
+        pred_width = image_width
+        pred_centre_tensor = torch.Tensor(list(pred_centre)).float().to(image.device) * 0.5 # type: ignore
+        pred_height_tensor = torch.Tensor([pred_height]).float().to(image.device) # type: ignore
+        pred_width_tensor = torch.Tensor([pred_width]).float().to(image.device) # type: ignore
 
     # Convert box to be same aspect ratio as HrNet input
     aspect_ratio = float(hrnet_config.MODEL.IMAGE_SIZE[1]) / float(hrnet_config.MODEL.IMAGE_SIZE[0])
-    if pred_height > pred_width * aspect_ratio:
-        pred_width = pred_height / aspect_ratio
-    elif pred_height < pred_width * aspect_ratio:
-        pred_height = pred_width * aspect_ratio
+    if pred_height_tensor > pred_width_tensor * aspect_ratio:
+        pred_width_tensor = pred_height_tensor / aspect_ratio
+    elif pred_height_tensor < pred_width_tensor * aspect_ratio:
+        pred_height_tensor = pred_width_tensor * aspect_ratio
 
     # Crop input image to centre-most person box + resize to 384x288 for HRNet input.
+    '''
     image = batch_crop_pytorch_affine(input_wh=(image_width, image_height),
                                       output_wh=(hrnet_config.MODEL.IMAGE_SIZE[0], hrnet_config.MODEL.IMAGE_SIZE[1]),
                                       num_to_crop=1,
                                       device=image.device,
                                       rgb=image[None, :, :, :],
-                                      bbox_centres=pred_centre[None, :],
-                                      bbox_heights=pred_height[None],
-                                      bbox_widths=pred_width[None],
+                                      bbox_centres=pred_centre_tensor[None, :],
+                                      bbox_heights=pred_height_tensor[None],
+                                      bbox_widths=pred_width_tensor[None],
                                       orig_scale_factor=bbox_scale_factor)['rgb'][0]  # (3, 384, 288)
+    '''
 
     # Predict 2D joint heatmaps using HRNet
     transform = transforms.Normalize(mean=[0.485, 0.456, 0.406],
