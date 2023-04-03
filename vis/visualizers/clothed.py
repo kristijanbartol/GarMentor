@@ -1,7 +1,7 @@
 from typing import (
     Tuple, 
     Optional, 
-    Union
+    List
 )
 from torch import Tensor
 import numpy as np
@@ -117,8 +117,8 @@ class ClothedVisualizer(Visualizer2D):
             smpl_output_dict['upper'].joints
         )
     
+    @staticmethod
     def save_vis(
-            self,
             rgb_img: np.ndarray,
             save_path: str
     ) -> None:
@@ -130,8 +130,8 @@ class ClothedVisualizer(Visualizer2D):
         pil_img.save(save_path)
         print(f'Saved clothed image: {save_path}...')
 
+    @staticmethod
     def save_masks(
-            self,
             seg_masks: np.ndarray,
             save_path: str
     ) -> None:
@@ -143,3 +143,16 @@ class ClothedVisualizer(Visualizer2D):
             seg_maps=seg_masks.astype(bool)
         )
         print(f'Saved clothing segmentation masks: {save_path}...')
+
+    @staticmethod
+    def save_masks_as_images(
+            seg_masks: np.ndarray,
+            save_paths: List[str]
+    ) -> None:
+        """
+        Save segmentation masks as .png images for verification.
+        """
+        for seg_idx in range(5):
+            mask_img = (seg_masks[seg_idx] * 255).astype(np.uint8)
+            pil_img = ImageOps.flip(Image.fromarray(mask_img))
+            pil_img.save(save_paths[seg_idx])

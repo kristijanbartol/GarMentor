@@ -40,10 +40,12 @@ Folder hierarchy of the stored data.
 """
 DATA_ROOT_DIR = '/data/garmentor/'
 RGB_DIR = 'rgb/'
+VERIFY_DIR = 'verify/'
 SEG_MAPS_DIR = 'segmentations/'
 
-IMG_NAME_TEMPLATE = '{idx:05d}.png'
-SEG_MAPS_NAME_TEMPLATE = '{idx:05d}.npz'
+IMG_NAME_TEMPLATE = '{sample_idx:05d}.png'
+SEG_MAPS_NAME_TEMPLATE = '{sample_idx:05d}.npz'
+SEG_IMGS_NAME_TEMPLATE = '{sample_idx:05d}-{idx}.png'
 VALUES_FNAME = 'values.npy'
 
 # AGORA paths

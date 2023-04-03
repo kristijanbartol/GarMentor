@@ -19,6 +19,7 @@ from data.prepare.common import DataGenerator
 from predict.predict_hrnet import predict_hrnet
 from utils.garment_classes import GarmentClasses
 from vis.visualizers.clothed import ClothedVisualizer
+from vis.visualizers.keypoints import KeypointsVisualizer
 
 
 class SurrealDataGenerator(DataGenerator):
@@ -90,18 +91,58 @@ class SurrealDataGenerator(DataGenerator):
     def _create_dirs(
             dataset_dir: str, 
             img_dirname: str, 
-            seg_dirname: str
+            seg_dirname: str,
+            verification_dirname: str
         ) -> None:
         """
         Create image and segmentation mask directories.
         """
-        img_dir = os.path.join(dataset_dir, img_dirname)
-        seg_dir = os.path.join(dataset_dir, seg_dirname)
-        
-        if not os.path.exists(img_dir):
-            os.makedirs(img_dir)
-        if not os.path.exists(seg_dir):
-            os.makedirs(seg_dir)
+        for dirname in [img_dirname, seg_dirname, verification_dirname]:
+            dirpath = os.path.join(dataset_dir, dirname)
+            if not os.path.exists(dirpath):
+                os.makedirs(dirpath)
+
+    def _save_verification(
+            self,
+            dataset_dir: str,
+            sample_idx: int,
+            rgb_img: np.ndarray,
+            joints_2d: Union[np.ndarray, None],
+            seg_maps: np.ndarray,
+            clothed_visualizer: ClothedVisualizer
+    ) -> None:
+        """
+        Save RGB (+2D joints) and seg maps as images for verification.
+        """
+        print(f'Saving vefification images and seg maps (#{sample_idx})...')
+        verify_dir_path = os.path.join(
+            dataset_dir,
+            paths.VERIFY_DIR
+        )
+        verify_rgb_path = os.path.join(
+            verify_dir_path,
+            paths.IMG_NAME_TEMPLATE.format(sample_idx=sample_idx)
+        )
+        seg_maps_paths = [os.path.join(
+            verify_dir_path,
+            paths.SEG_IMGS_NAME_TEMPLATE.format(
+                sample_idx=sample_idx,
+                idx=x
+            )) for x in range(5)
+        ]
+        if joints_2d is not None:
+            rgb_img = self.keypoints_visualizer.vis_keypoints(
+                kpts=joints_2d,
+                back_img=rgb_img
+            )
+        self.keypoints_visualizer.save_vis(
+            img=rgb_img,
+            save_path=verify_rgb_path
+        )
+        clothed_visualizer.save_masks_as_images(
+            seg_masks=seg_maps,
+            save_paths=seg_maps_paths
+        )
 
     def _save_sample(
             self, 
@@ -119,7 +160,8 @@ class SurrealDataGenerator(DataGenerator):
         self._create_dirs(
             dataset_dir=dataset_dir,
             img_dirname=paths.RGB_DIR,
-            seg_dirname=paths.SEG_MAPS_DIR
+            seg_dirname=paths.SEG_MAPS_DIR,
+            verification_dirname=paths.VERIFY_DIR
         )
         if rgb_img is not None:
             img_dir = os.path.join(
@@ -128,7 +170,7 @@ class SurrealDataGenerator(DataGenerator):
             )
             img_path = os.path.join(
                 img_dir, 
-                paths.IMG_NAME_TEMPLATE.format(idx=sample_idx)
+                paths.IMG_NAME_TEMPLATE.format(sample_idx=sample_idx)
             )
             clothed_visualizer.save_vis(
                 rgb_img=rgb_img,
@@ -136,7 +178,9 @@ class SurrealDataGenerator(DataGenerator):
             )
         seg_dir = os.path.join(dataset_dir, paths.SEG_MAPS_DIR)
         seg_path = os.path.join(
-            seg_dir, paths.SEG_MAPS_NAME_TEMPLATE.format(idx=sample_idx))
+            seg_dir, paths.SEG_MAPS_NAME_TEMPLATE.format(
+                sample_idx=sample_idx)
+            )
         clothed_visualizer.save_masks(
             seg_masks=seg_maps,
             save_path=seg_path
@@ -144,8 +188,19 @@ class SurrealDataGenerator(DataGenerator):
 
         samples_values.append(sample_values)
         if sample_idx % self.CHECKPOINT_COUNT == 0 and sample_idx != 0:
-            print(f'Saving values on checkpoint #{sample_idx}')
-            self._save_values(samples_values, dataset_dir)
+            self._save_values(
+                samples_values=samples_values, 
+                dataset_dir=dataset_dir,
+                sample_idx=sample_idx
+            )
+            self._save_verification(
+                dataset_dir=dataset_dir,
+                sample_idx=sample_idx,
+                rgb_img=rgb_img, 
+                joints_2d=sample_values.joints_2d, 
+                seg_maps=seg_maps,
+                clothed_visualizer=clothed_visualizer
+            )
             
     def _create_values_array(self, dataset_dir: str
                              ) -> Tuple[PreparedValuesArray, int]:

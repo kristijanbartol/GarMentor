@@ -16,6 +16,7 @@ from utils.augmentation.smpl_augmentation import (
     normal_sample_style_numpy
 )
 from utils.garment_classes import GarmentClasses
+from vis.visualizers.keypoints import KeypointsVisualizer
 
 
 @dataclass
@@ -168,6 +169,7 @@ class DataGenerator(object):
         self.preextract_kpt = preextract_kpt
         if preextract_kpt:
             self.kpt_model, self.kpt_cfg = get_pretrained_detector()
+        self.keypoints_visualizer = KeypointsVisualizer()
 
     def _load_poses(self) -> np.ndarray:
         """
@@ -257,11 +259,13 @@ class DataGenerator(object):
     @staticmethod
     def _save_values(
             samples_values: PreparedValuesArray, 
-            dataset_dir: str
+            dataset_dir: str,
+            sample_idx: int
         ) -> None:
         """
         Save all sample values as a dictionary of numpy arrays.
         """
+        print(f'Saving values on checkpoint #{sample_idx}')
         values_path = os.path.join(dataset_dir, paths.VALUES_FNAME)
         np.save(values_path, samples_values.get())
         print(f'Saved samples values to {values_path}!')

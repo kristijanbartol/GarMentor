@@ -134,6 +134,8 @@ class KeypointsVisualizer(Visualizer2D):
         """
         if back_img is None:
             back_img = np.zeros((self.img_wh, self.img_wh, 3))
+        if back_img.max() < 1:
+            back_img = (back_img * 255).astype(np.uint8)
 
         for idx, color_key in enumerate(KPT_COLORS):
             kpt: Tuple[int, int] = [int(x) for x in kpts[idx]]
