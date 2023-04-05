@@ -51,15 +51,45 @@ SEG_IMGS_NAME_TEMPLATE = '{sample_idx:05d}-{idx}.png'
 VALUES_FNAME = 'values.npy'
 
 # AGORA paths
-AGORA_ROOT_DIR = os.path.join(DATA_ROOT_DIR, 'agora/')
-AGORA_FULL_IMG_DIR = os.path.join(AGORA_ROOT_DIR, 'full_img/')
-AGORA_FITS_DIR = os.path.join(AGORA_ROOT_DIR, 'fits_3d/')
+AGORA_ROOT_DIR = os.path.join(
+    DATA_ROOT_DIR, 
+    'agora/'
+)
+AGORA_FULL_IMG_ROOT_DIR = os.path.join(
+    AGORA_ROOT_DIR, 
+    'full_img/'
+)
+AGORA_FITS_DIR = os.path.join(
+    AGORA_ROOT_DIR, 
+    'fits_3d/'
+)
 
-AGORA_PKL_DIR = os.path.join(AGORA_ROOT_DIR, 'pkl/')
-AGORA_GT_DIR = os.path.join(AGORA_PKL_DIR, 'gt/')
-AGORA_CAM_DIR = os.path.join(AGORA_PKL_DIR, 'camera/')
+AGORA_PKL_DIR = os.path.join(
+    AGORA_ROOT_DIR, 
+    'pkl/'
+)
+AGORA_GT_DIR = os.path.join(
+    AGORA_PKL_DIR, 
+    'gt/'
+)
+AGORA_CAM_DIR = os.path.join(
+    AGORA_PKL_DIR, 
+    'camera/'
+)
 
-AGORA_PREPARED_DIR = os.path.join(AGORA_ROOT_DIR, 'prepared/')
-AGORA_VALUES_PATH = os.path.join(AGORA_PREPARED_DIR, 'values.npy')
-AGORA_RGB_DIR_PATH = os.path.join(AGORA_PREPARED_DIR, 'rgb/')
-AGORA_DEBUG_DIR_PATH = os.path.join(AGORA_PREPARED_DIR, 'debug/')
+AGORA_PREPARED_DIR = os.path.join(
+    AGORA_ROOT_DIR, 
+    'prepared/'
+)
+AGORA_DEBUG_DIR_PATH = os.path.join(
+    AGORA_PREPARED_DIR, 
+    'debug/'
+)
+
+RESOLUTION_TEMPLATE = '{resolution}'    # "H x W"
+SCENE_NAME_TEMPLATE = '{scene_name}'
+AGORA_FULL_IMG_DIR_TEMPLATE = os.path.join(
+    AGORA_FULL_IMG_ROOT_DIR, 
+    SCENE_NAME_TEMPLATE,
+    RESOLUTION_TEMPLATE
+)

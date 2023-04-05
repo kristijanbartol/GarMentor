@@ -65,7 +65,6 @@ class SurrealDataGenerator(DataGenerator):
             cam_t=cam_t,     # TODO: Might remove cam_t as a parameter here.
         )
         joints_2d, joints_conf, bbox = self._predict_joints(
-            apply_detector=self.preextract_kpt,
             rgb_tensor=torch.swapaxes(rgb_img, 0, 2),
         )
         rgb_img = rgb_img.cpu().numpy()
