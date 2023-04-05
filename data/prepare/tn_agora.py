@@ -623,7 +623,9 @@ class AGORAPreparator(DataGenerator):
 
 
 if __name__ == '__main__':
-    agora_preparator = AGORAPreparator()
+    agora_preparator = AGORAPreparator(
+        preextract_kpt=False
+    )
     agora_preparator.prepare(
         gender='male',
         resolution_label='normal'
