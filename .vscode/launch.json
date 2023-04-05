@@ -54,7 +54,8 @@
                 "-G", "male", 
                 "-U", "shirt", 
                 "-L", "short-pant", 
-                "-N", "10000"
+                "-N", "10000",
+                "--preextract"
             ]
         },
 

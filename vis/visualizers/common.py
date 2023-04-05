@@ -5,7 +5,7 @@ import numpy as np
 from psbody.mesh import Mesh
 
 try:
-    from smplx.body_models import ModelOutput as SMPLOutput
+    from smplx.body_models import ModelOutput as SMPLOutput # type: ignore
 except ImportError:
     from smplx.utils import SMPLOutput
 
@@ -77,12 +77,14 @@ class Visualizer2D(Visualizer):
 
     def __init__(
             self,
-            backgrounds_dir_path: str = None
+            img_wh: int = 256,
+            backgrounds_dir_path: Optional[str] = None
     ) -> None:
         """
         All the 2D visualizers need background paths prepared.
         """
         super().__init__()
+        self.img_wh = img_wh
         self.backgrounds_dir_path = backgrounds_dir_path
 
         self.background_paths = None
@@ -127,7 +129,7 @@ class Visualizer2D(Visualizer):
                 back_img = load_background(
                     backgrounds_paths=self.backgrounds_paths,
                     img_wh=self.img_wh
-                ).to(self.device)
+                )
 
             rgb_img = add_rgb_background(
                 backgrounds=back_img,

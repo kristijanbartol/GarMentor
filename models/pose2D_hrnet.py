@@ -15,27 +15,31 @@ import logging
 import torch
 import torch.nn as nn
 
+import configs.paths as paths
+from configs.pose2D_hrnet_config import get_pose2D_hrnet_cfg_defaults
+
 
 BN_MOMENTUM = 0.1
 logger = logging.getLogger(__name__)
 
 
-def conv3x3(in_planes, out_planes, stride=1):
+def conv3x3(in_planes, out_planes, stride=1, device='cuda'):
     """3x3 convolution with padding"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=1, bias=False)
+                     padding=1, bias=False, device=device)
 
 
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
+    def __init__(self, inplanes, planes, stride=1, downsample=None, device='cuda:0'):
         super(BasicBlock, self).__init__()
-        self.conv1 = conv3x3(inplanes, planes, stride)
-        self.bn1 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
+        self.device = device
+        self.conv1 = conv3x3(inplanes, planes, stride, device)
+        self.bn1 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM, device=self.device)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(planes, planes)
-        self.bn2 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
+        self.conv2 = conv3x3(planes, planes, device=device)
+        self.bn2 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM, device=device)
         self.downsample = downsample
         self.stride = stride
 
@@ -63,15 +67,16 @@ class Bottleneck(nn.Module):
 
     def __init__(self, inplanes, planes, stride=1, downsample=None):
         super(Bottleneck, self).__init__()
-        self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
+        self.device = 'cuda:0'
+        self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False, device=self.device)
+        self.bn1 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM, device=self.device)
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
-                               padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
+                               padding=1, bias=False, device=self.device)
+        self.bn2 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM, device=self.device)
         self.conv3 = nn.Conv2d(planes, planes * self.expansion, kernel_size=1,
-                               bias=False)
+                               bias=False, device=self.device)
         self.bn3 = nn.BatchNorm2d(planes * self.expansion,
-                                  momentum=BN_MOMENTUM)
+                                  momentum=BN_MOMENTUM, device=self.device)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
@@ -103,6 +108,7 @@ class HighResolutionModule(nn.Module):
     def __init__(self, num_branches, blocks, num_blocks, num_inchannels,
                  num_channels, fuse_method, multi_scale_output=True):
         super(HighResolutionModule, self).__init__()
+        self.device = 'cuda:0'
         self._check_branches(
             num_branches, blocks, num_blocks, num_inchannels, num_channels)
 
@@ -146,11 +152,12 @@ class HighResolutionModule(nn.Module):
                 nn.Conv2d(
                     self.num_inchannels[branch_index],
                     num_channels[branch_index] * block.expansion,
-                    kernel_size=1, stride=stride, bias=False
+                    kernel_size=1, stride=stride, bias=False,
+                    device=self.device
                 ),
                 nn.BatchNorm2d(
                     num_channels[branch_index] * block.expansion,
-                    momentum=BN_MOMENTUM
+                    momentum=BN_MOMENTUM, device=self.device
                 ),
             )
 
@@ -201,9 +208,10 @@ class HighResolutionModule(nn.Module):
                             nn.Conv2d(
                                 num_inchannels[j],
                                 num_inchannels[i],
-                                1, 1, 0, bias=False
+                                1, 1, 0, bias=False,
+                                device=self.device
                             ),
-                            nn.BatchNorm2d(num_inchannels[i]),
+                            nn.BatchNorm2d(num_inchannels[i], device=self.device),
                             nn.Upsample(scale_factor=2**(j-i), mode='nearest')
                         )
                     )
@@ -219,9 +227,10 @@ class HighResolutionModule(nn.Module):
                                     nn.Conv2d(
                                         num_inchannels[j],
                                         num_outchannels_conv3x3,
-                                        3, 2, 1, bias=False
+                                        3, 2, 1, bias=False,
+                                        device=self.device
                                     ),
-                                    nn.BatchNorm2d(num_outchannels_conv3x3)
+                                    nn.BatchNorm2d(num_outchannels_conv3x3, device=self.device)
                                 )
                             )
                         else:
@@ -231,9 +240,10 @@ class HighResolutionModule(nn.Module):
                                     nn.Conv2d(
                                         num_inchannels[j],
                                         num_outchannels_conv3x3,
-                                        3, 2, 1, bias=False
+                                        3, 2, 1, bias=False,
+                                        device=self.device
                                     ),
-                                    nn.BatchNorm2d(num_outchannels_conv3x3),
+                                    nn.BatchNorm2d(num_outchannels_conv3x3, device=self.device),
                                     nn.ReLU(True)
                                 )
                             )
@@ -279,13 +289,15 @@ class PoseHighResolutionNet(nn.Module):
         extra = cfg['MODEL']['EXTRA']
         super(PoseHighResolutionNet, self).__init__()
 
+        self.device = 'cuda:0'
+
         # stem net
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=1,
-                               bias=False)
-        self.bn1 = nn.BatchNorm2d(64, momentum=BN_MOMENTUM)
+                               bias=False, device=self.device)
+        self.bn1 = nn.BatchNorm2d(64, momentum=BN_MOMENTUM, device=self.device)
         self.conv2 = nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1,
-                               bias=False)
-        self.bn2 = nn.BatchNorm2d(64, momentum=BN_MOMENTUM)
+                               bias=False, device=self.device)
+        self.bn2 = nn.BatchNorm2d(64, momentum=BN_MOMENTUM, device=self.device)
         self.relu = nn.ReLU(inplace=True)
         self.layer1 = self._make_layer(Bottleneck, 64, 4)
 
@@ -326,7 +338,8 @@ class PoseHighResolutionNet(nn.Module):
             out_channels=cfg['MODEL']['NUM_JOINTS'],
             kernel_size=extra['FINAL_CONV_KERNEL'],
             stride=1,
-            padding=1 if extra['FINAL_CONV_KERNEL'] == 3 else 0
+            padding=1 if extra['FINAL_CONV_KERNEL'] == 3 else 0,
+            device=self.device
         )
 
         self.pretrained_layers = extra['PRETRAINED_LAYERS']
@@ -345,9 +358,9 @@ class PoseHighResolutionNet(nn.Module):
                             nn.Conv2d(
                                 num_channels_pre_layer[i],
                                 num_channels_cur_layer[i],
-                                3, 1, 1, bias=False
+                                3, 1, 1, bias=False, device=self.device
                             ),
-                            nn.BatchNorm2d(num_channels_cur_layer[i]),
+                            nn.BatchNorm2d(num_channels_cur_layer[i], device=self.device),
                             nn.ReLU(inplace=True)
                         )
                     )
@@ -362,9 +375,9 @@ class PoseHighResolutionNet(nn.Module):
                     conv3x3s.append(
                         nn.Sequential(
                             nn.Conv2d(
-                                inchannels, outchannels, 3, 2, 1, bias=False
+                                inchannels, outchannels, 3, 2, 1, bias=False, device=self.device
                             ),
-                            nn.BatchNorm2d(outchannels),
+                            nn.BatchNorm2d(outchannels, device=self.device),
                             nn.ReLU(inplace=True)
                         )
                     )
@@ -378,9 +391,10 @@ class PoseHighResolutionNet(nn.Module):
             downsample = nn.Sequential(
                 nn.Conv2d(
                     self.inplanes, planes * block.expansion,
-                    kernel_size=1, stride=stride, bias=False
+                    kernel_size=1, stride=stride, bias=False,
+                    device=self.device
                 ),
-                nn.BatchNorm2d(planes * block.expansion, momentum=BN_MOMENTUM),
+                nn.BatchNorm2d(planes * block.expansion, momentum=BN_MOMENTUM, device=self.device),
             )
 
         layers = []
@@ -493,6 +507,7 @@ class PoseHighResolutionNet(nn.Module):
             raise ValueError('{} is not exist!'.format(pretrained))
 
 
+'''
 def get_pose_net(cfg, is_train, **kwargs):
     model = PoseHighResolutionNet(cfg, **kwargs)
 
@@ -500,3 +515,15 @@ def get_pose_net(cfg, is_train, **kwargs):
         model.init_weights(cfg['MODEL']['PRETRAINED'])
 
     return model
+'''
+
+
+def get_pretrained_detector():
+    kpt_hrnet_cfg = get_pose2D_hrnet_cfg_defaults()
+    hrnet_checkpoint = torch.load(paths.HRNET_PATH, map_location='cuda:0')
+    pose2D_hrnet_cfg = get_pose2D_hrnet_cfg_defaults()
+    hrnet_model = PoseHighResolutionNet(pose2D_hrnet_cfg)
+    hrnet_model.load_state_dict(hrnet_checkpoint, strict=False)
+    print('\nLoaded HRNet weights from', paths.HRNET_PATH)
+    hrnet_model.eval()
+    return hrnet_model, kpt_hrnet_cfg

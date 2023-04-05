@@ -1,4 +1,9 @@
-from typing import Tuple, Optional
+from typing import (
+    Tuple, 
+    Optional, 
+    List
+)
+from torch import Tensor
 import numpy as np
 from PIL import (
     Image, 
@@ -32,7 +37,7 @@ class ClothedVisualizer(Visualizer2D):
             upper_class: Optional[str] = None,
             lower_class: Optional[str] = None,
             garment_classes: Optional[GarmentClasses] = None,
-            backgrounds_dir_path: str = None,
+            backgrounds_dir_path: Optional[str] = None,
             img_wh=256
         ) -> None:
         """
@@ -43,7 +48,10 @@ class ClothedVisualizer(Visualizer2D):
         ClothedRenderer, which makes it more convenient for the user not
         to think about the rendering details.
         """
-        super().__init__(backgrounds_dir_path)
+        super().__init__(
+            img_wh=img_wh,
+            backgrounds_dir_path=backgrounds_dir_path
+        )
 
         if garment_classes is None:
             assert(upper_class is not None and lower_class is not None)
@@ -58,6 +66,7 @@ class ClothedVisualizer(Visualizer2D):
             gender=gender, 
             garment_classes=self.garment_classes
         )
+        assert(device != 'cpu')
         self.device = device
         self.renderer = ClothedRenderer(device=self.device)
         self.img_wh = img_wh
@@ -80,7 +89,7 @@ class ClothedVisualizer(Visualizer2D):
             shape: np.ndarray, 
             style_vector: np.ndarray,
             cam_t: Optional[np.ndarray] = None
-        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        ) -> Tuple[Tensor, np.ndarray, np.ndarray]:
         """
         Visualize clothed mesh(es).
         
@@ -97,9 +106,10 @@ class ClothedVisualizer(Visualizer2D):
             style_vector=style_vector
         )
         rgb_img, seg_maps = self.renderer(
-            smpl_output_dict,
-            self.parametric_model.garment_classes,
-            cam_t
+            smpl_output_dict=smpl_output_dict,
+            garment_classes=self.parametric_model.garment_classes,
+            cam_t=cam_t,
+            device=self.device
         )
         return (
             rgb_img, 
@@ -107,8 +117,8 @@ class ClothedVisualizer(Visualizer2D):
             smpl_output_dict['upper'].joints
         )
     
+    @staticmethod
     def save_vis(
-            self,
             rgb_img: np.ndarray,
             save_path: str
     ) -> None:
@@ -116,12 +126,12 @@ class ClothedVisualizer(Visualizer2D):
         Save RGB clothed image.
         """
         rgb_img = (rgb_img * 255).astype(np.uint8)
-        rgb_img = ImageOps.flip(Image.fromarray(rgb_img))
-        rgb_img.save(save_path)
+        pil_img = ImageOps.flip(Image.fromarray(rgb_img))
+        pil_img.save(save_path)
         print(f'Saved clothed image: {save_path}...')
 
+    @staticmethod
     def save_masks(
-            self,
             seg_masks: np.ndarray,
             save_path: str
     ) -> None:
@@ -133,3 +143,16 @@ class ClothedVisualizer(Visualizer2D):
             seg_maps=seg_masks.astype(bool)
         )
         print(f'Saved clothing segmentation masks: {save_path}...')
+
+    @staticmethod
+    def save_masks_as_images(
+            seg_masks: np.ndarray,
+            save_paths: List[str]
+    ) -> None:
+        """
+        Save segmentation masks as .png images for verification.
+        """
+        for seg_idx in range(5):
+            mask_img = (seg_masks[seg_idx] * 255).astype(np.uint8)
+            pil_img = ImageOps.flip(Image.fromarray(mask_img))
+            pil_img.save(save_paths[seg_idx])

@@ -1,6 +1,12 @@
+from typing import Dict
 import torch
+import numpy as np
 from torchvision import transforms
 
+from configs.const import (
+    BBOX_SCALE_FACTOR,
+    OBJECT_DETECT_THRESHOLD
+)
 from utils.image_utils import convert_bbox_corners_to_centre_hw_torch, batch_crop_pytorch_affine
 
 
@@ -34,8 +40,8 @@ def predict_hrnet(hrnet_model,
                   hrnet_config,
                   image,
                   object_detect_model=None,
-                  object_detect_threshold=0.8,
-                  bbox_scale_factor=1.2):
+                  object_detect_threshold=OBJECT_DETECT_THRESHOLD,
+                  bbox_scale_factor=BBOX_SCALE_FACTOR):
     """
     :param hrnet_model:
     :param object_detect_model:
@@ -71,31 +77,39 @@ def predict_hrnet(hrnet_model,
                 pred_width = all_pred_widths[0]
             except IndexError:
                 print("Could not find person bounding box - using entire image!")
-                pred_centre = torch.tensor(image.shape[1:], device=image.device, dtype=torch.float32) * 0.5
-                pred_height = torch.tensor(image_height, device=image.device, dtype=torch.float32)
-                pred_width = torch.tensor(image_width, device=image.device, dtype=torch.float32)
-    else:
-        pred_centre = torch.tensor(image.shape[1:], device=image.device, dtype=torch.float32) * 0.5
-        pred_height = torch.tensor(image_height, device=image.device, dtype=torch.float32)
-        pred_width = torch.tensor(image_width, device=image.device, dtype=torch.float32)
+                pred_centre = image.shape[1:]
+                pred_height = image_height
+                pred_width = image_width
+                pred_centre_tensor = torch.Tensor(pred_centre, device=image.device, dtype=torch.float32) * 0.5 # type: ignore
+                pred_height_tensor = torch.Tensor(pred_height, device=image.device, dtype=torch.float32) # type: ignore
+                pred_width_tensor = torch.Tensor(pred_width, device=image.device, dtype=torch.float32) # type: ignore
+    else: 
+        pred_centre = np.array(image.shape[1:]) * 0.5
+        pred_height = image_height
+        pred_width = image_width
+        pred_centre_tensor = torch.Tensor(list(pred_centre)).float().to(image.device) * 0.5 # type: ignore
+        pred_height_tensor = torch.Tensor([pred_height]).float().to(image.device) # type: ignore
+        pred_width_tensor = torch.Tensor([pred_width]).float().to(image.device) # type: ignore
 
     # Convert box to be same aspect ratio as HrNet input
     aspect_ratio = float(hrnet_config.MODEL.IMAGE_SIZE[1]) / float(hrnet_config.MODEL.IMAGE_SIZE[0])
-    if pred_height > pred_width * aspect_ratio:
-        pred_width = pred_height / aspect_ratio
-    elif pred_height < pred_width * aspect_ratio:
-        pred_height = pred_width * aspect_ratio
+    if pred_height_tensor > pred_width_tensor * aspect_ratio:
+        pred_width_tensor = pred_height_tensor / aspect_ratio
+    elif pred_height_tensor < pred_width_tensor * aspect_ratio:
+        pred_height_tensor = pred_width_tensor * aspect_ratio
 
     # Crop input image to centre-most person box + resize to 384x288 for HRNet input.
+    '''
     image = batch_crop_pytorch_affine(input_wh=(image_width, image_height),
                                       output_wh=(hrnet_config.MODEL.IMAGE_SIZE[0], hrnet_config.MODEL.IMAGE_SIZE[1]),
                                       num_to_crop=1,
                                       device=image.device,
                                       rgb=image[None, :, :, :],
-                                      bbox_centres=pred_centre[None, :],
-                                      bbox_heights=pred_height[None],
-                                      bbox_widths=pred_width[None],
+                                      bbox_centres=pred_centre_tensor[None, :],
+                                      bbox_heights=pred_height_tensor[None],
+                                      bbox_widths=pred_width_tensor[None],
                                       orig_scale_factor=bbox_scale_factor)['rgb'][0]  # (3, 384, 288)
+    '''
 
     # Predict 2D joint heatmaps using HRNet
     transform = transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -106,14 +120,12 @@ def predict_hrnet(hrnet_model,
     # Rescale 2D joint locations back to HRNet input size
     pred_joints2D *= hrnet_config.MODEL.IMAGE_SIZE[0] / hrnet_config.MODEL.HEATMAP_SIZE[0]
 
+    bbox = np.array([[pred_centre - pred_width/2, pred_centre + pred_width/2], 
+                     [pred_centre - pred_height/2, pred_centre + pred_height/2]], dtype=np.float32)
+
     output = {'joints2D': pred_joints2D[0],
               'joints2Dconfs': pred_joints2Dconfs[0],
               'cropped_image': image,
-              'bbox_centre': pred_centre,
-              'bbox_height': pred_height,
-              'bbox_width': pred_width}
+              'bbox': bbox}
 
     return output
-
-
-

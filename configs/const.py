@@ -1,3 +1,4 @@
+# Rendering constants
 CAM_DIST = 2.7
 MEAN_CAM_Y_OFFSET = 0.2
 # NOTE (cam_t): cam_t is currently relevant only for the augmentation purposes,
@@ -14,3 +15,32 @@ LIGHT_AMBIENT_COLOR = ((0.5, 0.5, 0.5),)
 LIGHT_DIFFUSE_COLOR = ((0.3, 0.3, 0.3),)
 LIGHT_SPECULAR_COLOR = ((0.2, 0.2, 0.2),)
 BACKGROUND_COLOR = (0.0, 0.0, 0.0)
+
+# Input data
+BBOX_SCALE_FACTOR = 1.2
+OBJECT_DETECT_THRESHOLD = 0.95
+
+# Constant strings
+TRAIN = 'train'
+VALID = 'valid'
+SURREAL_DATASET_NAME = 'surreal'
+AGORA_DATASET_NAME = 'agora'
+
+# AGORA const
+RESOLUTION = {
+    'high': [2160, 3840],
+    'normal': [720, 1280]
+}
+PREP_CROP_SIZE = {
+    'high': [600, 600],
+    'normal': [300, 300]
+}
+TRAIN_CROP_SIZE = {
+    'high': [512, 512],
+    'normal': [256, 256]
+}
+AGORA_BBOX_COEF = 1.4
+
+def to_resolution_str(resolution_label: str) -> str:
+    h, w = RESOLUTION[resolution_label]
+    return f'{h}x{w}'

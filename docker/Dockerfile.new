@@ -1,7 +1,8 @@
 FROM pytorch/pytorch:1.11.0-cuda11.3-cudnn8-devel
 
 # needed to allow apt update
-RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
+#RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
+RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys A4B469963BF863CC
 
 RUN apt update && apt install -y git \
     ninja-build \
@@ -45,10 +46,17 @@ RUN pip install --ignore-installed PyYAML \
 	open3d \
 	loguru \
 	omegaconf \
-	pickle5
+	pickle5 \
+	pandas \
+	mxnet-mkl==1.6.0
 
-# pytorch3d prebuilt wheel
-RUN pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py38_cu113_pyt1110/download.html
+RUN conda install pytorch=1.13.0 torchvision pytorch-cuda=11.6 -c pytorch -c nvidia
+
+RUN conda install -c fvcore -c iopath -c conda-forge fvcore iopath 
+
+RUN conda install -c bottler nvidiacub
+
+RUN conda install pytorch3d -c pytorch3d
 
 # psbody.mesh installation
 RUN mkdir /git && cd /git && git clone https://github.com/MPI-IS/mesh && cd mesh && make all
@@ -60,6 +68,9 @@ RUN cd /git && git clone https://github.com/vchoutas/torch-trust-ncg.git && cd t
 RUN cd /git && git clone https://github.com/vchoutas/smplx && cd smplx && git reset --hard 5fa20519735cceda19afed0beeabd53caef711cd && cd tools && \
 	sed -i "/body_data = / s/pickle.load(body_file)/pickle.load(body_file, encoding='latin1')/" clean_ch.py && \
 	sed -i "s/iteritems/items/g" clean_ch.py
+
+# Use this numpy version when you get error that bool can't be imported from numpy.
+RUN pip install numpy==1.23.1
 
 RUN mkdir -p /garmentor
 

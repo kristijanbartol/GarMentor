@@ -1,5 +1,5 @@
 from typing import Dict, Tuple, List
-
+import torch
 import numpy as np
 
 from data.mesh_managers.colored_garments import ColoredGarmentsMeshManager
@@ -44,7 +44,7 @@ class ClothedRenderer(Renderer):
             apply this procedure for the second piece of clothing.
         '''
         maps = []
-        rgb = np.zeros_like(rgbs[-1])
+        rgb = np.zeros_like(rgbs[-1][0])
         for rgb_idx in range(len(rgbs) - 1, -1, -1):
             seg_map = ~np.all(np.isclose(rgb, rgbs[rgb_idx], atol=1e-3), axis=-1)
             maps.append(seg_map)
@@ -73,13 +73,17 @@ class ClothedRenderer(Renderer):
             self, 
             smpl_output_dict: Dict[str, SMPL4GarmentOutput],
             garment_classes: GarmentClasses,
+            device: str,
             *args,
             **kwargs
-        ) -> Tuple[np.ndarray, np.ndarray]:
+        ) -> Tuple[torch.Tensor, np.ndarray]:
         '''Render RGB images of clothed meshes, single-colored piece-wise.'''
         self._process_optional_arguments(*args, **kwargs)
 
-        meshes = self.mesh_manager.create_meshes(smpl_output_dict)
+        meshes = self.mesh_manager.create_meshes(
+            smpl_output_dict=smpl_output_dict,
+            device=device
+        )
         rgbs = []
         for mesh_part, mesh in zip(['body', 'upper', 'lower'], meshes):
             print(f'Rendering {mesh_part} mesh...')
@@ -92,9 +96,10 @@ class ClothedRenderer(Renderer):
                 mesh, 
                 lights=self.lights_rgb_render
             )[:, :, :, :3]
-            rgbs.append(rgb_image[0].cpu().numpy())
+            rgbs.append(rgb_image)
             
-        seg_maps = self._extract_seg_maps(rgbs)
+        final_rgb = rgbs[-1][0]     # NOTE: for now, non-batched rendering
+        seg_maps = self._extract_seg_maps([x[0].cpu().numpy() for x in rgbs])
         feature_maps = self._organize_seg_maps(seg_maps, garment_classes)
 
-        return rgbs[-1], feature_maps
+        return final_rgb, feature_maps
