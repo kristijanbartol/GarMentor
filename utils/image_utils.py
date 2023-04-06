@@ -46,9 +46,11 @@ def convert_bbox_centre_hw_to_corners(centre, height, width):
     return np.array([x1, y1, x2, y2])
 
 
-def _batch_add_rgb_background(backgrounds,
-                             rgb,
-                             seg):
+def _batch_add_rgb_background(
+        backgrounds: torch.Tensor,
+        rgb: torch.Tensor,
+        seg: torch.Tensor
+    ):
     ''' Add background for torch arguments.
 
         Parameters
@@ -83,14 +85,23 @@ def _numpy_add_rgb_background(
 
 
 def add_rgb_background(
-        *args,
-        **kwargs
+        backgrounds: Union[np.ndarray, torch.Tensor],
+        rgb: Union[np.ndarray, torch.Tensor],
+        seg: Union[np.ndarray, torch.Tensor]
     ) -> Union[np.ndarray, torch.Tensor]:
     '''Add RGB background "behind" the rendered person.'''
-    if type(kwargs[0]) == torch.Tensor:
-        return _batch_add_rgb_background(*args, **kwargs)
+    if type(backgrounds) == torch.Tensor:
+        return _batch_add_rgb_background(
+            backgrounds=backgrounds,
+            rgb=rgb, #type:ignore
+            seg=seg  #type:ignore
+        )
     else:
-        return _numpy_add_rgb_background(*args, **kwargs)
+        return _numpy_add_rgb_background(
+            backgrounds=backgrounds, #type:ignore
+            rgb=rgb,  #type:ignore
+            seg=seg   #type:ignore
+        )
 
 
 def batch_crop_opencv_affine(output_wh,

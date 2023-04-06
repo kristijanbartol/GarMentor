@@ -83,8 +83,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                       current_epoch=current_epoch)
 
     # Useful tensors that are re-used and can be pre-defined
-    mean_cam_t = torch.Tensor(pose_shape_cfg.TRAIN.SYNTH_DATA.MEAN_CAM_T,
-                              device=device, dtype=torch.float32)
+    mean_cam_t = torch.Tensor(pose_shape_cfg.TRAIN.SYNTH_DATA.MEAN_CAM_T).float().to(device)
     mean_cam_t = mean_cam_t[None, :].expand(pose_shape_cfg.TRAIN.BATCH_SIZE, -1)
 
     # Starting training loop

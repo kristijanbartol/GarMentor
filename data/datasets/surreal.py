@@ -236,9 +236,9 @@ class SurrealDataset(Dataset):
             'style_vector': self._to_tensor(self.values.style_vectors[idx]),
             'garment_labels': self._to_tensor(self.values.garment_labelss[idx]),
             'joints_3d': self._to_tensor(self.values.joints_3ds[idx]),
-            'joints_2d': None,
+            'joints_2d': self._to_tensor(self.values.joints_2ds[idx]),
             'cam_t': self._to_tensor(self.values.cam_ts[idx]),
-            'bbox': None,
+            'bbox': self._to_tensor(self.values.bboxs[idx]),
             'rgb_img': self._to_tensor(rgb_img, type=np.uint8),
             'seg_maps': self._to_tensor(seg_maps, type=bool),
             'background': self._load_background()

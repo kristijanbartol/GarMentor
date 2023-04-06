@@ -48,14 +48,14 @@ def load_background(
 class Values:
     
     def __init__(self):
-        self.poses = np.empty(0)
-        self.shapes = np.empty(0)
-        self.style_vectors = np.empty(0)
-        self.garment_labelss = np.empty(0)
-        self.joints_3ds = np.empty(0)
-        self.joints_2ds = np.empty(0)
-        self.cam_ts = np.empty(0)
-        self.bboxs = np.empty(0)
+        self._poses: List = []
+        self._shapes = []
+        self._style_vectors = []
+        self._garment_labelss = []
+        self._joints_3ds = []
+        self._joints_2ds = []
+        self._cam_ts = []
+        self._bboxs = []
     
     def load(self, 
              np_path: str, 
@@ -63,24 +63,24 @@ class Values:
              ) -> None:
         data = np.load(np_path, allow_pickle=True).item()
         
-        np.append(self.poses, data['poses'][data_slice])
-        np.append(self.shapes, data['shapes'][data_slice])
-        np.append(self.style_vectors, data['style_vectors'][data_slice])
-        np.append(self.cam_ts, data['cam_ts'][data_slice])
-        np.append(self.joints_2ds, data['joint_2ds'][data_slice])
-        np.append(self.joints_3ds, data['joints_3ds'][data_slice])
-        np.append(self.garment_labelss, data['garment_labelss'][data_slice])
-        np.append(self.bboxs, data['bboxs'][data_slice])
+        self._poses.append(data['poses'][data_slice])
+        self._shapes.append(data['shapes'][data_slice])
+        self._style_vectors.append(data['style_vectors'][data_slice])
+        self._cam_ts.append(data['cam_ts'][data_slice])
+        self._joints_2ds.append(data['joints_2ds'][data_slice])
+        self._joints_3ds.append(data['joints_3ds'][data_slice])
+        self._garment_labelss.append(data['garment_labelss'][data_slice])
+        self._bboxs.append(data['bboxs'][data_slice])
         
     def to_numpy(self) -> None:
-        self.poses = np.concatenate(self.poses, axis=0)
-        self.shapes = np.concatenate(self.shapes, axis=0)
-        self.style_vectors = np.concatenate(self.style_vectors, axis=0)
-        self.cam_ts = np.concatenate(self.cam_ts, axis=0)
-        self.joints_2ds = np.concatenate(self.joints_2ds, axis=0)
-        self.joints_3ds = np.concatenate(self.joints_3ds, axis=0)
-        self.garment_labelss = np.concatenate(self.garment_labelss, axis=0)
-        self.bboxs = np.concatenate(self.bboxs, axis=0)
+        self.poses: np.ndarray = np.concatenate(self._poses, axis=0)
+        self.shapes: np.ndarray = np.concatenate(self._shapes, axis=0)
+        self.style_vectors: np.ndarray = np.concatenate(self._style_vectors, axis=0)
+        self.cam_ts: np.ndarray = np.concatenate(self._cam_ts, axis=0)
+        self.joints_2ds: np.ndarray = np.concatenate(self._joints_2ds, axis=0)
+        self.joints_3ds: np.ndarray = np.concatenate(self._joints_3ds, axis=0)
+        self.garment_labelss: np.ndarray = np.concatenate(self._garment_labelss, axis=0)
+        self.bboxs: np.ndarray = np.concatenate(self._bboxs, axis=0)
     
     def __len__(self):
         return self.poses.shape[0]

@@ -38,8 +38,8 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "-E", "experiments/resnet50-coco-shape-only", 
-                "--gpu", "1"
+                "-E", "experiments/tmp", 
+                "--gpu", "0"
             ]
         },
 
