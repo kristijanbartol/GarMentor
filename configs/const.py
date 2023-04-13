@@ -19,6 +19,7 @@ BACKGROUND_COLOR = (0.0, 0.0, 0.0)
 # Input data
 BBOX_SCALE_FACTOR = 1.2
 OBJECT_DETECT_THRESHOLD = 0.95
+NUM_SEG_MAPS = 5
 
 # Constant strings
 TRAIN = 'train'

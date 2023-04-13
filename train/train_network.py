@@ -181,9 +181,10 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     heatmaps = heatmaps * target_joints2d_visib[:, :, None, None]
 
                     # Concatenate edge-image and 2D joint heatmaps to create input proxy representation
-                    #proxy_rep_input = torch.cat([edge_in, seg_maps, j2d_heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
-                    proxy_rep_input = torch.cat([edge_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
-
+                    if pose_shape_cfg.MODEL.NUM_IN_CHANNELS > 18:
+                        proxy_rep_input = torch.cat([edge_in, seg_maps, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
+                    else:
+                        proxy_rep_input = torch.cat([edge_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
                 with torch.set_grad_enabled(split == 'train'): #type:ignore
                     #############################################################
                     # ---------------------- FORWARD PASS -----------------------
