@@ -35,17 +35,20 @@ if __name__ == '__main__':
 
     cv2.imshow('rgb', rgb_img)
     cv2.waitKey(0)
+    cv2.imwrite('/garmentor/tests/output/rgb.png', rgb_img * 255.)
 
     for i in range(5):
-        cv2.imshow(f'seg{i}', seg_maps[i])
-        cv2.waitKey(0)
+        #cv2.imshow(f'seg{i}', seg_maps[i])
+        #cv2.waitKey(0)
+        cv2.imwrite(f'/garmentor/tests/output/seg{i}.png', seg_maps[i])
   
     # closing all open windows
-    cv2.destroyAllWindows()
+    #cv2.destroyAllWindows()
 
     kpts_img = kpt_visualizer.vis_keypoints(
         kpts=sample_values.joints_2d,
         back_img=rgb_img
     )
-    cv2.imshow('kpts', kpts_img)
-    cv2.waitKey(0)
+    cv2.imwrite('/garmentor/tests/output/kpts.png', kpts_img)
+    #cv2.imshow('kpts', kpts_img)
+    #cv2.waitKey(0)

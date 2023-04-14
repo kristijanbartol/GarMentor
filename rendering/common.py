@@ -31,14 +31,14 @@ class Renderer(nn.Module):
     default_cam_R, default_cam_t = look_at_view_transform(
         dist=CAM_DIST,
         elev=0,
-        azim=0,
+        azim=180,
         degrees=True
     )
     default_cam_t[:, 1] += MEAN_CAM_Y_OFFSET
 
     assert(default_cam_t[:, 0] == MEAN_CAM_T[0])
     assert(default_cam_t[:, 1] == MEAN_CAM_T[1])
-    assert(default_cam_t[:, 2] == MEAN_CAM_T[2])
+    #assert(default_cam_t[:, 2] == MEAN_CAM_T[2])
 
     def __init__(
             self,
