@@ -8,7 +8,7 @@ from models.poseMF_shapeGaussian_net import PoseMFShapeGaussianNet
 from models.smpl_official import SMPL
 from models.pose2D_hrnet import PoseHighResolutionNet
 from models.canny_edge_detector import CannyEdgeDetector
-from models.parametric_model import ParametricModel
+from models.tn_parametric_model import TnParametricModel
 
 from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
 from configs.pose2D_hrnet_config import get_pose2D_hrnet_cfg_defaults
@@ -68,7 +68,7 @@ def run_predict(device,
     
     upper_class='t-shirt'
     lower_class='pant'
-    parametric_model = ParametricModel(gender=gender, 
+    parametric_model = TnParametricModel(gender=gender, 
                                        garment_classes=GarmentClasses(
                                            upper_class=upper_class,
                                            lower_class=lower_class

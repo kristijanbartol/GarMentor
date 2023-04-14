@@ -15,7 +15,7 @@ from models.fully_parametric_net import FullyParametricNet
 from models.smpl_official import SMPL
 from models.poseMF_shapeGaussian_net import PoseMFShapeGaussianNet
 from models.canny_edge_detector import CannyEdgeDetector
-from models.parametric_model import ParametricModel
+from models.tn_parametric_model import TnParametricModel
 from evaluate.evaluate_poseMF_shapeGaussian_net import evaluate_pose_MF_shapeGaussian_net
 from rendering.body import BodyRenderer
 from utils.garment_classes import GarmentClasses
@@ -61,7 +61,7 @@ def run_evaluate(device,
     upper_class = 't-shirt'
     lower_class = 'pant'
     
-    parametric_model = ParametricModel(gender='male', 
+    parametric_model = TnParametricModel(gender='male', 
                                        garment_classes=GarmentClasses(
                                            upper_class=upper_class,
                                            lower_class=lower_class

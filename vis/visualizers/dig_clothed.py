@@ -10,15 +10,18 @@ from PIL import (
     ImageOps
 )
 
-from models.parametric_model import ParametricModel
-from rendering.clothed import ClothedRenderer
+from models.dig_parametric_model import (
+    DigParametricModel,
+    DigOutput
+)
+from rendering.dig_clothed import DigClothedRenderer
 from utils.garment_classes import GarmentClasses
 from vis.visualizers.common import Visualizer2D
 
 from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
 
 
-class ClothedVisualizer(Visualizer2D):
+class DigClothedVisualizer(Visualizer2D):
 
     ''' Visualize a parametric model with clothing.
     
@@ -34,9 +37,6 @@ class ClothedVisualizer(Visualizer2D):
             self, 
             device: str,
             gender: str,
-            upper_class: Optional[str] = None,
-            lower_class: Optional[str] = None,
-            garment_classes: Optional[GarmentClasses] = None,
             backgrounds_dir_path: Optional[str] = None,
             img_wh=256
         ) -> None:
@@ -53,32 +53,21 @@ class ClothedVisualizer(Visualizer2D):
             backgrounds_dir_path=backgrounds_dir_path
         )
 
-        if garment_classes is None:
-            assert(upper_class is not None and lower_class is not None)
-            self.garment_classes = GarmentClasses(
-                upper_class, 
-                lower_class
-            )
-        else:
-            self.garment_classes = garment_classes
-
-        self.parametric_model = ParametricModel(
-            gender=gender, 
-            garment_classes=self.garment_classes
+        self.dig_model = DigParametricModel(
+            gender=gender
         )
         assert(device != 'cpu')
         self.device = device
-        self.renderer = ClothedRenderer(device=self.device)
+        self.renderer = DigClothedRenderer(device=self.device)
         self.img_wh = img_wh
 
     def vis(self,
-            smpl_output_dict: SMPL4GarmentOutput,
+            dig_output: DigOutput,
             cam_t: Optional[np.ndarray] = None
         ) -> Tuple[np.ndarray, np.ndarray]:
         ''' Visualize clothed mesh(es), given SMPL4GarmentOutput info.'''
         rgb_img, seg_maps = self.renderer(
-            smpl_output_dict,
-            self.parametric_model.garment_classes,
+            dig_output,
             cam_t
         )
         return rgb_img, seg_maps
@@ -87,9 +76,8 @@ class ClothedVisualizer(Visualizer2D):
             self,
             pose: np.ndarray, 
             shape: np.ndarray, 
-            style_vector: np.ndarray,
             cam_t: Optional[np.ndarray] = None
-        ) -> Tuple[Tensor, np.ndarray, np.ndarray]:
+        ) -> Tuple[Tensor, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         Visualize clothed mesh(es).
         
@@ -100,21 +88,21 @@ class ClothedVisualizer(Visualizer2D):
         always expects Numpy arrays because visualizing TailorNet 
         will not be required in training loop, for now.
         """
-        smpl_output_dict = self.parametric_model.run(
+        dig_output = self.dig_model.run(
             pose=pose,
-            shape=shape,
-            style_vector=style_vector
+            shape=shape
         )
         rgb_img, seg_maps = self.renderer(
-            smpl_output_dict=smpl_output_dict,
-            garment_classes=self.parametric_model.garment_classes,
+            dig_output=dig_output,
             cam_t=cam_t,
             device=self.device
         )
         return (
             rgb_img, 
             seg_maps,
-            smpl_output_dict['upper'].joints
+            dig_output.joints_3d,
+            dig_output.upper_style,
+            dig_output.lower_style
         )
     
     @staticmethod

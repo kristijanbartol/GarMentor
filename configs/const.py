@@ -23,8 +23,10 @@ OBJECT_DETECT_THRESHOLD = 0.95
 # Constant strings
 TRAIN = 'train'
 VALID = 'valid'
-SURREAL_DATASET_NAME = 'surreal'
-AGORA_DATASET_NAME = 'agora'
+
+DIG_SURREAL_DATASET_NAME = 'dig-surreal'
+TN_SURREAL_DATASET_NAME = 'tn-surreal'
+TN_AGORA_DATASET_NAME = 'tn-agora'
 
 # AGORA const
 RESOLUTION = {

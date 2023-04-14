@@ -12,7 +12,7 @@ from psbody.mesh import Mesh
 
 sys.path.append('/garmentor/')
 
-from models.parametric_model import ParametricModel
+from models.tn_parametric_model import TnParametricModel
 from models.smpl_conversions import smplx2smpl
 from utils.augmentation.smpl_augmentation import normal_sample_style_numpy
 from utils.garment_classes import GarmentClasses
@@ -225,7 +225,7 @@ if __name__ == '__main__':
         pkl_fpath = pkl_fpaths[subject_idx % 3]
 
         parametric_models = {
-            'male': ParametricModel(
+            'male': TnParametricModel(
                 gender='male',
                 garment_classes=GarmentClasses(
                     upper_class=garments[subject_idx]['upper'],

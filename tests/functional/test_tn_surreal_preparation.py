@@ -4,9 +4,9 @@ import cv2
 sys.path.append('/garmentor')
 
 
-from data.prepare.surreal.tn import SurrealDataGenerator
+from data.prepare.surreal.tn import TnSurrealDataGenerator
 from utils.garment_classes import GarmentClasses
-from vis.visualizers.clothed import ClothedVisualizer
+from vis.visualizers.tn_clothed import TnClothedVisualizer
 from vis.visualizers.keypoints import KeypointsVisualizer
 
 
@@ -15,12 +15,12 @@ if __name__ == '__main__':
     lower_class = 'pant'
     gender = 'male'
 
-    surreal_generator = SurrealDataGenerator(
+    surreal_generator = TnSurrealDataGenerator(
         preextract_kpt=True
     )
 
     garment_classes = GarmentClasses(upper_class, lower_class)
-    clothed_visualizer = ClothedVisualizer(
+    clothed_visualizer = TnClothedVisualizer(
         device='cuda:0',
         gender=gender,
         garment_classes=garment_classes

@@ -8,7 +8,7 @@ from tqdm import tqdm
 sys.path.append('/garmentor/')
 
 from data.mesh_managers.textured_garments import TexturedGarmentsMeshManager
-from models.parametric_model import ParametricModel
+from models.tn_parametric_model import TnParametricModel
 from models.smpl_conversions import smplx2smpl
 from utils.augmentation.smpl_augmentation import normal_sample_style_numpy
 from utils.garment_classes import GarmentClasses
@@ -103,11 +103,11 @@ if __name__ == '__main__':
     subject_garment_subdir = str(garment_classes)
 
     parametric_models = {
-        'male': ParametricModel(
+        'male': TnParametricModel(
             gender='male', 
             garment_classes=garment_classes
         ),
-        'female': ParametricModel(
+        'female': TnParametricModel(
             gender='female',
             garment_classes=garment_classes
         )

@@ -1,35 +1,35 @@
-from typing import Tuple, Union
+from typing import Tuple
+import os
 import numpy as np
 import torch
-from torch import Tensor
-import torch.cuda
-import os
-import sys
-import argparse
 
-sys.path.append('/garmentor')
+from configs.const import DIG_SURREAL_DATASET_NAME
+from data.prepare.common import DataGenerator
 
-from configs.const import TN_SURREAL_DATASET_NAME
 import configs.paths as paths
 from data.prepare.common import (
     PreparedSampleValues,
     PreparedValuesArray
 )
-from data.prepare.common import DataGenerator
 from predict.predict_hrnet import predict_hrnet
 from utils.garment_classes import GarmentClasses
 from vis.visualizers.tn_clothed import TnClothedVisualizer
 from vis.visualizers.keypoints import KeypointsVisualizer
 
+from DIG_for_garmentor.networks import IGR, lbs_mlp, learnt_representations
+from DIG_for_garmentor.smpl_pytorch.smpl_server import SMPLServer
+from DIG_for_garmentor.utils.deform import rotate_root_pose_x, infer
 
-class TnSurrealDataGenerator(DataGenerator):
+
+
+class DigDataGenerator(DataGenerator):
 
     """
-    A data generation class specific to TN-SURREAL dataset.
+    A data generation class specific to DIG-SURREAL dataset.
     """
 
-    DATASET_NAME = TN_SURREAL_DATASET_NAME
-    CHECKPOINT_COUNT = 100
+    DATASET_NAME = DIG_SURREAL_DATASET_NAME
+    CHECKPOINT_COUNT = 25
 
     def __init__(
             self,
@@ -86,63 +86,6 @@ class TnSurrealDataGenerator(DataGenerator):
             sample_values
         )
     
-    @staticmethod
-    def _create_dirs(
-            dataset_dir: str, 
-            img_dirname: str, 
-            seg_dirname: str,
-            verification_dirname: str
-        ) -> None:
-        """
-        Create image and segmentation mask directories.
-        """
-        for dirname in [img_dirname, seg_dirname, verification_dirname]:
-            dirpath = os.path.join(dataset_dir, dirname)
-            if not os.path.exists(dirpath):
-                os.makedirs(dirpath)
-
-    def _save_verification(
-            self,
-            dataset_dir: str,
-            sample_idx: int,
-            rgb_img: np.ndarray,
-            joints_2d: Union[np.ndarray, None],
-            seg_maps: np.ndarray,
-            clothed_visualizer: TnClothedVisualizer
-    ) -> None:
-        """
-        Save RGB (+2D joints) and seg maps as images for verification.
-        """
-        print(f'Saving vefification images and seg maps (#{sample_idx})...')
-        verify_dir_path = os.path.join(
-            dataset_dir,
-            paths.VERIFY_DIR
-        )
-        verify_rgb_path = os.path.join(
-            verify_dir_path,
-            paths.IMG_NAME_TEMPLATE.format(sample_idx=sample_idx)
-        )
-        seg_maps_paths = [os.path.join(
-            verify_dir_path,
-            paths.SEG_IMGS_NAME_TEMPLATE.format(
-                sample_idx=sample_idx,
-                idx=x
-            )) for x in range(5)
-        ]
-        if joints_2d is not None:
-            rgb_img = self.keypoints_visualizer.vis_keypoints(
-                kpts=joints_2d,
-                back_img=rgb_img
-            )
-        self.keypoints_visualizer.save_vis(
-            img=rgb_img,
-            save_path=verify_rgb_path
-        )
-        clothed_visualizer.save_masks_as_images(
-            seg_masks=seg_maps,
-            save_paths=seg_maps_paths
-        )
-
     def _save_sample(
             self, 
             dataset_dir: str, 
@@ -200,7 +143,7 @@ class TnSurrealDataGenerator(DataGenerator):
                 seg_maps=seg_maps,
                 clothed_visualizer=clothed_visualizer
             )
-            
+    
     def _create_values_array(self, dataset_dir: str
                              ) -> Tuple[PreparedValuesArray, int]:
         """
@@ -232,23 +175,19 @@ class TnSurrealDataGenerator(DataGenerator):
     
     def _log_class(self, 
                    gender: str, 
-                   upper_class: str, 
-                   lower_class: str, 
-                   num_samples_per_class: int,
+                   num_samples: int,
                    num_generated: int):
-        total_num_samples = self.num_poses \
-            if num_samples_per_class is None else num_samples_per_class
+        total_num_samples = num_samples
         subset_str = f'{gender}-{upper_class}-{lower_class}'
         num_samples_to_generate = total_num_samples - num_generated
         print(f'Generating {total_num_samples}-{num_generated}='
               f'{num_samples_to_generate} samples for {subset_str}...')
         return total_num_samples
-
+    
     def generate(self, 
                  gender: str,
-                 upper_class: str,
-                 lower_class: str,
-                 num_samples_per_class: int) -> None:
+                 num_samples: int
+        ) -> None:
         """
         (Pre-)generate the dataset for particular upper+lower garment class.
 
@@ -262,27 +201,20 @@ class TnSurrealDataGenerator(DataGenerator):
         arrays are frequently updated on the disk in case the failure
         happens along the way.
         """
-
-        garment_classes = GarmentClasses(upper_class, lower_class)
         clothed_visualizer = TnClothedVisualizer(
             device=self.device,
-            gender=gender,
-            garment_classes=garment_classes
+            gender=gender
         )
         dataset_dir = self.dataset_path_template.format(
             dataset_name=self.DATASET_NAME,
-            gender=gender,
-            upper_garment_class=upper_class,
-            lower_garment_class=lower_class
+            gender=gender
         )  
         samples_values, num_generated = self._create_values_array(
             dataset_dir=dataset_dir
         )
         total_num_samples = self._log_class(
             gender=gender, 
-            upper_class=upper_class, 
-            lower_class=lower_class,
-            num_samples_per_class=num_samples_per_class,
+            num_samples=num_samples,
             num_generated=num_generated
         )
 
@@ -302,28 +234,3 @@ class TnSurrealDataGenerator(DataGenerator):
                 clothed_visualizer=clothed_visualizer
             )
         torch.cuda.empty_cache()
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--gender', '-G', type=str, choices=['male', 'female'],
-                        help='Gender string.')
-    parser.add_argument('--upper_class', '-U', type=str, choices=['t-shirt', 'shirt'],
-                        help='Upper class string.')
-    parser.add_argument('--lower_class', '-L', type=str, choices=['pant', 'short-pant'],
-                        help='Lower class string.')
-    parser.add_argument('--num_samples', '-N', type=int, default=None,
-                        help='Number of samples to have for the class after the generation is done.')
-    parser.add_argument('--preextract', dest='preextract', action='store_true', 
-                        help='Whether to pre-extract 2D joint using HRNet pose detector.')
-    args = parser.parse_args()
-    
-    surreal_generator = TnSurrealDataGenerator(
-        preextract_kpt=args.preextract
-    )
-    surreal_generator.generate(
-        gender=args.gender,
-        upper_class=args.upper_class,
-        lower_class=args.lower_class,
-        num_samples_per_class=args.num_samples
-    )

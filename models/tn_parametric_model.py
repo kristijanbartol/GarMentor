@@ -13,7 +13,7 @@ from tailornet_for_garmentor.utils.rotation import normalize_y_rotation
 from tailornet_for_garmentor.utils.interpenetration import remove_interpenetration_fast
 
 
-class ParametricModel(object):
+class TnParametricModel(object):
 
     '''Gathers functionalities of TailorNet and SMPL4Garment.'''
 

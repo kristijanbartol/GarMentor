@@ -3,7 +3,7 @@ import numpy as np
 from psbody.mesh import Mesh
 
 from data.mesh_managers.textured_garments import TexturedGarmentsMeshManager
-from models.parametric_model import ParametricModel
+from models.tn_parametric_model import TnParametricModel
 from utils.garment_classes import GarmentClasses
 from vis.visualizers.common import Visualizer3D
 
@@ -39,7 +39,7 @@ class ClothedVisualizer3D(Visualizer3D):
             lower_class
         )
         self.mesh_manager = TexturedGarmentsMeshManager(save_maps_to_disk=True)
-        self.parametric_model = ParametricModel(
+        self.parametric_model = TnParametricModel(
             gender=gender, 
             garment_classes=self.garment_classes
         )

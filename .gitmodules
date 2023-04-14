@@ -13,3 +13,6 @@
 [submodule "agora_for_garmentor"]
 	path = agora_for_garmentor
 	url = https://github.com/kristijanbartol/agora_for_garmentor.git
+[submodule "DIG_for_garmentor"]
+	path = DIG_for_garmentor
+	url = https://github.com/kristijanbartol/DIG_for_garmentor.git

@@ -9,10 +9,10 @@ sys.path.append('/garmentor/')
 from models.smpl_official import easy_create_smpl_model
 from vis.visualizers.keypoints import KeypointsVisualizer
 from vis.visualizers.body import BodyVisualizer
-from vis.visualizers.clothed import ClothedVisualizer
+from vis.visualizers.tn_clothed import TnClothedVisualizer
 from vis.visualizers.clothed3d import ClothedVisualizer3D
 from vis.logger import VisLogger
-from data.datasets.prepare.surreal.tn import DataPreGenerator
+from data.prepare.surreal.tn import TnSurrealDataGenerator
 
 
 if __name__ == '__main__':
@@ -23,7 +23,7 @@ if __name__ == '__main__':
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 
-    data_generator = DataPreGenerator()
+    data_generator = TnSurrealDataGenerator()
     pose, shape, style_vector, cam_t = data_generator.generate_random_params()
 
     keypoints_visualizer = KeypointsVisualizer()
