@@ -97,7 +97,19 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--pose_shape_weights", "experiments/resnet50-style-params/saved_models/epoch_095.tar"
+                "--pose_shape_weights", "experiments/res50-400k-t+p/saved_models/epoch_195.tar"
+            ]
+        },
+
+        {
+            "name": "Python: (Pre-Process) Evaluate",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--dataset_path", "/data/3DPW/"
             ]
         }
     ]
