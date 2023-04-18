@@ -129,8 +129,6 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
                                                     rot_mult_order='pre')
             target_pose[:, :3] = target_glob_vecs
 
-            # TODO: Here I should add a logic to create ground truth meshes following ClothWild.
-            # NOTE: I can also keep the unclothed ones for additional evaluation.
             if target_gender == 'm':
                 target_smpl_output_unclothed = smpl_model_male(body_pose=target_pose[:, 3:],
                                                      global_orient=target_pose[:, :3],
@@ -356,6 +354,8 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
             print(f"PVE-PA: {np.array(metrics_tracker.per_frame_metrics['PVE-PA']).mean() * 1000.}")
             print(f"PVE-SC: {np.array(metrics_tracker.per_frame_metrics['PVE-SC']).mean() * 1000.}")
             print(f"PVE-T-SC: {np.array(metrics_tracker.per_frame_metrics['PVE-T-SC']).mean() * 1000.}")
+            # NOTE: Not relevant for us in this paper as others either don't separate body from clothes or
+            #       they anyways the state-of-the-art pose&shape estimation model and we can't compete then.
             print(f'Measurements error: {np.mean(np.array(measurements_errors), axis=0) * 1000.}')
             
             pred_vertices_merged_trimesh, pred_faces_merged_trimesh = concatenate_meshes(
