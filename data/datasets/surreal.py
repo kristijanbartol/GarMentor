@@ -228,8 +228,8 @@ class SurrealDataset(Dataset):
         Get the sample based on index, which can be a list of indices.
         """
         seg_maps = np.load(self.seg_maps_paths[idx])['seg_maps']
-        rgb_img = imageio.imread(self.rgb_img_paths[idx]).transpose(2, 0, 1)
-        rgb_img = np.flip(rgb_img[::-1] / 255, axis=1)
+        seg_maps = np.flip(seg_maps, axis=1)
+        rgb_img = imageio.imread(self.rgb_img_paths[idx]).transpose(2, 0, 1)[::-1] / 255
         style_vector = self.values.style_vectors[idx][self.values.garment_labelss[idx]]
 
         return {
