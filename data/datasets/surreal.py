@@ -229,17 +229,19 @@ class SurrealDataset(Dataset):
         """
         seg_maps = np.load(self.seg_maps_paths[idx])['seg_maps']
         rgb_img = imageio.imread(self.rgb_img_paths[idx]).transpose(2, 0, 1)
+        rgb_img = np.flip(rgb_img[::-1] / 255, axis=1)
+        style_vector = self.values.style_vectors[idx][self.values.garment_labelss[idx]]
 
         return {
             'pose': self._to_tensor(self.values.poses[idx]),
             'shape': self._to_tensor(self.values.shapes[idx]),
-            'style_vector': self._to_tensor(self.values.style_vectors[idx]),
+            'style_vector': self._to_tensor(style_vector),
             'garment_labels': self._to_tensor(self.values.garment_labelss[idx]),
             'joints_3d': self._to_tensor(self.values.joints_3ds[idx]),
             'joints_2d': self._to_tensor(self.values.joints_2ds[idx]),
             'cam_t': self._to_tensor(self.values.cam_ts[idx]),
             'bbox': self._to_tensor(self.values.bboxs[idx]),
-            'rgb_img': self._to_tensor(rgb_img, type=np.uint8),
+            'rgb_img': self._to_tensor(rgb_img, type=np.float32),
             'seg_maps': self._to_tensor(seg_maps, type=bool),
             'background': self._load_background()
         }

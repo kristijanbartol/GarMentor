@@ -117,8 +117,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
 
                     target_shape = sample_batch['shape'].to(device)    # (bs, 10)
 
-                    target_style_vector = sample_batch['style_vector'].to(device)   # (bs, num_garment_classes=4, 10)
-                    assert(target_style_vector.shape[1] == 4)
+                    target_style_vector = sample_batch['style_vector'].to(device)   # (bs, num_garment_classes=2, num_style_params=4)
+                    assert(target_style_vector.shape[1] == 2)
                     garment_labels = sample_batch['garment_labels'].to(device)      # (bs, num_garment_classes=4)
 
                     target_cam_t = sample_batch['cam_t'].to(device)    # (bs, 3)
@@ -181,8 +181,10 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     heatmaps = heatmaps * target_joints2d_visib[:, :, None, None]
 
                     # Concatenate edge-image and 2D joint heatmaps to create input proxy representation
-                    #proxy_rep_input = torch.cat([edge_in, seg_maps, j2d_heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
-                    proxy_rep_input = torch.cat([edge_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
+                    if pose_shape_cfg.MODEL.NUM_IN_CHANNELS > 18:
+                        proxy_rep_input = torch.cat([edge_in, seg_maps, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
+                    else:
+                        proxy_rep_input = torch.cat([edge_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
 
                 with torch.set_grad_enabled(split == 'train'): #type:ignore
                     #############################################################
