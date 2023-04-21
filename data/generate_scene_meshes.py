@@ -44,18 +44,6 @@ def _sample_scene_data(
         pd.DataFrame: The sampled scene information
         int: Number of sampled elements
     """
-    if scene_name == 'archviz':
-        to_sample = [
-            'ag_trainset_renderpeople_bfh_archviz_5_10_cam02_00003.png',
-            'ag_trainset_renderpeople_bfh_archviz_5_10_cam02_00008.png',
-            'ag_trainset_renderpeople_bfh_archviz_5_10_cam02_00048.png'
-        ]
-    elif scene_name == 'brushifygrasslands':
-        to_sample = [
-            "ag_trainset_renderpeople_bfh_brushifygrasslands_5_15_00001.png",
-            "ag_trainset_renderpeople_bfh_brushifygrasslands_5_15_00007.png",
-            "ag_trainset_renderpeople_bfh_brushifygrasslands_5_15_00012.png"
-        ]
     next_index = 0
     df_scene = pd.DataFrame()
     for pkl_file in [file for file in os.listdir(path_cam_files) \
@@ -69,11 +57,7 @@ def _sample_scene_data(
         # Only get the rows which contain entries for the specified scene
         df_scene = pd.concat([
             df_scene,
-            #df[df['imgPath'] == "ag_trainset_3dpeople_bfh_archviz_5_10_cam00_00003.png"]
-            #df[df['imgPath'].str.contains(scene_name)]
-            df[df['imgPath'].str.contains(to_sample[0])],
-            df[df['imgPath'].str.contains(to_sample[1])],
-            df[df['imgPath'].str.contains(to_sample[2])]
+            df[df['imgPath'].str.contains(scene_name)]
         ])
     # df_scene now contains all entries for the given scene
     number_rows = len(df_scene.index)
@@ -490,7 +474,7 @@ def generate_scene_samples(
                 print(f"Subject {mesh_basepath} invalid, skipping...")
                 invalid_subjects.append(f"Image: {img_path}")
                 invalid_subjects.append(f"Subject: {mesh_basepath}")
-                invalid_subjects.append(f"Error: {e}")
+                invalid_subjects.append(f"Error: {e}\n")
                 for element in os.listdir(output_dirpath):
                     if _subject_idx_formatting(subject_idx) in element:
                         os.remove(osp.join(output_dirpath, element))
