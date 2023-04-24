@@ -387,12 +387,6 @@ def generate_scene_samples(
         transformation_info[osp.splitext(img_path)[0]] = {
             'camera': {'x': camX, 'y': camY, 'z': camZ, 'yaw': camYaw}
         }
-        #camera_information[osp.splitext(img_path)[0]] = {
-        #    'x': camX,
-        #    'y': camY,
-        #    'z': camZ,
-        #    'yaw': camYaw
-        #}
 
         output_dirpath = osp.join(
             SCENE_OBJ_SAVEDIR,
@@ -436,14 +430,6 @@ def generate_scene_samples(
                 subject_styles.append(None)
                 continue
             subject_styles.append(style_params)
-
-            # Not relevant here, as translations are given in unreal coordinate
-            # space
-            #trans = np.array([
-            #    Xs[subject_idx],
-            #    Ys[subject_idx],
-            #    Zs[subject_idx]
-            #]) / 100.0 # translations are given in cm, while blender uses m
 
             for mesh_type in ['body', 'upper', 'lower']:
                 shutil.copy(
