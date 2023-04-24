@@ -23,18 +23,21 @@ def normal_sample_params(batch_size, mean_params, std_vector):
 def normal_sample_shape_numpy(mean_params: np.ndarray,      # (10,)
                               std_vector: np.ndarray        # (10,)        
                               ) -> np.ndarray:             # (10,)
-    '''Gaussian sampling of shape parameter deviations from the mean.'''
-
+    """
+    Gaussian sampling of shape parameter deviations from the mean.
+    """
     shape = mean_params + np.random.randn(mean_params.shape[0]) * std_vector
     return shape
 
 
-def normal_sample_style_numpy(num_garment_classes: int,     
-                              mean_params: np.ndarray,      # (10,)
-                              std_vector: np.ndarray        # (10,)
-                              ) -> np.ndarray:              # (num_garment_classes, 10)
-    '''Normal sampling of style parameter deviations from the mean, for each garment.'''
-
+def normal_sample_style_numpy(
+        num_garment_classes: int,     
+        mean_params: np.ndarray,      # (10,)
+        std_vector: np.ndarray        # (10,)
+    ) -> np.ndarray:                  # (num_garment_classes, 10)
+    """
+    Normal sampling of style parameter deviations from the mean, for each garment.
+    """
     style = mean_params + np.random.randn(num_garment_classes, mean_params.shape[0]) * std_vector
     return style
 

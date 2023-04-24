@@ -7,6 +7,7 @@ from torch import nn as nn
 from torch.distributions import Normal
 
 from models.resnet import resnet18, resnet50
+from utils.garment_classes import GarmentClasses
 
 from utils.rigid_transform_utils import rotmat_to_rot6d
 
@@ -38,15 +39,19 @@ class PoseMFShapeGaussianNet(nn.Module):
         self.parents_dict = immediate_parents_to_all_parents(smpl_parents)
         self.num_joints = len(self.parents_dict)
         self.num_pose_params = self.num_joints * 3 * 3  # 3x3 matrix parameter for MF distribution for each joint.
+        
+        self.using_style = config.MODEL.USE_STYLE
 
         # Number of shape, glob and cam parameters + sensible initial estimates for weak-perspective camera and global rotation
         self.num_shape_params = self.config.MODEL.NUM_SMPL_BETAS
+        self.num_style_params = self.config.MODEL.NUM_STYLE_PARAMS
+        self.num_garment_classes = self.config.MODEL.NUM_GARMENT_CLASSES
         self.num_glob_params = 6
         init_glob = rotmat_to_rot6d(torch.eye(3)[None, :].float())
 
         self.register_buffer('init_glob', init_glob)
         self.num_cam_params = 3
-        init_cam = torch.tensor([0.9, 0.0, 0.0]).float()  # Initialise weak-perspective camera scale at 0.9
+        init_cam = torch.tensor(self.config.MODEL.WP_CAM).float()  # Initialise weak-perspective camera scale at 0.9
         self.register_buffer('init_cam', init_cam)
 
         # ResNet Image Encoder
@@ -66,13 +71,32 @@ class PoseMFShapeGaussianNet(nn.Module):
 
         self.fc1 = nn.Linear(num_image_features, fc1_dim)
 
-        # TODO (kbartol): Add fc_style.
-        self.fc_shape = nn.Linear(fc1_dim, self.num_shape_params * 2)  # Means and variances for SMPL betas and/or measurements
+        self.fc_shape = nn.Linear(fc1_dim, self.num_shape_params * 2) # x2 because of (means, variances)
+        if self.using_style:
+            self.fc_style = nn.Linear(
+                fc1_dim, 
+                self.num_style_params * self.num_garment_classes * 2      # x2 for (means, variances)
+            )                                                             # xN for garment classes
         self.fc_glob = nn.Linear(fc1_dim, self.num_glob_params)
         self.fc_cam = nn.Linear(fc1_dim, self.num_cam_params)
 
-        self.fc_embed = nn.Linear(num_image_features + self.num_shape_params * 2 + self.num_glob_params + self.num_cam_params,
-                                  self.config.MODEL.EMBED_DIM)
+        if self.using_style:
+            self.fc_embed = nn.Linear(
+                num_image_features +                                   \
+                self.num_shape_params * 2 +                            \
+                self.num_style_params * self.num_garment_classes * 2 + \
+                self.num_glob_params +                                 \
+                self.num_cam_params,
+                self.config.MODEL.EMBED_DIM
+            )
+        else:
+            self.fc_embed = nn.Linear(
+                num_image_features +                                   \
+                self.num_shape_params * 2 +                            \
+                self.num_glob_params +                                 \
+                self.num_cam_params,
+                self.config.MODEL.EMBED_DIM
+            )
 
         # FC Pose networks for each joint
         self.fc_pose = nn.ModuleList()
@@ -96,10 +120,19 @@ class PoseMFShapeGaussianNet(nn.Module):
         x = self.activation(self.fc1(input_feats))
 
         # Shape
-        shape_params = self.fc_shape(x)  # (bsize, num_smpl_betas * 2)
+        shape_params = self.fc_shape(x)  # (bsize, num_shape_params * 2)
         shape_mean = shape_params[:, :self.num_shape_params]
         shape_log_std = shape_params[:, self.num_shape_params:]
         shape_dist = Normal(loc=shape_mean, scale=torch.exp(shape_log_std))
+        
+        # Style
+        if self.using_style:
+            style_params = self.fc_style(x)  # (bsize, num_style_params * num_garment_classes * 2)
+            style_params_reshaped = torch.reshape(style_params, (-1, self.num_garment_classes, self.num_style_params, 2))
+            style_mean, style_log_std = style_params_reshaped[:, :, :, 0], style_params_reshaped[:, :, :, 1]
+            style_dist = Normal(loc=style_mean, scale=torch.exp(style_log_std))
+        else:
+            style_dist = None
 
         # Glob rot and WP Cam
         delta_cam = self.fc_cam(x)
@@ -108,8 +141,21 @@ class PoseMFShapeGaussianNet(nn.Module):
         cam = delta_cam + self.init_cam  # (bsize, 3)
 
         # Input Feats/Shape/Glob/Cam embed
-        # TODO (kbartol): Add style parameters to the embedded representation.
-        embed = self.activation(self.fc_embed(torch.cat([input_feats, shape_params, glob, cam], dim=1)))  # (bsize, embed dim)
+        if self.using_style:
+            embed = self.activation(self.fc_embed(torch.cat([
+                input_feats, 
+                shape_params, 
+                style_params, 
+                glob, 
+                cam
+            ], dim=1)))  # (bsize, embed dim)
+        else:
+            embed = self.activation(self.fc_embed(torch.cat([
+                input_feats, 
+                shape_params,
+                glob, 
+                cam
+            ], dim=1)))  # (bsize, embed dim)
 
         # Pose
         pose_F = torch.zeros(batch_size, self.num_joints, 3, 3, device=device)  # (bsize, 23, 3, 3)
@@ -161,5 +207,5 @@ class PoseMFShapeGaussianNet(nn.Module):
             pose_S_proper[:, joint, :] = joint_S_proper
             pose_rotmats_mode[:, joint, :, :] = joint_rotmat_mode
 
-        return pose_F, pose_U, pose_S, pose_V, pose_rotmats_mode, shape_dist, glob, cam
+        return pose_F, pose_U, pose_S, pose_V, pose_rotmats_mode, shape_dist, style_dist, glob, cam
 

@@ -138,6 +138,19 @@ data/*.obj
 data/*.mtl
 data/*.jpg
 data/textures/
+notebooks/data/
+output/
+tests/functional/out/
+tests/functional/data/
+tests/functional/*.png
 
 # Dependencies
 torch-trust-ncg/
+smplx/
+torch-trust-ncg/
+
+# Pretrained - original
+model_files/poseMF_shapeGaussian_net_weights.tar
+
+# Temporary
+git_token

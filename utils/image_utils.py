@@ -1,3 +1,4 @@
+from typing import Union
 import cv2
 import numpy as np
 import torch
@@ -45,18 +46,62 @@ def convert_bbox_centre_hw_to_corners(centre, height, width):
     return np.array([x1, y1, x2, y2])
 
 
-def batch_add_rgb_background(backgrounds,
-                             rgb,
-                             seg):
-    """
-    :param backgrounds: (bs, 3, wh, wh)
-    :param rgb: (bs, 3, wh, wh)
-    :param iuv: (bs, wh, wh)
-    :return: rgb_with_background: (bs, 3, wh, wh)
-    """
+def _batch_add_rgb_background(
+        backgrounds: torch.Tensor,
+        rgb: torch.Tensor,
+        seg: torch.Tensor
+    ):
+    ''' Add background for torch arguments.
+
+        Parameters
+        ----------
+        :param backgrounds: (bs, 3, wh, wh)
+        :param rgb: (bs, 3, wh, wh)
+        :param iuv: (bs, wh, wh)
+        :return: rgb_with_background: (bs, 3, wh, wh)
+    '''
     background_pixels = seg[:, None, :, :] == 0  # Body pixels are > 0 and out of frame pixels are -1
     rgb_with_background = rgb * (torch.logical_not(background_pixels)) + backgrounds * background_pixels
     return rgb_with_background
+
+
+def _numpy_add_rgb_background(
+        backgrounds: np.ndarray,
+        rgb: np.ndarray,
+        seg: np.ndarray
+    ) -> np.ndarray:
+    ''' Add background for Numpy arguments.
+
+        Parameters
+        ----------
+        :param backgrounds: (3, wh, wh)
+        :param rgb: (3, wh, wh)
+        :param iuv: (wh, wh)
+        :return: rgb_with_background: (3, wh, wh)
+    '''
+    background_pixels = seg[None, :, :] == 0  # Body pixels are > 0 and out of frame pixels are -1
+    rgb_with_background = rgb * (np.logical_not(background_pixels)) + backgrounds * background_pixels
+    return rgb_with_background
+
+
+def add_rgb_background(
+        backgrounds: Union[np.ndarray, torch.Tensor],
+        rgb: Union[np.ndarray, torch.Tensor],
+        seg: Union[np.ndarray, torch.Tensor]
+    ) -> Union[np.ndarray, torch.Tensor]:
+    '''Add RGB background "behind" the rendered person.'''
+    if type(backgrounds) == torch.Tensor:
+        return _batch_add_rgb_background(
+            backgrounds=backgrounds,
+            rgb=rgb, #type:ignore
+            seg=seg  #type:ignore
+        )
+    else:
+        return _numpy_add_rgb_background(
+            backgrounds=backgrounds, #type:ignore
+            rgb=rgb,  #type:ignore
+            seg=seg   #type:ignore
+        )
 
 
 def batch_crop_opencv_affine(output_wh,

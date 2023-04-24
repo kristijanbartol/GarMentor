@@ -5,13 +5,17 @@ import cv2
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from smplx.lbs import batch_rodrigues
+from pytorch3d.transforms import matrix_to_axis_angle
+import imageio
 
 from predict.predict_hrnet import predict_hrnet
 
-from renderers.pytorch3d_textured_renderer import TexturedIUVRenderer
+from rendering.body import BodyRenderer
+from rendering.clothed import ClothedRenderer
 
 from utils.image_utils import batch_add_rgb_background, batch_crop_pytorch_affine, batch_crop_opencv_affine
 from utils.label_conversions import convert_2Djoints_to_gaussian_heatmaps_torch
+from utils.mesh_utils import concatenate_meshes
 from utils.rigid_transform_utils import rot6d_to_rotmat, aa_rotate_translate_points_pytorch3d
 from utils.sampling_utils import compute_vertex_uncertainties_by_poseMF_shapeGaussian_sampling, joints2D_error_sorted_verts_sampling
 
@@ -19,6 +23,7 @@ from utils.sampling_utils import compute_vertex_uncertainties_by_poseMF_shapeGau
 def predict_poseMF_shapeGaussian_net(pose_shape_model,
                                      pose_shape_cfg,
                                      smpl_model,
+                                     parametric_model,
                                      hrnet_model,
                                      hrnet_cfg,
                                      edge_detect_model,
@@ -37,12 +42,19 @@ def predict_poseMF_shapeGaussian_net(pose_shape_model,
     Pose predictions follow the kinematic chain.
     """
     # Setting up body visualisation renderer
-    body_vis_renderer = TexturedIUVRenderer(device=device,
+    body_vis_renderer = BodyRenderer(device=device,
                                             batch_size=1,
                                             img_wh=visualise_wh,
-                                            projection_type='orthographic',
+                                            #projection_type='orthographic',
                                             render_rgb=True,
                                             bin_size=32)
+    surreal_renderer = ClothedRenderer(
+            device='cuda:0',
+            batch_size=1
+        )
+    mean_cam_t = np.array(
+            pose_shape_cfg.TRAIN.SYNTH_DATA.MEAN_CAM_T, 
+            dtype=np.float32)
     plain_texture = torch.ones(1, 1200, 800, 3, device=device).float() * 0.7
     lights_rgb_settings = {'location': torch.tensor([[0., -0.8, -2.0]], device=device, dtype=torch.float32),
                            'ambient_color': 0.5 * torch.ones(1, 3, device=device, dtype=torch.float32),
@@ -101,13 +113,44 @@ def predict_poseMF_shapeGaussian_net(pose_shape_model,
 
             # ------------------------------- POSE AND SHAPE DISTRIBUTION PREDICTION -------------------------------
             pred_pose_F, pred_pose_U, pred_pose_S, pred_pose_V, pred_pose_rotmats_mode, \
-            pred_shape_dist, pred_glob, pred_cam_wp = pose_shape_model(proxy_rep_input)
+                pred_shape_dist, pred_style_dist, pred_glob, pred_cam_wp = pose_shape_model(proxy_rep_input)
             # Pose F, U, V and rotmats_mode are (bsize, 23, 3, 3) and Pose S is (bsize, 23, 3)
 
             if pred_glob.shape[-1] == 3:
                 pred_glob_rotmats = batch_rodrigues(pred_glob)  # (1, 3, 3)
             elif pred_glob.shape[-1] == 6:
                 pred_glob_rotmats = rot6d_to_rotmat(pred_glob)  # (1, 3, 3)
+                
+            pred_pose_axis_angle = matrix_to_axis_angle(pred_pose_rotmats_mode)
+            pred_glob_axis_angle = matrix_to_axis_angle(pred_glob_rotmats).unsqueeze(0)
+            pred_pose_axis_angle = torch.cat((pred_glob_axis_angle, pred_pose_axis_angle), dim=1).reshape(1, 72)
+                
+            smpl_output_dict = parametric_model.run(
+                pose=pred_pose_axis_angle[0].cpu().numpy(),
+                shape=pred_shape_dist.loc[0].cpu().numpy(),
+                style_vector=pred_style_dist.loc[0].cpu().numpy()
+            )
+            
+            pred_vertices_merged_trimesh, pred_faces_merged_trimesh = concatenate_meshes(
+                vertices_list = [
+                    smpl_output_dict['upper'].body_verts,
+                    smpl_output_dict['upper'].garment_verts,
+                    smpl_output_dict['lower'].garment_verts
+                ],
+                faces_list = [
+                    smpl_output_dict['upper'].body_faces,
+                    smpl_output_dict['upper'].garment_verts,
+                    smpl_output_dict['lower'].garment_verts
+                ]
+            )
+            
+            #trimesh.Trimesh(vertices=pred_vertices_merged_trimesh, faces=pred_faces_merged_trimesh).export(
+            #    f'output/demo/{image_fname.split(".")[0]}.obj')
+            rgb, _ = surreal_renderer(smpl_output_dict,
+                             garment_classes=parametric_model.garment_classes,
+                             cam_t=mean_cam_t)
+            imageio.imwrite(f'output/demo/{image_fname}', rgb)
+            continue
 
             pred_smpl_output_mode = smpl_model(body_pose=pred_pose_rotmats_mode,
                                                global_orient=pred_glob_rotmats.unsqueeze(1),

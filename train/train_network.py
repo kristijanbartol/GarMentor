@@ -4,18 +4,26 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from smplx.lbs import batch_rodrigues
-from psbody.mesh import Mesh
 from tqdm import tqdm
 
 from metrics.train_loss_and_metrics_tracker import TrainingLossesAndMetricsTracker
-
 from utils.checkpoint_utils import load_training_info_from_checkpoint
-from utils.cam_utils import perspective_project_torch, orthographic_project_torch
-from utils.rigid_transform_utils import rot6d_to_rotmat, aa_rotate_translate_points_pytorch3d, aa_rotate_rotmats_pytorch3d
-from utils.label_conversions import convert_2Djoints_to_gaussian_heatmaps_torch, \
-    H36M_TO_J14, BASE_JOINTS_TO_COCO_MAP, BASE_JOINTS_TO_H36M_MAP
-from utils.joints2d_utils import check_joints2d_visibility_torch
-from utils.image_utils import batch_add_rgb_background
+from utils.cam_utils import (
+    perspective_project_torch, 
+    orthographic_project_torch
+)
+from utils.rigid_transform_utils import rot6d_to_rotmat
+from utils.label_conversions import (
+    ALL_JOINTS_TO_H36M_MAP, 
+    convert_2Djoints_to_gaussian_heatmaps_torch,
+    H36M_TO_J14, 
+    ALL_JOINTS_TO_COCO_MAP
+)
+from utils.joints2d_utils import (
+    check_joints2d_visibility_torch, 
+    undo_keypoint_normalisation
+)
+from utils.image_utils import add_rgb_background
 from utils.augmentation.rgb_augmentation import augment_rgb
 
 
@@ -75,10 +83,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                       current_epoch=current_epoch)
 
     # Useful tensors that are re-used and can be pre-defined
-    x_axis = torch.tensor([1., 0., 0.],
-                          device=device, dtype=torch.float32)
-    mean_cam_t = torch.tensor(pose_shape_cfg.TRAIN.SYNTH_DATA.MEAN_CAM_T,
-                              device=device, dtype=torch.float32)
+    mean_cam_t = torch.Tensor(pose_shape_cfg.TRAIN.SYNTH_DATA.MEAN_CAM_T).float().to(device)
     mean_cam_t = mean_cam_t[None, :].expand(pose_shape_cfg.TRAIN.BATCH_SIZE, -1)
 
     # Starting training loop
@@ -109,16 +114,12 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     target_pose_rotmats = batch_rodrigues(target_pose.contiguous().view(-1, 3)).view(-1, 24, 3, 3)
                     target_glob_rotmats = target_pose_rotmats[:, 0, :, :]
                     target_pose_rotmats = target_pose_rotmats[:, 1:, :, :]
-                    # Flipping pose targets such that they are right way up in 3D space - i.e. wrong way up when projected
-                    # Then pose predictions will also be right way up in 3D space - network doesn't need to learn to flip.
-                    _, target_glob_rotmats = aa_rotate_rotmats_pytorch3d(rotmats=target_glob_rotmats,
-                                                                         angles=np.pi,
-                                                                         axes=x_axis,
-                                                                         rot_mult_order='post')
 
                     target_shape = sample_batch['shape'].to(device)    # (bs, 10)
 
-                    target_style_vector = sample_batch['style_vector'].to(device)  # (bs, num_garment_types+1, 10)
+                    target_style_vector = sample_batch['style_vector'].to(device)   # (bs, num_garment_classes=4, 10)
+                    assert(target_style_vector.shape[1] == 4)
+                    garment_labels = sample_batch['garment_labels'].to(device)      # (bs, num_garment_classes=4)
 
                     target_cam_t = sample_batch['cam_t'].to(device)    # (bs, 3)
                     
@@ -128,30 +129,23 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                     pose2rot=False)
 
                     target_vertices = target_smpl_output.vertices
-                    target_joints = sample_batch['joints'].to(device)
-                    target_joints_h36m = target_joints[:, BASE_JOINTS_TO_H36M_MAP]
+                    target_joints = target_smpl_output.joints[:, ALL_JOINTS_TO_COCO_MAP]
+                    target_joints_h36m = target_smpl_output.joints[:, ALL_JOINTS_TO_H36M_MAP]
                     target_joints_h36mlsp = target_joints_h36m[:, H36M_TO_J14, :]
                     
-                    target_reposed_vertices = smpl_model(body_pose=torch.zeros_like(target_pose)[:, 3:],
-                                                         global_orient=torch.zeros_like(target_pose)[:, :3],
+                    target_reposed_vertices = smpl_model(body_pose=torch.zeros_like(target_pose)[:, 3:], #type:ignore
+                                                         global_orient=torch.zeros_like(target_pose)[:, :3], #type:ignore
                                                          betas=target_shape).vertices
 
                     # ------------ INPUT PROXY REPRESENTATION GENERATION + 2D TARGET JOINTS ------------
-                    # Pose targets were flipped such that they are right way up in 3D space - i.e. wrong way up when projected
-                    # Need to flip target_vertices_for_rendering 180° about x-axis so they are right way up when projected
-                    # Need to flip target_joints_coco 180° about x-axis so they are right way up when projected
-                    target_joints_coco = aa_rotate_translate_points_pytorch3d(points=target_joints[:, BASE_JOINTS_TO_COCO_MAP],
-                                                                              axes=x_axis,
-                                                                              angles=np.pi,
-                                                                              translations=torch.zeros(3, device=device).float())
-                    target_joints2d_coco = perspective_project_torch(target_joints_coco,
-                                                                     None,
-                                                                     target_cam_t,
-                                                                     focal_length=pose_shape_cfg.TRAIN.SYNTH_DATA.FOCAL_LENGTH,
-                                                                     img_wh=pose_shape_cfg.DATA.PROXY_REP_SIZE)
+                    target_joints2d = perspective_project_torch(target_joints,
+                                                                None,
+                                                                target_cam_t,
+                                                                focal_length=pose_shape_cfg.TRAIN.SYNTH_DATA.FOCAL_LENGTH,
+                                                                img_wh=pose_shape_cfg.DATA.PROXY_REP_SIZE)
 
                     # Check if joints within image dimensions before cropping + recentering.
-                    target_joints2d_visib_coco = check_joints2d_visibility_torch(target_joints2d_coco,
+                    target_joints2d_visib = check_joints2d_visibility_torch(target_joints2d,
                                                                                  pose_shape_cfg.DATA.PROXY_REP_SIZE)  # (batch_size, 17)
 
                     seg_maps = sample_batch['seg_maps'].to(device)
@@ -159,14 +153,14 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     # Add background rgb
                     # NOTE: The last seg map (-1) is the whole body seg map.
                     if rgb_in is not None:
-                        rgb_in = batch_add_rgb_background(backgrounds=background,
+                        rgb_in = add_rgb_background(backgrounds=background,
                                                         rgb=rgb_in,
                                                         seg=seg_maps[:, -1])
                     # Apply RGB-based render augmentations + 2D joints augmentations
-                        rgb_in, target_joints2d_coco_input, target_joints2d_visib_coco = augment_rgb(
+                        rgb_in, target_joints2d_input, target_joints2d_visib = augment_rgb(
                             rgb=rgb_in,
-                            joints2D=target_joints2d_coco,
-                            joints2D_visib=target_joints2d_visib_coco,
+                            joints2D=target_joints2d,
+                            joints2D_visib=target_joints2d_visib,
                             rgb_augment_config=pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.RGB
                         )
                         # Compute edge-images edges
@@ -174,28 +168,28 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                         edge_in = edge_detector_output['thresholded_thin_edges'] \
                             if pose_shape_cfg.DATA.EDGE_NMS else edge_detector_output['thresholded_grad_magnitude']
                     else:
-                        edge_in = torch.zeros((
+                        edge_in = torch.zeros(( #type:ignore
                             pose_shape_cfg.TRAIN.BATCH_SIZE, 
                             pose_shape_cfg.DATA.PROXY_REP_SIZE, 
                             pose_shape_cfg.DATA.PROXY_REP_SIZE)
                         )
 
                     # Compute 2D joint heatmaps
-                    j2d_heatmaps = convert_2Djoints_to_gaussian_heatmaps_torch(target_joints2d_coco_input,
-                                                                               pose_shape_cfg.DATA.PROXY_REP_SIZE,
-                                                                               std=pose_shape_cfg.DATA.HEATMAP_GAUSSIAN_STD)
-                    j2d_heatmaps = j2d_heatmaps * target_joints2d_visib_coco[:, :, None, None]
+                    heatmaps = convert_2Djoints_to_gaussian_heatmaps_torch(target_joints2d_input, #type:ignore
+                                                                           pose_shape_cfg.DATA.PROXY_REP_SIZE,
+                                                                           std=pose_shape_cfg.DATA.HEATMAP_GAUSSIAN_STD)
+                    heatmaps = heatmaps * target_joints2d_visib[:, :, None, None]
 
                     # Concatenate edge-image and 2D joint heatmaps to create input proxy representation
                     #proxy_rep_input = torch.cat([edge_in, seg_maps, j2d_heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
-                    proxy_rep_input = torch.cat([edge_in, j2d_heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
+                    proxy_rep_input = torch.cat([edge_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
 
-                with torch.set_grad_enabled(split == 'train'):
+                with torch.set_grad_enabled(split == 'train'): #type:ignore
                     #############################################################
                     # ---------------------- FORWARD PASS -----------------------
                     #############################################################
                     pred_pose_F, pred_pose_U, pred_pose_S, pred_pose_V, pred_pose_rotmats_mode, \
-                        pred_shape_dist, pred_glob, pred_cam_wp = pose_shape_model(proxy_rep_input)
+                        pred_shape_dist, pred_style_dist, pred_glob, pred_cam_wp = pose_shape_model(proxy_rep_input)
                     # Pose F, U, V and rotmats_mode are (bs, 23, 3, 3) and Pose S is (bs, 23, 3)
 
                     pred_glob_rotmats = rot6d_to_rotmat(pred_glob)  # (bs, 3, 3)
@@ -206,26 +200,20 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                        pose2rot=False)
 
                     pred_vertices_mode = pred_smpl_output_mode.vertices
-                    pred_joints_mode = pred_smpl_output_mode.joints
-                    pred_joints_h36m_mode = pred_joints_mode[:, BASE_JOINTS_TO_H36M_MAP, :]
+                    pred_joints_mode = pred_smpl_output_mode.joints[:, ALL_JOINTS_TO_COCO_MAP]
+                    pred_joints_h36m_mode = pred_smpl_output_mode.joints[:, ALL_JOINTS_TO_H36M_MAP]
                     pred_joints_h36mlsp_mode = pred_joints_h36m_mode[:, H36M_TO_J14, :]  # (bs, 14, 3)
-                    # Pose targets were flipped such that they are right way up in 3D space - i.e. wrong way up when projected
-                    # Need to flip pred_joints_coco 180° about x-axis so they are right way up when projected
-                    pred_joints_coco_mode = aa_rotate_translate_points_pytorch3d(
-                        points=pred_joints_mode[:, BASE_JOINTS_TO_COCO_MAP],
-                        axes=x_axis,
-                        angles=np.pi,
-                        translations=torch.zeros(3, device=device).float())
-                    pred_joints2d_coco_mode = orthographic_project_torch(pred_joints_coco_mode,
-                                                                         pred_cam_wp)  # (bs, 17, 2)
+                    
+                    pred_joints2d_mode = orthographic_project_torch(pred_joints_mode,
+                                                                    pred_cam_wp)  # (bs, 17, 2)
                     
                     with torch.no_grad():
-                        pred_reposed_smpl_output_mean = smpl_model(body_pose=torch.zeros_like(target_pose)[:, 3:],
-                                                                   global_orient=torch.zeros_like(target_pose)[:, :3],
+                        pred_reposed_smpl_output_mean = smpl_model(body_pose=torch.zeros_like(target_pose)[:, 3:], #type:ignore
+                                                                   global_orient=torch.zeros_like(target_pose)[:, :3], #type:ignore
                                                                    betas=pred_shape_dist.loc)
                         pred_reposed_vertices_mean = pred_reposed_smpl_output_mean.vertices  # (bs, 6890, 3)
 
-                    pred_joints2d_coco_samples = pred_joints2d_coco_mode[:, None, :, :]  # (batch_size, 1, 17, 2)
+                    pred_joints2d_samples = pred_joints2d_mode[:, None, :, :]  # (batch_size, 1, 17, 2)
 
                     #############################################################
                     # ----------------- LOSS AND BACKWARD PASS ------------------
@@ -235,19 +223,20 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                           'pose_params_S': pred_pose_S,
                                           'pose_params_V': pred_pose_V,
                                           'shape_params': pred_shape_dist,
+                                          'style_params': pred_style_dist,
                                           'verts': pred_vertices_mode,
-                                          #'style_params': pred_style_dist,
                                           'joints3D': pred_joints_h36mlsp_mode,
-                                          'joints2D': pred_joints2d_coco_samples,
+                                          'joints2D': pred_joints2d_samples,
                                           'glob_rotmats': pred_glob_rotmats}
 
                     target_dict_for_loss = {'pose_params_rotmats': target_pose_rotmats,
                                             'shape_params': target_shape,
-                                            'verts': target_vertices,
                                             'style_params': target_style_vector,
+                                            'garment_labels': garment_labels,
+                                            'verts': target_vertices,
                                             'joints3D': target_joints_h36mlsp,
-                                            'joints2D': target_joints2d_coco,
-                                            'joints2D_vis': target_joints2d_visib_coco,
+                                            'joints2D': target_joints2d,
+                                            'joints2D_vis': target_joints2d_visib,
                                             'glob_rotmats': target_glob_rotmats}
 
                     optimiser.zero_grad()
@@ -259,16 +248,17 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                 #############################################################
                 # --------------------- TRACK METRICS ----------------------
                 #############################################################
-                pred_dict_for_loss['joints2D'] = pred_joints2d_coco_mode
+                pred_dict_for_loss['joints2D'] = pred_joints2d_mode
                 if criterion.loss_config.J2D_LOSS_ON == 'samples':
-                    pred_dict_for_loss['joints2Dsamples'] = pred_joints2d_coco_samples
+                    pred_dict_for_loss['joints2Dsamples'] = pred_joints2d_samples
                 elif criterion.loss_config.J2D_LOSS_ON == 'means+samples':
-                    pred_dict_for_loss['joints2Dsamples'] = pred_joints2d_coco_samples[:, 1:, :, :]
+                    pred_dict_for_loss['joints2Dsamples'] = pred_joints2d_samples[:, 1:, :, :]
                 del pred_dict_for_loss['pose_params_F']
                 del pred_dict_for_loss['pose_params_U']
                 del pred_dict_for_loss['pose_params_S']
                 del pred_dict_for_loss['pose_params_V']
                 del pred_dict_for_loss['shape_params']
+                del pred_dict_for_loss['style_params']
                 metrics_tracker.update_per_batch(split=split,
                                                  loss=loss,
                                                  pred_dict=pred_dict_for_loss,
@@ -283,7 +273,18 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                 if vis_logger is not None:
                     vis_logger.vis_rgb(rgb_in)
                     vis_logger.vis_edge(edge_in)
-                    vis_logger.vis_j2d_heatmaps(j2d_heatmaps)
+                    vis_logger.vis_heatmaps(heatmaps, label='gt_coco')
+
+                    pred_joints2d_normalized = undo_keypoint_normalisation(
+                        pred_joints2d_samples[:, 0],
+                        pose_shape_cfg.DATA.PROXY_REP_SIZE
+                    )
+                    pred_joints2d_coco_heatmaps = convert_2Djoints_to_gaussian_heatmaps_torch(
+                        pred_joints2d_normalized,
+                        pose_shape_cfg.DATA.PROXY_REP_SIZE,
+                        std=pose_shape_cfg.DATA.HEATMAP_GAUSSIAN_STD
+                    )
+                    vis_logger.vis_heatmaps(pred_joints2d_coco_heatmaps, label='pred_coco')
 
         #############################################################
         # ------------- UPDATE METRICS HISTORY and SAVE -------------
