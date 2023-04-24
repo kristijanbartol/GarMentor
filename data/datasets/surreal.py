@@ -49,7 +49,7 @@ class SurrealDataset(Dataset):
         _, garment_dirnames = self._get_all_garment_pairs(
             dataset_gender_dir=dataset_gender_dir
         )
-        garment_dirnames = ['shirt+pant']
+        garment_dirnames = ['t-shirt+pant']
         garment_dirpaths = [
             os.path.join(dataset_gender_dir, x) for x in garment_dirnames]
         

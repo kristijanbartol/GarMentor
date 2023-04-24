@@ -260,8 +260,10 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                 del pred_dict_for_loss['pose_params_U']
                 del pred_dict_for_loss['pose_params_S']
                 del pred_dict_for_loss['pose_params_V']
-                del pred_dict_for_loss['shape_params']
-                del pred_dict_for_loss['style_params']
+                #del pred_dict_for_loss['shape_params']
+                pred_dict_for_loss['shape_params'] = pred_dict_for_loss['shape_params'].loc
+                #del pred_dict_for_loss['style_params']
+                pred_dict_for_loss['style_params'] = pred_dict_for_loss['style_params'].loc
                 metrics_tracker.update_per_batch(split=split,
                                                  loss=loss,
                                                  pred_dict=pred_dict_for_loss,
