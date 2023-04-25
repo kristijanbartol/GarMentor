@@ -6,7 +6,7 @@ import torch
 from torch import nn as nn
 from torch.distributions import Normal
 
-from models.resnet import resnet18, resnet50
+from models.resnet import resnet18, resnet50, resnet101
 from utils.garment_classes import GarmentClasses
 
 from utils.rigid_transform_utils import rotmat_to_rot6d
@@ -62,6 +62,11 @@ class PoseMFShapeGaussianNet(nn.Module):
             fc1_dim = 512
         elif self.config.MODEL.NUM_RESNET_LAYERS == 50:
             self.image_encoder = resnet50(in_channels=self.config.MODEL.NUM_IN_CHANNELS,
+                                          pretrained=False)
+            num_image_features = 2048
+            fc1_dim = 1024
+        elif self.config.MODEL.NUM_RESNET_LAYERS == 101:
+            self.image_encoder = resnet101(in_channels=self.config.MODEL.NUM_IN_CHANNELS,
                                           pretrained=False)
             num_image_features = 2048
             fc1_dim = 1024
