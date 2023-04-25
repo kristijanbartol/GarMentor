@@ -17,7 +17,7 @@
         },
 
         {
-            "name": "Python: Train (Debug)",
+            "name": "Train (Debug)",
             "type": "python",
             "request": "launch",
             "program": "${file}",
@@ -31,7 +31,7 @@
         },
 
         {
-            "name": "Python: Train",
+            "name": "Train",
             "type": "python",
             "request": "launch",
             "program": "${file}",
@@ -44,7 +44,7 @@
         },
 
         {
-            "name": "Python: Pregenerate (TailorNet)",
+            "name": "Pregenerate (TailorNet)",
             "type": "python",
             "request": "launch",
             "program": "${file}",
@@ -60,7 +60,7 @@
         },
 
         {
-            "name": "Python: Copy LSUN",
+            "name": "Copy LSUN",
             "type": "python",
             "request": "launch",
             "program": "${file}",
@@ -73,7 +73,7 @@
         },
 
         {
-            "name": "Python: Predict",
+            "name": "Predict",
             "type": "python",
             "request": "launch",
             "program": "${file}",
@@ -90,7 +90,7 @@
         },
 
         {
-            "name": "Python: Evaluate",
+            "name": "Evaluate",
             "type": "python",
             "request": "launch",
             "program": "${file}",
@@ -102,7 +102,7 @@
         },
 
         {
-            "name": "Python: (Pre-Process) Evaluate",
+            "name": "(Pre-Process) Evaluate",
             "type": "python",
             "request": "launch",
             "program": "${file}",
@@ -110,6 +110,40 @@
             "justMyCode": false,
             "args": [
                 "--dataset_path", "/data/3DPW/"
+            ]
+        },
+
+        {
+            "name": "Check pred format (AGORA)",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--predZip", "/agora-evaluation/validation_predictions.zip",
+                "--extractZipFolder", "/agora-evaluation/predictions/frankmocap",
+                "--modeltype", "SMPL"
+            ]
+        },
+
+        {
+            "name": "Evaluate AGORA",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--pred_path", "/output/agora/pred/frankmocap/",
+                "--result_savePath", "/output/agora/results/frankmocap/",
+                "--imgFolder", "/data/agora/validation/",
+                "--loadPrecomputed", "/output/agora/pred/frankmocap/",
+                "--baseline", "frankmocap",
+                "--modeltype", "SMPL",
+                "--indices_path", "utils",
+                "--kid_template_path", "/data/agora/smpl/smpl_kid_template.npy",
+                "--modelFolder", "/data/agora/smpl/"
             ]
         }
     ]
