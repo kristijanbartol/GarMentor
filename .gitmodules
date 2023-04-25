@@ -13,3 +13,6 @@
 [submodule "agora_for_garmentor"]
 	path = agora_for_garmentor
 	url = https://github.com/kristijanbartol/agora_for_garmentor.git
+[submodule "frankmocap"]
+	path = frankmocap
+	url = https://github.com/kristijanbartol/frankmocap.git
