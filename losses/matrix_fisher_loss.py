@@ -275,11 +275,16 @@ class PoseMFShapeGaussianLoss(nn.Module):
             # NOTE: Only 2/4 (if num_classes=4) NLL losses are non-zero, others are masked.
             #style_nll = target_dict['garment_labels'] * style_nll_per_class                                    # (batch_size, num_classes=4)
             if self.loss_config.REDUCTION == 'mean':
-                style_nll = torch.mean(style_nll)
+                style_nll_primary = torch.mean(style_nll[:, :2])
+                style_nll_secondary = torch.mean(style_nll[:, 2:])
             elif self.loss_config.REDUCTION == 'sum':
-                style_nll = torch.sum(style_nll)
+                style_nll_primary = torch.sum(style_nll[:, :2])
+                style_nll_secondary = torch.sum(style_nll[:, 2:])
         else:
-            style_nll = 0.
+            style_nll_primary = 0.
+            style_weights_primary = 0.
+            style_nll_secondary = 0.
+            style_weights_secondary = 0.
 
         # Joints2D MSE
         target_joints2D = target_dict['joints2D']
@@ -302,7 +307,8 @@ class PoseMFShapeGaussianLoss(nn.Module):
 
         total_loss = pose_nll * self.loss_config.WEIGHTS.POSE \
                      + shape_nll * self.loss_config.WEIGHTS.SHAPE \
-                     + style_nll * self.loss_config.WEIGHTS.STYLE \
+                     + style_nll_primary * self.loss_config.WEIGHTS.STYLE \
+                     + style_nll_secondary * (self.loss_config.WEIGHTS.STYLE / 5.) \
                      + joints2D_loss * self.loss_config.WEIGHTS.JOINTS2D \
                      + glob_rotmats_loss * self.loss_config.WEIGHTS.GLOB_ROTMATS \
                      + joints3D_loss * self.loss_config.WEIGHTS.JOINTS3D
