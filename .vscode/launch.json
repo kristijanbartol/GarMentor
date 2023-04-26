@@ -145,6 +145,22 @@
                 "--kid_template_path", "/data/agora/smpl/smpl_kid_template.npy",
                 "--modelFolder", "/data/agora/smpl/"
             ]
+        },
+
+        {
+            "name": "Run FrankMocap",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--input_path", "/data/agora/validation/",
+                "--smpl_dir", "/data/hierprob3d/smpl/",
+                "--no_display",
+                "--out_dir", "/frankmocap/agora/results/",
+                "--save_pred_pkl"
+            ]
         }
     ]
 }

@@ -28,9 +28,10 @@
     ```
     git submodule update --recursive --remote
     ```
-5) Setup data required by TailorNet and HierProb3D:
+5) Setup data required by TailorNet, HierProb3D, and FrankMocap:
     * TailorNet: Please refer to [this document](docs/tailornet_preparation.md)
     * HierProb3D: Please refer to [this document](docs/hierprob3d_preparation.md)
+    * FrankMocap: Please refer to [this document](frankmocap/docs/INSTALL.md) (install body model for Garmentor)
 6) Setup 3DPW and SSP-3D datasets:
     * 3DPW: Please refer to [this document](docs/3dpw_preparation.md)
     * SSP-3D: Please refer to [this document](docs/ssp-3d_preparation.md)
