@@ -135,7 +135,17 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                
+                //"--regenerate",
+                //"--single_person,
+                "--pred_path", "/garmentor/frankmocap/output/agora/predictions/",
+                "--result_savePath", "/garmentor/frankmocap/output/agora/results/",
+                "--imgFolder", "/data/agora/validation/",
+                "--loadPrecomputed", "/garmentor/frankmocap/output/agora/predictions/",
+                "--baseline", "frankmocap",
+                "--modeltype", "SMPL",
+                "--indices_path", "utils",
+                "--kid_template_path", "/data/agora/smpl/smpl_kid_template.npy",
+                "--modelFolder", "/data/agora/smpl/"
             ]
         },
 

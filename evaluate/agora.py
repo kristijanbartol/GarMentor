@@ -9,17 +9,20 @@ import numpy as np
 import torch
 import cv2
 import sys
+import argparse
 
 sys.path.append('/garmentor/')
 
 from configs.paths import SMPL
+
+from agora_for_garmentor.agora_evaluation.evaluate_agora import run_evaluation
 
 from frankmocap.bodymocap.body_bbox_detector import BodyPoseEstimator
 from frankmocap.bodymocap.body_mocap_api import BodyMocap
 
 
 #RESULTS_DIR = '/garmentor/frankmocap/results/mocap/'
-PREDICTIONS_DIR = '/garmentor/frankmocap/results/agora/predictions/'
+#PREDICTIONS_DIR = '/garmentor/frankmocap/output/agora/predictions/'
 PRED_TEMPLATE = '{img_name}_personId_{subject_idx}.pkl'
 
 AGORA_IMG_DIR = '/data/agora/validation/'
@@ -45,6 +48,7 @@ def sort_by_bbox_size(
 
 def save_predictions(
         img_path: str,
+        pred_dir: str,
         pred_output_list: List[np.ndarray]
     ) -> None:
     img_name = os.path.basename(img_path).split('.')[0]
@@ -66,7 +70,7 @@ def save_predictions(
             }
         }
         pred_fpath = os.path.join(
-            PREDICTIONS_DIR, 
+            pred_dir, 
             PRED_TEMPLATE.format(
                 img_name=img_name, 
                 subject_idx=subject_idx)
@@ -76,24 +80,31 @@ def save_predictions(
             pkl.dump(pred_dict, pkl_f, protocol=pkl.HIGHEST_PROTOCOL)
 
 
-def check_regenerate(regenerate: bool):
-    if not os.path.exists(PREDICTIONS_DIR):
-        os.makedirs(PREDICTIONS_DIR)
+def check_regenerate(
+        regenerate: bool, 
+        pred_dir: str
+    ) -> bool:
+    if not os.path.exists(pred_dir):
+        os.makedirs(pred_dir)
         return True
     if not regenerate:
-        if len(os.listdir(PREDICTIONS_DIR)) == 0:
+        if len(os.listdir(pred_dir)) == 0:
             return True
     return regenerate
 
 
-def evaluate_agora(
+def predict(
         img_dir: str,
+        pred_dir: str,
         body_bbox_detector: BodyPoseEstimator,
         body_mocap: BodyMocap,
         regenerate: bool = True,
         single_person: bool = False
     ):
-    if check_regenerate(regenerate):
+    if check_regenerate(
+            regenerate=regenerate,
+            pred_dir=pred_dir
+        ):
         print('(Re-)generating predictions...')
         for img_name in os.listdir(img_dir):
             img_path = os.path.join(img_dir, img_name)
@@ -112,24 +123,95 @@ def evaluate_agora(
             assert len(body_bbox_list) == len(pred_output_list)
             save_predictions(
                 img_path=img_path,
+                pred_dir=pred_dir,
                 pred_output_list=pred_output_list
             )
-    
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--use_smplx', action='store_true', default=False,
+                        help='Whether to regenerate the predictions')
+    parser.add_argument('--regenerate', action='store_true', default=False,
+                        help='Whether to regenerate the predictions')
+    parser.add_argument('--single_person', action='store_true', default=False,
+                        help='Used in case of single-person crops which will be used for CAT-3D eval.')
+    parser.add_argument('--pred_path', type=str, default=None,
+                        help='Path containing the predicitons')
+    parser.add_argument('--debug_path', type=str, default=None,
+                        help='Path where the debug files will be stored')
+    parser.add_argument('--modelFolder', type=str,
+                        default='demo/model/smplx')
+    parser.add_argument('--numBetas', type=int, default=10)
+
+    parser.add_argument('--result_savePath', type=str, default=None,
+                        help='Path where all the results will be saved')
+    parser.add_argument(
+        '--indices_path',
+        type=str,
+        default='',
+        help='Path to hand,face and body vertex indices for SMPL-X')
+    parser.add_argument('--imgHeight', type=int, default=2160,
+                        help='Height of the image')
+    parser.add_argument('--imgWidth', type=int, default=3840,
+                        help='Width of the image')
+    parser.add_argument('--numBodyJoints', type=int, default=24,
+                        help='Num of body joints used for evaluation')
+    parser.add_argument(
+        '--imgFolder',
+        type=str,
+        default='',
+        help='Path to the folder containing test/validation images')
+    parser.add_argument('--loadPrecomputed', type=str, default='',
+                        help='Path to the ground truth SMPL/SMPLX dataframe')
+    parser.add_argument(
+        '--loadMatched',
+        type=str,
+        default='',
+        help='Path to the dataframe after the matching is done')
+    parser.add_argument(
+        '--meanPoseBaseline',
+        default=False,
+        action='store_true')
+    parser.add_argument(
+        '--onlyComputeErrorLoadPath',
+        type=str,
+        default='',
+        help='Path to the dataframe with all the errors already calculated and stored')
+    parser.add_argument(
+        '--baseline',
+        type=str,
+        default='SPIN',
+        help='Name of the baseline or the model being evaluated')
+    parser.add_argument(
+        '--modeltype',
+        type=str,
+        default='SMPLX',
+        help='SMPL or SMPLX')
+    parser.add_argument('--kid_template_path', type=str, default='template')
+    parser.add_argument('--gt_model_path', type=str, default='')
+    parser.add_argument('--onlybfh', action='store_true')
+    parser.add_argument('--debug', action='store_true')
+
+    return parser.parse_args()
 
 
 if __name__ == '__main__':
+    args = parse_args()
     device = torch.device('cuda')
     body_bbox_detector = BodyPoseEstimator()
     body_mocap = BodyMocap(
         regressor_checkpoint=MOCAP_CHECKPOINT_PATH, 
         smpl_dir=SMPL, 
         device=device, 
-        use_smplx=False
+        use_smplx=args.use_smplx
     )
-    evaluate_agora(
+    predict(
         img_dir=AGORA_IMG_DIR,
+        pred_dir=args.pred_path,
         body_bbox_detector=body_bbox_detector,
         body_mocap=body_mocap,
-        regenerate=False,
-        single_person=False
+        regenerate=args.regenerate,
+        single_person=args.single_person
     )
+    run_evaluation(args)
