@@ -135,15 +135,7 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--pred_path", "/output/agora/pred/frankmocap/",
-                "--result_savePath", "/output/agora/results/frankmocap/",
-                "--imgFolder", "/data/agora/validation/",
-                "--loadPrecomputed", "/output/agora/pred/frankmocap/",
-                "--baseline", "frankmocap",
-                "--modeltype", "SMPL",
-                "--indices_path", "utils",
-                "--kid_template_path", "/data/agora/smpl/smpl_kid_template.npy",
-                "--modelFolder", "/data/agora/smpl/"
+                
             ]
         },
 
