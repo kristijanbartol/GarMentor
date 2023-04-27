@@ -10,6 +10,7 @@ if [[ "$USER" == "kristijan" ]]; then
 	GARMENTOR_DATA_DIR=${BASE_DATA_DIR}/garmentor
 	MGN_DATA_DIR=${BASE_DATA_DIR}/mgn
 	AGORA_DATA_DIR=${BASE_DATA_DIR}/agora
+	FRANKMOCAP_DATA_DIR=${BASE_DATA_DIR}/frankmocap
 elif [[ "$USER" == "dbojanic" ]]; then
 	REPO_DIR=/home/dbojanic/garmentor/
 	BASE_DATA_DIR=/home/dbojanic/data/
@@ -20,6 +21,7 @@ elif [[ "$USER" == "dbojanic" ]]; then
 	GARMENTOR_DATA_DIR=${BASE_DATA_DIR}/garmentor/
 	MGN_DATA_DIR=${BASE_DATA_DIR}/mgn
 	AGORA_DATA_DIR=${BASE_DATA_DIR}/agora
+	FRANKMOCAP_DATA_DIR=${BASE_DATA_DIR}/frankmocap
 	USER="kbartol"
 elif [[ "$USER" == "julien" ]]; then
 	REPO_DIR=/home/julien/git/garmentor
@@ -30,6 +32,7 @@ elif [[ "$USER" == "julien" ]]; then
 	GARMENTOR_DATA_DIR=/home/julien/data/garmentor
 	MGN_DATA_DIR=/home/julien/data/mgn
 	AGORA_DATA_DIR=/home/julien/data/agora
+	FRANKMOCAP_DATA_DIR=${BASE_DATA_DIR}/frankmocap
 else
 	REPO_DIR=/path/to/garmentor/repository
 	PW3D_DIR=/path/to/3DPW/dataset
@@ -39,6 +42,7 @@ else
 	GARMENTOR_DATA_DIR=/path/to/garmentor/folder
 	MGN_DATA_DIR=/path/to/mgn/folder
 	AGORA_DATA_DIR=/path/to/agora/folder
+	FRANKMOCAP_DATA_DIR=${BASE_DATA_DIR}/frankmocap
 fi
 
 docker run -it \
@@ -55,4 +59,5 @@ docker run -it \
 	-v ${GARMENTOR_DATA_DIR}:/data/garmentor/ \
 	-v ${MGN_DATA_DIR}:/data/mgn/ \
 	-v ${AGORA_DATA_DIR}:/data/agora/ \
+	-v ${FRANKMOCAP_DATA_DIR}:/data/frankmocap/ \
 	$USER-garmentor

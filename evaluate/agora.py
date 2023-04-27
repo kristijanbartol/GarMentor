@@ -10,6 +10,7 @@ import torch
 import cv2
 import sys
 import argparse
+import shutil
 
 sys.path.append('/garmentor/')
 
@@ -21,11 +22,9 @@ from frankmocap.bodymocap.body_bbox_detector import BodyPoseEstimator
 from frankmocap.bodymocap.body_mocap_api import BodyMocap
 
 
-#RESULTS_DIR = '/garmentor/frankmocap/results/mocap/'
-#PREDICTIONS_DIR = '/garmentor/frankmocap/output/agora/predictions/'
 PRED_TEMPLATE = '{img_name}_personId_{subject_idx}.pkl'
+ZIP_TEMPLATE = '/garmentor/frankmocap/output/agora/predictions/{dirname}.zip'
 
-AGORA_IMG_DIR = '/data/agora/validation/'
 MOCAP_CHECKPOINT_PATH = '/data/frankmocap/pretrained/frankmocap/2020_05_31-00_50_43-best-51.749683916568756.pt'
 
 
@@ -88,7 +87,7 @@ def check_regenerate(
         os.makedirs(pred_dir)
         return True
     if not regenerate:
-        if len(os.listdir(pred_dir)) == 0:
+        if not os.path.exists(ZIP_TEMPLATE.format(dirname=os.path.basename(os.path.normpath(pred_dir)))):
             return True
     return regenerate
 
@@ -126,6 +125,11 @@ def predict(
                 pred_dir=pred_dir,
                 pred_output_list=pred_output_list
             )
+        shutil.make_archive(
+            ZIP_TEMPLATE.format(dirname=pred_dir), 
+            'zip', 
+            pred_dir
+        )
 
 
 def parse_args():
@@ -207,7 +211,7 @@ if __name__ == '__main__':
         use_smplx=args.use_smplx
     )
     predict(
-        img_dir=AGORA_IMG_DIR,
+        img_dir=args.imgFolder,
         pred_dir=args.pred_path,
         body_bbox_detector=body_bbox_detector,
         body_mocap=body_mocap,

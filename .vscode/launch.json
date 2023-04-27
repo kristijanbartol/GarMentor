@@ -121,8 +121,8 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--predZip", "/agora-evaluation/validation_predictions.zip",
-                "--extractZipFolder", "/agora-evaluation/predictions/frankmocap",
+                "--predZip", "/garmentor/frankmocap/output/agora/predictions/valid.zip",
+                "--extractZipFolder", "/garmentor/frankmocap/output/agora/tmp/",
                 "--modeltype", "SMPL"
             ]
         },
@@ -137,15 +137,15 @@
             "args": [
                 //"--regenerate",
                 //"--single_person,
-                "--pred_path", "/garmentor/frankmocap/output/agora/predictions/",
-                "--result_savePath", "/garmentor/frankmocap/output/agora/results/",
-                "--imgFolder", "/data/agora/validation/",
-                "--loadPrecomputed", "/garmentor/frankmocap/output/agora/predictions/",
+                "--pred_path", "/garmentor/frankmocap/output/agora/predictions/valid/",
+                "--result_savePath", "/garmentor/frankmocap/output/agora/results/valid",
+                "--imgFolder", "/data/agora/images/valid/",
+                "--loadPrecomputed", "/data/agora/gt/camera/valid/",
                 "--baseline", "frankmocap",
                 "--modeltype", "SMPL",
-                "--indices_path", "utils",
+                "--indices_path", "/garmentor/agora_for_garmentor/utils/",
                 "--kid_template_path", "/data/agora/smpl/smpl_kid_template.npy",
-                "--modelFolder", "/data/agora/smpl/"
+                "--modelFolder", "/data/hierprob3d/"
             ]
         },
 
