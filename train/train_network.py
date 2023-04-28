@@ -263,7 +263,10 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                 #del pred_dict_for_loss['shape_params']
                 pred_dict_for_loss['shape_params'] = pred_dict_for_loss['shape_params'].loc
                 #del pred_dict_for_loss['style_params']
-                pred_dict_for_loss['style_params'] = pred_dict_for_loss['style_params'].loc
+                if pred_dict_for_loss['style_params'] is not None:
+                    pred_dict_for_loss['style_params'] = pred_dict_for_loss['style_params'].loc
+                else:
+                    del pred_dict_for_loss['style_params']
                 metrics_tracker.update_per_batch(split=split,
                                                  loss=loss,
                                                  pred_dict=pred_dict_for_loss,

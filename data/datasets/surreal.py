@@ -41,17 +41,27 @@ class SurrealDataset(Dataset):
         super().__init__()
         print(f'Loading {data_split} data...')
         
-        dataset_gender_dir = os.path.join(
-            paths.DATA_ROOT_DIR,
-            self.DATASET_NAME,
-            gender)
+        if gender == 'neutral':
+            dataset_gender_dirs = [os.path.join(
+                paths.DATA_ROOT_DIR,
+                self.DATASET_NAME,
+                x) for x in ['male', 'female']]
+        else:
+            dataset_gender_dirs = [os.path.join(
+                paths.DATA_ROOT_DIR,
+                self.DATASET_NAME,
+                gender)]
 
         _, garment_dirnames = self._get_all_garment_pairs(
-            dataset_gender_dir=dataset_gender_dir
+            dataset_gender_dirs=dataset_gender_dirs
         )
         garment_dirnames = ['t-shirt+pant']
-        garment_dirpaths = [
-            os.path.join(dataset_gender_dir, x) for x in garment_dirnames]
+        garment_dirpaths = []
+        #garment_dirpaths = [
+        #    os.path.join(dataset_gender_dir, x) for x in garment_dirnames]
+        for dataset_gender_dir in dataset_gender_dirs:
+            for garment_dirname in garment_dirnames:
+                garment_dirpaths.append(os.path.join(dataset_gender_dir, garment_dirname))
         
         data_split_slices_list = self._get_slices(
             garment_dirpaths=garment_dirpaths,
@@ -82,7 +92,7 @@ class SurrealDataset(Dataset):
         
     @staticmethod
     def _get_all_garment_pairs(
-            dataset_gender_dir
+            dataset_gender_dirs: List[str]
         ) -> Tuple[List[GarmentClasses], List[str]]:
         """
         Collects all the garment class pairs based on directory names.
@@ -92,13 +102,14 @@ class SurrealDataset(Dataset):
         the combination this way.
         """
         garment_class_list, garment_dirnames = [], []
-        for garment_dirname in os.listdir(dataset_gender_dir):
-            garment_dirnames.append(garment_dirname)
-            garment_class_pair = garment_dirname.split('+')
-            garment_class_list.append(GarmentClasses(
-                upper_class=garment_class_pair[0],
-                lower_class=garment_class_pair[1]
-            ))
+        for dataset_gender_dir in dataset_gender_dirs:
+            for garment_dirname in os.listdir(dataset_gender_dir):
+                garment_dirnames.append(garment_dirname)
+                garment_class_pair = garment_dirname.split('+')
+                garment_class_list.append(GarmentClasses(
+                    upper_class=garment_class_pair[0],
+                    lower_class=garment_class_pair[1]
+                ))
         print(f'Found dirnames: {garment_dirnames}')
         return garment_class_list, garment_dirnames
     
