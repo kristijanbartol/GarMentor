@@ -93,7 +93,7 @@ def convert_multiclass_to_binary_labels(multiclass_labels):
     return binary_labels
 
 
-def convert_2Djoints_to_gaussian_heatmaps(joints2D, img_wh, std=4):
+def convert_2Djoints_to_gaussian_heatmaps(joints2D, img_wh, std=4.0):
     """
     :param joints2D: (N, 2) array, 2D joint locations.
     :return heatmaps: (img_wh, img_wh, N) array, 2D joint heatmaps (channels last).

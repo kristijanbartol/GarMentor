@@ -135,7 +135,9 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                //"--regenerate",
+                "--use_garmentor",
+                "--pose_shape_weights", "/garmentor/experiments/res50-400k-t+p-proper/saved_models/epoch_050.tar",
+                "--regenerate",
                 //"--single_person,
                 "--pred_path", "/garmentor/frankmocap/output/agora/predictions/valid/",
                 "--result_savePath", "/garmentor/frankmocap/output/agora/results/valid",
