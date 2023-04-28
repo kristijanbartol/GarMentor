@@ -2,7 +2,11 @@
 # NOTE (kbartol): Need to take from `demo_bodymocap.py` in the frankmocap repository to run the FrankMocap predictions.
 # NOTE (kbartol): Finally, need to also include the predictions made by our method.
 
-from typing import List, Union
+from typing import (
+    List, 
+    Union, 
+    Tuple
+)
 import os
 import pickle as pkl
 import numpy as np
@@ -118,9 +122,10 @@ def run_garmentor(
         edge_detector: CannyEdgeDetector,
         cropped_imgs: np.ndarray,
         device: torch.device
-    ):
+    ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
     imgs_tensor = torch.from_numpy(cropped_imgs.swapaxes(1, 3)).float().to(device)
-    heatmaps_list = []
+    shape_params_list = []
+    style_params_list = []
     for img_tensor in imgs_tensor:
         hrnet_output = predict_hrnet(
             hrnet_model=kpt_detector,
@@ -133,19 +138,18 @@ def run_garmentor(
             img_wh=IMG_WH,
             std=HEATMAP_GAUSSIAN_STD
         )
-        heatmaps_list.append(heatmaps)
-    heatmaps_array = np.transpose(np.stack(heatmaps_list, axis=0), [0, 3, 1, 2])
-    heatmaps_batch = torch.from_numpy(heatmaps_array).to(device)
-    edge_detector_output = edge_detector(imgs_tensor)
-    edge_map_batch = edge_detector_output['thresholded_thin_edges']  # EDGE_NMS=True
-    proxy_rep_input = torch.cat([edge_map_batch, heatmaps_batch], dim=1)
+        #heatmaps_list.append(heatmaps)
+        heatmaps = np.expand_dims(np.transpose(heatmaps, [2, 0, 1]), axis=0)
+        heatmaps = torch.from_numpy(heatmaps).to(device)
+        edge_detector_output = edge_detector(torch.unsqueeze(img_tensor, dim=0))
+        edge_map = edge_detector_output['thresholded_thin_edges']  # EDGE_NMS=True
+        proxy_rep_input = torch.cat([edge_map, heatmaps], dim=1)
 
-    _, _, _, _, _, pred_shape_dist, pred_style_dist, _, _ = garmentor_model(proxy_rep_input)
+        _, _, _, _, _, pred_shape_dist, pred_style_dist, _, _ = garmentor_model(proxy_rep_input)
+        shape_params_list.append(pred_shape_dist.loc[0].detach().cpu().numpy())
+        style_params_list.append(pred_style_dist.loc[0].detach().cpu().numpy())
 
-    return (
-        pred_shape_dist.loc.detach().cpu().numpy(), 
-        pred_style_dist.loc.detach().cpu().numpy()
-    )
+    return shape_params_list, style_params_list
 
 
 def sort_by_bbox_size(
@@ -182,8 +186,8 @@ def save_predictions(
         img_path: str,
         pred_dir: str,
         pred_output_list: List[np.ndarray],
-        pred_shape: np.ndarray,
-        pred_style: np.ndarray
+        pred_shape_list: List[np.ndarray],
+        pred_style_list: List[np.ndarray]
     ) -> None:
     img_name = os.path.basename(img_path).split('.')[0]
     for subject_idx, pred_output in enumerate(pred_output_list):
@@ -198,7 +202,7 @@ def save_predictions(
             'joints': joints,
             'params': {
                 'transl': np.array([[0., 0., 0.]]),
-                'betas': pred_shape,
+                'betas': pred_shape_list[subject_idx],
                 'global_orient': pose[None, :, :3],
                 'body_pose': np.reshape(pose[:, 3:], (1, 23, 3))
             }
@@ -264,11 +268,11 @@ def predict(
                     img_path=img_path,
                     pred_dir=pred_dir,
                     pred_output_list=pred_output_list,
-                    pred_shape=pred_shape,
-                    pred_style=pred_style
+                    pred_shape_list=pred_shape,
+                    pred_style_list=pred_style
                 )
         shutil.make_archive(
-            ZIP_TEMPLATE.format(dirname=pred_dir), 
+            ZIP_TEMPLATE.format(dirname=os.path.basename(os.path.normpath(pred_dir))), 
             'zip', 
             pred_dir
         )

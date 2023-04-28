@@ -48,7 +48,7 @@ RUN pip install --ignore-installed PyYAML \
 	loguru \
 	omegaconf \
 	pickle5 \
-	pandas \
+	pandas==1.0.3 \
 	mxnet-mkl==1.6.0
 
 RUN conda install pytorch=1.13.0 torchvision pytorch-cuda=11.6 -c pytorch -c nvidia
