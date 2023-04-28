@@ -131,7 +131,7 @@ def run_train(device,
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--gender', '-G', type=str, choices=['male', 'female'], default='male',
+    parser.add_argument('--gender', '-G', type=str, choices=['male', 'female', 'neutral'], default='male',
                         help='Select gender (both training data and SMPL model will be of that gender).')
     parser.add_argument('--experiment_dir', '-E', type=str,
                         help='Path to directory where logs and checkpoints are saved.')

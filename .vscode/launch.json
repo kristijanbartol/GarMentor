@@ -39,7 +39,8 @@
             "justMyCode": false,
             "args": [
                 "-E", "experiments/tmp", 
-                "--gpu", "0"
+                "--gpu", "0",
+                "-G", "neutral"
             ]
         },
 
