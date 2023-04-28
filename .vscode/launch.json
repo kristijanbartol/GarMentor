@@ -110,7 +110,7 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--pose_shape_weights", "experiments/res50-400k-t+p/saved_models/epoch_195.tar"
+                "--pose_shape_weights", "experiments/res50-400k-t+p-nostyle/saved_models/epoch_195.tar"
             ]
         },
 
@@ -150,13 +150,14 @@
             "args": [
                 "--use_garmentor",
                 "--pose_shape_weights", "/garmentor/experiments/res50-400k-t+p-proper/saved_models/epoch_050.tar",
+                //"--pose_shape_weights", "/data/hierprob3d/poseMF_shapeGaussian_net_weights.tar",
                 "--regenerate",
                 //"--single_person,
                 "--pred_path", "/garmentor/frankmocap/output/agora/predictions/valid/",
                 "--result_savePath", "/garmentor/frankmocap/output/agora/results/valid",
                 "--imgFolder", "/data/agora/images/valid/",
                 "--loadPrecomputed", "/data/agora/gt/camera/valid/",
-                "--baseline", "frankmocap",
+                "--baseline", "garmentor-res50-400k-t+p-proper",
                 "--modeltype", "SMPL",
                 "--indices_path", "/garmentor/agora_for_garmentor/utils/",
                 "--kid_template_path", "/data/agora/smpl/smpl_kid_template.npy",

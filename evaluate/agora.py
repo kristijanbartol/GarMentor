@@ -48,7 +48,7 @@ def parse_args():
     parser.add_argument('--use_garmentor', action='store_true', default=True,
                         help='whether to use our predictions for shape (and style)')
     parser.add_argument('--pose_shape_weights', '-W3D', type=str, 
-                        default='./model_files/poseMF_shapeGaussian_net_weights.tar')
+                        default='/data/hierprob3d/poseMF_shapeGaussian_net_weights.tar')
     parser.add_argument('--use_smplx', action='store_true', default=False,
                         help='Whether to regenerate the predictions')
     parser.add_argument('--regenerate', action='store_true', default=False,
@@ -147,7 +147,8 @@ def run_garmentor(
 
         _, _, _, _, _, pred_shape_dist, pred_style_dist, _, _ = garmentor_model(proxy_rep_input)
         shape_params_list.append(pred_shape_dist.loc[0].detach().cpu().numpy())
-        style_params_list.append(pred_style_dist.loc[0].detach().cpu().numpy())
+        if pred_style_dist is not None:
+            style_params_list.append(pred_style_dist.loc[0].detach().cpu().numpy())
 
     return shape_params_list, style_params_list
 

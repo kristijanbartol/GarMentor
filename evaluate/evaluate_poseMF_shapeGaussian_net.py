@@ -187,7 +187,8 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
                                           pose2rot=False)
 
             smpl_output_dict = parametric_model.run(
-                pose=pred_pose_axis_angle[0].cpu().numpy(),
+                #pose=pred_pose_axis_angle[0].cpu().numpy(),
+                pose=target_pose[0].cpu().numpy(),
                 shape=np.zeros(target_shape.shape[1:]),
                 #shape=pred_shape_dist.loc[0].cpu().numpy(),
                 style_vector=np.zeros((4, 4))
@@ -201,8 +202,8 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
             smpl_reposed_output_dict = parametric_model.run(
                 #pose=pred_pose_axis_angle[0].cpu().numpy(),
                 pose=np.zeros(pred_pose_axis_angle.shape[1:]),
-                #shape=np.zeros(target_shape.shape[1:]),
-                shape=pred_shape_dist.loc[0].cpu().numpy(),
+                shape=np.zeros(target_shape.shape[1:]),
+                #shape=pred_shape_dist.loc[0].cpu().numpy(),
                 #style_vector=pred_style_dist.loc[0].cpu().numpy()
                 style_vector=np.zeros((4, 4))
             )
@@ -383,10 +384,36 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
                 ]
             )
             
-            #Trimesh(vertices=pred_vertices_merged_trimesh, faces=pred_faces_merged_trimesh).export(
-            #    f'output/pred/{batch_num:05d}.obj')
-            Trimesh(vertices=pred_reposed_vertices_merged_trimesh * 1000., faces=pred_reposed_faces_merged_trimesh).export(
+            Trimesh(
+                vertices=smpl_output_dict['upper'].body_verts, 
+                faces=smpl_output_dict['upper'].body_faces
+            ).export(f'output/pred/{batch_num:05d}_body.obj')
+            Trimesh(
+                vertices=smpl_output_dict['upper'].garment_verts, 
+                faces=smpl_output_dict['upper'].garment_faces
+            ).export(f'output/pred/{batch_num:05d}_upper.obj')
+            Trimesh(
+                vertices=smpl_output_dict['lower'].garment_verts, 
+                faces=smpl_output_dict['lower'].garment_faces
+            ).export(f'output/pred/{batch_num:05d}_lower.obj')
+            Trimesh(vertices=pred_vertices_merged_trimesh, faces=pred_faces_merged_trimesh).export(
+                f'output/pred/{batch_num:05d}.obj')
+            Trimesh(
+                vertices=smpl_reposed_output_dict['upper'].body_verts, 
+                faces=smpl_reposed_output_dict['upper'].body_faces
+            ).export(f'output/pred_reposed/{batch_num:05d}_body.obj')
+            Trimesh(
+                vertices=smpl_reposed_output_dict['upper'].garment_verts, 
+                faces=smpl_reposed_output_dict['upper'].garment_faces
+            ).export(f'output/pred_reposed/{batch_num:05d}_upper.obj')
+            Trimesh(
+                vertices=smpl_reposed_output_dict['lower'].garment_verts, 
+                faces=smpl_reposed_output_dict['lower'].garment_faces
+            ).export(f'output/pred_reposed/{batch_num:05d}_lower.obj')
+            Trimesh(vertices=pred_reposed_vertices_merged_trimesh, faces=pred_reposed_faces_merged_trimesh).export(
                 f'output/pred_reposed/{batch_num:05d}.obj')
+            #Trimesh(vertices=pred_reposed_vertices_merged_trimesh * 1000., faces=pred_reposed_faces_merged_trimesh).export(
+            #    f'output/pred_reposed/{batch_num:05d}.obj')
             #Trimesh(vertices=target_vertices_clothed[0].cpu().numpy(), faces=smpl_faces).export(
             #    f'output/target/{batch_num:05d}.obj')
             #Trimesh(vertices=target_reposed_vertices_clothed[0].cpu().numpy(), faces=smpl_faces).export(
