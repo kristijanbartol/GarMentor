@@ -1,4 +1,5 @@
-# NOTE (kbartol): Adapted from MPI (original copyright and license below):
+# NOTE (kbartol): Adapted from MPI (original copyright and license below)
+# NOTE (kbartol): I should not publish this based on a more detailed AGORA license.
 
 #------------------------------------------------------------------------------
 # -*- coding: utf-8 -*-
@@ -40,6 +41,7 @@ import io
 import cv2
 from scipy.spatial.transform import Rotation as R
 import sys
+import argparse
 
 sys.path.append('/garmentor')
 
@@ -318,10 +320,10 @@ class DfData:
         return iter(data)
 
 
-class AGORAPreparator(DataGenerator):
+class Cat3DPreparator(DataGenerator):
 
     """
-    A data preparation class for ClothAGORA.
+    A data preparation class for CAT-3D<TN>.
     """
 
     DATASET_NAME = 'agora'
@@ -622,10 +624,79 @@ class AGORAPreparator(DataGenerator):
                     samples_counter += 1
 
 
+class Cat3DTestPreparator(Cat3DPreparator):
+
+    def __init__(self):
+        super().__init__(preextract_kpt=False)
+
+    def prepare(
+            self,
+            gender: str,
+            resolution_label: str = 'high'     # 'normal' or 'high'
+        ) -> None:
+        """
+        (Pre-)generate the dataset for particular upper+lower garment class.
+
+        The generated samples are stored in files (RGB images, seg maps),
+        i.e., update in the corresponding sample values' arrays. The sample
+        arrays are frequently updated on the disk in case the failure
+        happens along the way.
+        """
+        samples_values, num_generated = DataGenerator._create_values_array(
+            dataset_dir=os.path.join(
+                paths.AGORA_PREPARED_DIR,
+                gender
+            )
+        )
+        scene_pkl_file_names = os.listdir(paths.AGORA_GT_DIR)
+        samples_counter = 0
+        for df_idx, df_file_name in tqdm(enumerate(scene_pkl_file_names)):
+            logging.info(f'Preparing {df_idx}/{len(scene_pkl_file_names)} df...')
+            df = pandas.read_pickle(os.path.join(
+                paths.AGORA_GT_DIR,
+                df_file_name)
+            )
+            scene_name = df_file_name.split('.')[0]
+            for idx in tqdm(range(len(df))):
+                for jdx, _gender in enumerate(df.iloc[idx]['gender']):
+                    if _gender != gender or df.iloc[idx]['kid'][jdx] == True:
+                        continue
+                    if samples_counter < num_generated: # NOTE: To avoid regeneration.
+                        samples_counter += 1
+
+                    img_crop, sample_values = self.prepare_sample(
+                        gender=gender,
+                        scene_name=scene_name,
+                        resolution_label=resolution_label,
+                        df_row=df.iloc[idx], 
+                        jdx=jdx
+                    )
+                    if img_crop is None and sample_values is None:
+                        continue
+                    self._save_sample(
+                        sample_idx=samples_counter, 
+                        rgb_img=img_crop, #type:ignore
+                        seg_maps=None,  # NOTE: Might do with pretrained cloth seg.
+                        gender=gender,
+                        sample_values=sample_values, #type:ignore
+                        samples_values=samples_values
+                    )
+                    samples_counter += 1
+
+
 if __name__ == '__main__':
-    agora_preparator = AGORAPreparator(
-        preextract_kpt=False
-    )
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data_split', '-D', type=str, choices=['train', 'test'],
+                        help='data split for which to prepare data')
+    args = parser.parse_args()
+
+    if args.data_split == 'train':
+        agora_preparator = Cat3DPreparator(
+            preextract_kpt=False
+        )
+    else:
+        agora_preparator = Cat3DTestPreparator()
+        
     agora_preparator.prepare(
         gender='male',
         resolution_label='normal'

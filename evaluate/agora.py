@@ -202,7 +202,7 @@ def save_predictions(
             'joints': joints,
             'params': {
                 'transl': np.array([[0., 0., 0.]]),
-                'betas': pred_shape_list[subject_idx],
+                'betas': np.expand_dims(pred_shape_list[subject_idx], axis=0),
                 'global_orient': pose[None, :, :3],
                 'body_pose': np.reshape(pose[:, 3:], (1, 23, 3))
             }

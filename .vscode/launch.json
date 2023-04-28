@@ -59,6 +59,19 @@
             ]
         },
 
+
+        {
+            "name": "Prepare (CAT-3D)",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "-D", "test"
+            ]
+        },
+
         {
             "name": "Copy LSUN",
             "type": "python",
