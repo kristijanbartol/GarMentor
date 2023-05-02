@@ -2,12 +2,18 @@ from typing import Dict
 import torch
 import numpy as np
 from torchvision import transforms
+import cv2
 
 from configs.const import (
     BBOX_SCALE_FACTOR,
     OBJECT_DETECT_THRESHOLD
 )
 from utils.image_utils import convert_bbox_corners_to_centre_hw_torch, batch_crop_pytorch_affine
+from vis.visualizers.keypoints import KeypointsVisualizer
+
+
+
+keypoints_visualizer = KeypointsVisualizer(device='cuda')
 
 
 def get_kp_locations_confs_from_heatmaps(batch_heatmaps):
@@ -36,6 +42,12 @@ def get_kp_locations_confs_from_heatmaps(batch_heatmaps):
     return pred_kps, max_confs
 
 
+def tmp_debug(heatmaps, img_tensor):
+    heatmap_img = keypoints_visualizer.vis_heatmap_torch(heatmaps[0], heatmaps.shape[2], heatmaps.shape[3])
+    cv2.imwrite('heatmap_hrnet.png', np.swapaxes(heatmap_img.detach().cpu().numpy(), 0, 2))
+    cv2.imwrite('rgb_hrnet.png', np.swapaxes(img_tensor.detach().cpu().numpy(), 0, 2) * 255)
+
+
 def predict_hrnet(hrnet_model,
                   hrnet_config,
                   image,
@@ -52,6 +64,9 @@ def predict_hrnet(hrnet_model,
 
     """
     image_height, image_width = image.shape[1:]
+    if image.max() > 1.:
+        image /= 255.
+    
     if object_detect_model is not None:
         # Detecting object bounding boxes in input image
         # Bounding boxes are in (hor, vert) coordinates
@@ -99,6 +114,7 @@ def predict_hrnet(hrnet_model,
         pred_height_tensor = pred_width_tensor * aspect_ratio
 
     # Crop input image to centre-most person box + resize to 384x288 for HRNet input.
+    # NOTE (kbartol): The keypoint detection model seems to work better with the original image size (256, 256).
     '''
     image = batch_crop_pytorch_affine(input_wh=(image_width, image_height),
                                       output_wh=(hrnet_config.MODEL.IMAGE_SIZE[0], hrnet_config.MODEL.IMAGE_SIZE[1]),

@@ -93,12 +93,17 @@ class KeypointsVisualizer(Visualizer2D):
 
     def vis_heatmap_torch(
             self,
-            heatmap: torch.Tensor
+            heatmap: torch.Tensor,
+            height: Optional[int] = None,
+            width: Optional[int] = None
     ) -> torch.Tensor:
         """
         Visualize a colored heatmap based on given heatmap in Torch.
         """
-        colored_heatmap = torch.zeros(3, self.img_wh, self.img_wh).to(self.device)
+        if height is not None and width is not None:
+            colored_heatmap = torch.zeros(3, height, width).to(self.device)
+        else:
+            colored_heatmap = torch.zeros(3, self.img_wh, self.img_wh).to(self.device)
         for color_idx, color_key in enumerate(KPT_COLORS):
             _heatmap = torch.stack((heatmap[color_idx],) * 3, dim=0)
             color_tensor = torch.tensor(KPT_COLORS[color_key])

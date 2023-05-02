@@ -40,7 +40,7 @@
             "args": [
                 "-E", "experiments/tmp", 
                 "--gpu", "0",
-                "-G", "neutral"
+                "-G", "male"
             ]
         },
 
@@ -135,7 +135,7 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--predZip", "/garmentor/frankmocap/output/agora/predictions/valid.zip",
+                "--predZip", "/garmentor/frankmocap/output/agora/predictions/frankmocap/valid.zip",
                 "--extractZipFolder", "/garmentor/frankmocap/output/agora/tmp/",
                 "--modeltype", "SMPL"
             ]
@@ -149,16 +149,17 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--use_garmentor",
-                "--pose_shape_weights", "/garmentor/experiments/res50-400k-t+p-proper/saved_models/epoch_050.tar",
+                "--pose_shape_weights", "/garmentor/experiments/res50-500k-t+p-nostyle-proper-metrics/saved_models/epoch_060.tar",
+                //"--pose_shape_weights", "/garmentor/experiments/res50-400k-t+p-proper/saved_models/epoch_050.tar",
                 //"--pose_shape_weights", "/data/hierprob3d/poseMF_shapeGaussian_net_weights.tar",
-                "--regenerate",
+                //"--regenerate",
                 //"--single_person,
-                "--pred_path", "/garmentor/frankmocap/output/agora/predictions/valid/",
-                "--result_savePath", "/garmentor/frankmocap/output/agora/results/valid",
+                "--pred_path", "/garmentor/frankmocap/output/agora/predictions/{method}/valid/",
+                "--result_savePath", "/garmentor/frankmocap/output/agora/results/{method}/valid",
                 "--imgFolder", "/data/agora/images/valid/",
                 "--loadPrecomputed", "/data/agora/gt/camera/valid/",
-                "--baseline", "garmentor-res50-400k-t+p-proper",
+                "--baseline", "res50-500k-t+p-nostyle-proper-metrics",
+                //"--baseline", "frankmocap",
                 "--modeltype", "SMPL",
                 "--indices_path", "/garmentor/agora_for_garmentor/utils/",
                 "--kid_template_path", "/data/agora/smpl/smpl_kid_template.npy",

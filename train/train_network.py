@@ -185,7 +185,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                         #np.repeat((seg_maps[:, -1][None, 0] * 255).detach().cpu().numpy(), 3, axis=0)
                         proxy_rep_input = torch.cat([edge_in, seg_maps, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
                     else:
-                        proxy_rep_input = torch.cat([edge_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
+                        #proxy_rep_input = torch.cat([edge_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
+                        proxy_rep_input = torch.cat([heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
 
                 with torch.set_grad_enabled(split == 'train'): #type:ignore
                     #############################################################

@@ -30,6 +30,7 @@ from models.canny_edge_detector import CannyEdgeDetector
 from models.pose2D_hrnet import get_pretrained_detector, PoseHighResolutionNet
 from predict.predict_hrnet import predict_hrnet
 from utils.label_conversions import convert_2Djoints_to_gaussian_heatmaps
+from vis.visualizers.keypoints import KeypointsVisualizer
 
 from agora_for_garmentor.agora_evaluation.evaluate_agora import run_evaluation
 
@@ -38,14 +39,17 @@ from frankmocap.bodymocap.body_mocap_api import BodyMocap
 
 
 PRED_TEMPLATE = '{img_name}_personId_{subject_idx}.pkl'
-ZIP_TEMPLATE = '/garmentor/frankmocap/output/agora/predictions/{dirname}.zip'
+ZIP_TEMPLATE = '/garmentor/frankmocap/output/agora/predictions/{method}/{dirname}'
 
 MOCAP_CHECKPOINT_PATH = '/data/frankmocap/pretrained/frankmocap/2020_05_31-00_50_43-best-51.749683916568756.pt'
 
 
+keypoints_visualizer = KeypointsVisualizer(device='cuda')
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--use_garmentor', action='store_true', default=True,
+    parser.add_argument('--use_our_predictions', action='store_true', default=False,
                         help='whether to use our predictions for shape (and style)')
     parser.add_argument('--pose_shape_weights', '-W3D', type=str, 
                         default='/data/hierprob3d/poseMF_shapeGaussian_net_weights.tar')
@@ -115,12 +119,21 @@ def parse_args():
     return parser.parse_args()
 
 
+def tmp_debug(heatmaps, img_tensor, edge_map):
+    heatmap_img = keypoints_visualizer.vis_heatmap_torch(heatmaps[0])
+    cv2.imwrite('heatmap.png', np.swapaxes(heatmap_img.detach().cpu().numpy(), 0, 2))
+    cv2.imwrite('rgb.png', np.swapaxes(img_tensor.detach().cpu().numpy(), 0, 2) * 255)
+    #cv2.imwrite('whole_rgb.png', np.swapaxes(whole_img_tensor.detach().cpu().numpy(), 0, 2))
+    cv2.imwrite('edge.png', np.swapaxes(edge_map[0].detach().cpu().numpy(), 0, 2))
+
+
 def run_garmentor(
         garmentor_model: PoseMFShapeGaussianNet,
         kpt_detector: PoseHighResolutionNet,
         kpt_detector_cfg,
         edge_detector: CannyEdgeDetector,
         cropped_imgs: np.ndarray,
+        img: np.ndarray,
         device: torch.device
     ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
     imgs_tensor = torch.from_numpy(cropped_imgs.swapaxes(1, 3)).float().to(device)
@@ -132,13 +145,12 @@ def run_garmentor(
             hrnet_config=kpt_detector_cfg,
             image=img_tensor
         )
-        joints_2d = hrnet_output['joints2D'].detach().cpu().numpy()[:, ::-1]
+        joints_2d = hrnet_output['joints2D'].detach().cpu().numpy()#[:, ::-1]
         heatmaps = convert_2Djoints_to_gaussian_heatmaps(
             joints2D=joints_2d.round().astype(np.int16),
             img_wh=IMG_WH,
             std=HEATMAP_GAUSSIAN_STD
         )
-        #heatmaps_list.append(heatmaps)
         heatmaps = np.expand_dims(np.transpose(heatmaps, [2, 0, 1]), axis=0)
         heatmaps = torch.from_numpy(heatmaps).to(device)
         edge_detector_output = edge_detector(torch.unsqueeze(img_tensor, dim=0))
@@ -172,13 +184,17 @@ def sort_by_bbox_size(
 
 def check_regenerate(
         regenerate: bool, 
-        pred_dir: str
+        pred_dir: str,
+        method_name: str
     ) -> bool:
     if not os.path.exists(pred_dir):
         os.makedirs(pred_dir)
         return True
     if not regenerate:
-        if not os.path.exists(ZIP_TEMPLATE.format(dirname=os.path.basename(os.path.normpath(pred_dir)))):
+        if not os.path.exists(ZIP_TEMPLATE.format(
+                method=method_name,
+                dirname=os.path.basename(os.path.normpath(pred_dir))),
+            ):
             return True
     return regenerate
     
@@ -229,12 +245,14 @@ def predict(
         body_bbox_detector: BodyPoseEstimator,
         body_mocap: BodyMocap,
         device: torch.device,
+        method_name: str = 'frankmocap',
         regenerate: bool = True,
         single_person: bool = False
     ):
     if check_regenerate(
             regenerate=regenerate,
-            pred_dir=pred_dir
+            pred_dir=pred_dir,
+            method_name=method_name
         ):
         print('(Re-)generating predictions...')
         for img_name in os.listdir(img_dir):
@@ -253,27 +271,38 @@ def predict(
             )
             assert len(body_bbox_list) == len(pred_output_list)
             if len(body_bbox_list) > 0:
-                pred_shape, pred_style = run_garmentor(
-                    garmentor_model=garmentor_model,
-                    kpt_detector=kpt_detector,
-                    kpt_detector_cfg=kpt_detector_cfg,
-                    edge_detector=edge_detector,
-                    cropped_imgs=np.stack(
-                        [cv2.resize(x['img_cropped'], (IMG_WH, IMG_WH)) \
-                            for x in pred_output_list],
-                        axis=0
-                    ),
-                    device=device
-                )
+                if method_name != 'frankmocap' and method_name != 'zero':
+                    pred_shape_list, pred_style_list = run_garmentor(
+                        garmentor_model=garmentor_model,
+                        kpt_detector=kpt_detector,
+                        kpt_detector_cfg=kpt_detector_cfg,
+                        edge_detector=edge_detector,
+                        cropped_imgs=np.stack(
+                            [cv2.resize(x['img_cropped'] / 255, (IMG_WH, IMG_WH)) \
+                                for x in pred_output_list],
+                            axis=0
+                        ),
+                        img=img,
+                        device=device
+                    )
+                elif method_name == 'zero':
+                    pred_shape_list = [np.zeros((10,)) for _ in pred_output_list]
+                    pred_style_list = []    # NOTE: This is for AGORA evaluation OK.
+                else:
+                    pred_shape_list = [x['pred_betas'][0] for x in pred_output_list]
+                    pred_style_list = []
                 save_predictions(
                     img_path=img_path,
                     pred_dir=pred_dir,
                     pred_output_list=pred_output_list,
-                    pred_shape_list=pred_shape,
-                    pred_style_list=pred_style
+                    pred_shape_list=pred_shape_list,
+                    pred_style_list=pred_style_list
                 )
         shutil.make_archive(
-            ZIP_TEMPLATE.format(dirname=os.path.basename(os.path.normpath(pred_dir))), 
+            ZIP_TEMPLATE.format(
+                method=method_name,
+                dirname=os.path.basename(os.path.normpath(pred_dir)),
+            ), 
             'zip', 
             pred_dir
         )
@@ -316,6 +345,9 @@ if __name__ == '__main__':
         use_smplx=args.use_smplx
     )
 
+    args.pred_path = args.pred_path.format(method=args.baseline)
+    args.result_savePath = args.result_savePath.format(method=args.baseline)
+
     # Predict using the provided models and data.
     predict(
         img_dir=args.imgFolder,
@@ -326,6 +358,7 @@ if __name__ == '__main__':
         garmentor_model=pose_shape_dist_model,
         body_bbox_detector=body_bbox_detector,
         body_mocap=body_mocap,
+        method_name=args.baseline,
         regenerate=args.regenerate,
         single_person=args.single_person,
         device=device
