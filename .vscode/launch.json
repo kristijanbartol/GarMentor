@@ -149,21 +149,23 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--pose_shape_weights", "/garmentor/experiments/res50-500k-t+p-nostyle-proper-metrics/saved_models/epoch_060.tar",
+                //"--pose_shape_weights", "/garmentor/experiments/res50-400k-t+p-nostyle-proper-metrics-noedges/saved_models/epoch_030.tar",
                 //"--pose_shape_weights", "/garmentor/experiments/res50-400k-t+p-proper/saved_models/epoch_050.tar",
-                //"--pose_shape_weights", "/data/hierprob3d/poseMF_shapeGaussian_net_weights.tar",
+                "--pose_shape_weights", "/data/hierprob3d/poseMF_shapeGaussian_net_weights.tar",
                 //"--regenerate",
                 //"--single_person,
                 "--pred_path", "/garmentor/frankmocap/output/agora/predictions/{method}/valid/",
                 "--result_savePath", "/garmentor/frankmocap/output/agora/results/{method}/valid",
                 "--imgFolder", "/data/agora/images/valid/",
                 "--loadPrecomputed", "/data/agora/gt/camera/valid/",
-                "--baseline", "res50-500k-t+p-nostyle-proper-metrics",
+                "--baseline", "hierprob-zeroedges",
                 //"--baseline", "frankmocap",
                 "--modeltype", "SMPL",
                 "--indices_path", "/garmentor/agora_for_garmentor/utils/",
                 "--kid_template_path", "/data/agora/smpl/smpl_kid_template.npy",
-                "--modelFolder", "/data/hierprob3d/"
+                "--modelFolder", "/data/hierprob3d/",
+                "--num_in_channels", "18"
+                //"--num_in_channels", "17"
             ]
         },
 

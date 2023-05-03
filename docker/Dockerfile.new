@@ -71,6 +71,7 @@ RUN cd /git && git clone https://github.com/vchoutas/smplx && cd smplx && git re
 	sed -i "s/iteritems/items/g" clean_ch.py
 
 # Use this numpy version when you get error that bool can't be imported from numpy.
+# NOTE: Also pay attention to pandas==1.0.3
 RUN pip install numpy==1.23.1
 
 RUN mkdir -p /garmentor

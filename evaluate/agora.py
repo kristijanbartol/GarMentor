@@ -39,7 +39,8 @@ from frankmocap.bodymocap.body_mocap_api import BodyMocap
 
 
 PRED_TEMPLATE = '{img_name}_personId_{subject_idx}.pkl'
-ZIP_TEMPLATE = '/garmentor/frankmocap/output/agora/predictions/{method}/{dirname}'
+PRED_DIR_TEMPLATE = '/garmentor/frankmocap/output/agora/predictions/{method}/{dirname}'
+ZIP_FILE_TEMPLATE = '/garmentor/frankmocap/output/agora/predictions/{method}/{dirname}.zip'
 
 MOCAP_CHECKPOINT_PATH = '/data/frankmocap/pretrained/frankmocap/2020_05_31-00_50_43-best-51.749683916568756.pt'
 
@@ -51,6 +52,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--use_our_predictions', action='store_true', default=False,
                         help='whether to use our predictions for shape (and style)')
+    parser.add_argument('--num_in_channels', type=int, default=18,
+                        help='the number of input channels for garmentor-based models')
     parser.add_argument('--pose_shape_weights', '-W3D', type=str, 
                         default='/data/hierprob3d/poseMF_shapeGaussian_net_weights.tar')
     parser.add_argument('--use_smplx', action='store_true', default=False,
@@ -131,6 +134,7 @@ def run_garmentor(
         garmentor_model: PoseMFShapeGaussianNet,
         kpt_detector: PoseHighResolutionNet,
         kpt_detector_cfg,
+        num_in_channels: int,
         edge_detector: CannyEdgeDetector,
         cropped_imgs: np.ndarray,
         img: np.ndarray,
@@ -155,7 +159,13 @@ def run_garmentor(
         heatmaps = torch.from_numpy(heatmaps).to(device)
         edge_detector_output = edge_detector(torch.unsqueeze(img_tensor, dim=0))
         edge_map = edge_detector_output['thresholded_thin_edges']  # EDGE_NMS=True
-        proxy_rep_input = torch.cat([edge_map, heatmaps], dim=1)
+        # Concatenate edge-image and 2D joint heatmaps to create input proxy representation
+        if num_in_channels == 17:
+            proxy_rep_input = torch.cat([heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
+        else: # num_in_channels == 18
+            assert num_in_channels == 18
+            proxy_rep_input = torch.cat([edge_map * 0., heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
+        #proxy_rep_input = torch.cat([edge_map, heatmaps], dim=1)
 
         _, _, _, _, _, pred_shape_dist, pred_style_dist, _, _ = garmentor_model(proxy_rep_input)
         shape_params_list.append(pred_shape_dist.loc[0].detach().cpu().numpy())
@@ -191,7 +201,7 @@ def check_regenerate(
         os.makedirs(pred_dir)
         return True
     if not regenerate:
-        if not os.path.exists(ZIP_TEMPLATE.format(
+        if not os.path.exists(ZIP_FILE_TEMPLATE.format(
                 method=method_name,
                 dirname=os.path.basename(os.path.normpath(pred_dir))),
             ):
@@ -241,6 +251,7 @@ def predict(
         edge_detector: CannyEdgeDetector,
         kpt_detector: PoseHighResolutionNet,
         kpt_detector_cfg,
+        num_in_channels: int,
         garmentor_model: PoseMFShapeGaussianNet,
         body_bbox_detector: BodyPoseEstimator,
         body_mocap: BodyMocap,
@@ -276,6 +287,7 @@ def predict(
                         garmentor_model=garmentor_model,
                         kpt_detector=kpt_detector,
                         kpt_detector_cfg=kpt_detector_cfg,
+                        num_in_channels=num_in_channels,
                         edge_detector=edge_detector,
                         cropped_imgs=np.stack(
                             [cv2.resize(x['img_cropped'] / 255, (IMG_WH, IMG_WH)) \
@@ -299,7 +311,7 @@ def predict(
                     pred_style_list=pred_style_list
                 )
         shutil.make_archive(
-            ZIP_TEMPLATE.format(
+            PRED_DIR_TEMPLATE.format(
                 method=method_name,
                 dirname=os.path.basename(os.path.normpath(pred_dir)),
             ), 
@@ -355,6 +367,7 @@ if __name__ == '__main__':
         edge_detector=edge_detector,
         kpt_detector=kpt_detector,
         kpt_detector_cfg=kpt_detector_cfg,
+        num_in_channels=args.num_in_channels,
         garmentor_model=pose_shape_dist_model,
         body_bbox_detector=body_bbox_detector,
         body_mocap=body_mocap,

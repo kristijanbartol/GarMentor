@@ -113,6 +113,10 @@ def run_train(device,
         pose_shape_model.load_state_dict(checkpoint['model_state_dict']) # type: ignore
         optimiser.load_state_dict(checkpoint['optimiser_state_dict']) # type: ignore
 
+    metrics = ['PVE', 'PVE-SC', 'PVE-T-SC', 'shape', 'MPJPE', 'MPJPE-SC', 'MPJPE-PA', 'joints2D-L2E']
+    if pose_shape_cfg.MODEL.USE_STYLE is True:
+        metrics.append('style')
+
     train_poseMF_shapeGaussian_net(pose_shape_model=pose_shape_model,
                                    pose_shape_cfg=pose_shape_cfg,
                                    smpl_model=smpl_model,
@@ -122,8 +126,7 @@ def run_train(device,
                                    val_dataset=val_dataset,
                                    criterion=criterion,
                                    optimiser=optimiser,
-                                   #metrics=['PVE', 'PVE-SC', 'PVE-T-SC', 'shape', 'style', 'MPJPE', 'MPJPE-SC', 'MPJPE-PA', 'joints2D-L2E'],
-                                   metrics=['PVE', 'PVE-SC', 'PVE-T-SC', 'shape', 'MPJPE', 'MPJPE-SC', 'MPJPE-PA', 'joints2D-L2E'],
+                                   metrics=metrics,
                                    model_save_dir=model_save_dir,
                                    logs_save_path=logs_save_path,
                                    checkpoint=checkpoint,

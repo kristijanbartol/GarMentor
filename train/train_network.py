@@ -181,12 +181,16 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     heatmaps = heatmaps * target_joints2d_visib[:, :, None, None]
 
                     # Concatenate edge-image and 2D joint heatmaps to create input proxy representation
-                    if pose_shape_cfg.MODEL.NUM_IN_CHANNELS > 18:
+                    if pose_shape_cfg.MODEL.NUM_IN_CHANNELS > 23:
                         #np.repeat((seg_maps[:, -1][None, 0] * 255).detach().cpu().numpy(), 3, axis=0)
                         proxy_rep_input = torch.cat([edge_in, seg_maps, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
-                    else:
-                        #proxy_rep_input = torch.cat([edge_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
+                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 17:
                         proxy_rep_input = torch.cat([heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
+                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 18:
+                        proxy_rep_input = torch.cat([edge_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
+                    else:
+                        assert pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 22
+                        proxy_rep_input = torch.cat([seg_maps, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
 
                 with torch.set_grad_enabled(split == 'train'): #type:ignore
                     #############################################################
