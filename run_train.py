@@ -104,6 +104,7 @@ def run_train(device,
 
     # ------------------------- Loss Function + Optimiser -------------------------
     criterion = PoseMFShapeGaussianLoss(loss_config=pose_shape_cfg.LOSS.STAGE1,
+                                        model_config=pose_shape_cfg.MODEL,
                                         img_wh=pose_shape_cfg.DATA.PROXY_REP_SIZE)
     optimiser = optim.Adam(pose_shape_model.parameters(),
                            lr=pose_shape_cfg.TRAIN.LR)

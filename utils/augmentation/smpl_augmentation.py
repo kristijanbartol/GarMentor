@@ -32,9 +32,9 @@ def normal_sample_shape_numpy(mean_params: np.ndarray,      # (10,)
 
 def normal_sample_style_numpy(
         num_garment_classes: int,     
-        mean_params: np.ndarray,      # (10,)
-        std_vector: np.ndarray        # (10,)
-    ) -> np.ndarray:                  # (num_garment_classes, 10)
+        mean_params: np.ndarray,      # (4,)
+        std_vector: np.ndarray        # (4,)
+    ) -> np.ndarray:                  # (num_garment_classes, 4)
     """
     Normal sampling of style parameter deviations from the mean, for each garment.
     """

@@ -111,7 +111,8 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--pose_shape_weights", "experiments/res50-400k-t+p-nostyle/saved_models/epoch_195.tar"
+                "--pose_shape_weights", "/data/hierprob3d/poseMF_shapeGaussian_net_weights.tar",
+                "--dataset", "3dpw"
             ]
         },
 
@@ -123,7 +124,7 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--dataset_path", "/data/3DPW/"
+                "--dataset_path", "/data/3DPW/",
             ]
         },
 

@@ -237,10 +237,12 @@ class PoseMFShapeGaussianLoss(nn.Module):
     """
     def __init__(self,
                  loss_config,
+                 model_config,
                  img_wh):
         super(PoseMFShapeGaussianLoss, self).__init__()
 
         self.loss_config = loss_config
+        self.model_config = model_config
 
         self.img_wh = img_wh
         self.joints2D_loss = nn.MSELoss(reduction=loss_config.REDUCTION)
@@ -249,67 +251,97 @@ class PoseMFShapeGaussianLoss(nn.Module):
 
     def forward(self, target_dict, pred_dict):
 
-        # Pose NLL
-        pose_nll = matrix_fisher_nll(pred_F=pred_dict['pose_params_F'],
-                                     pred_U=pred_dict['pose_params_U'],
-                                     pred_S=pred_dict['pose_params_S'],
-                                     pred_V=pred_dict['pose_params_V'],
-                                     target_R=target_dict['pose_params_rotmats'],
-                                     overreg=self.loss_config.MF_OVERREG)
-        if self.loss_config.REDUCTION == 'mean':
-            pose_nll = torch.mean(pose_nll)
-        elif self.loss_config.REDUCTION == 'sum':
-            pose_nll = torch.sum(pose_nll)
+        if self.model_config.OUTPUT_SET == 'all':
+            # Pose NLL
+            pose_nll = matrix_fisher_nll(pred_F=pred_dict['pose_params_F'],
+                                        pred_U=pred_dict['pose_params_U'],
+                                        pred_S=pred_dict['pose_params_S'],
+                                        pred_V=pred_dict['pose_params_V'],
+                                        target_R=target_dict['pose_params_rotmats'],
+                                        overreg=self.loss_config.MF_OVERREG)
+            if self.loss_config.REDUCTION == 'mean':
+                pose_nll = torch.mean(pose_nll)
+            elif self.loss_config.REDUCTION == 'sum':
+                pose_nll = torch.sum(pose_nll)
 
-        # Shape NLL
-        shape_nll = -(pred_dict['shape_params'].log_prob(target_dict['shape_params']).sum(dim=1))  # (batch_size,)
-        if self.loss_config.REDUCTION == 'mean':
-            shape_nll = torch.mean(shape_nll)
-        elif self.loss_config.REDUCTION == 'sum':
-            shape_nll = torch.sum(shape_nll)
+            # Shape NLL
+            shape_nll = -(pred_dict['shape_params'].log_prob(target_dict['shape_params']).sum(dim=1))  # (batch_size,)
+            if self.loss_config.REDUCTION == 'mean':
+                shape_nll = torch.mean(shape_nll)
+            elif self.loss_config.REDUCTION == 'sum':
+                shape_nll = torch.sum(shape_nll)
+                
+            # Style NLL
+            if pred_dict['style_params'] is not None:
+                #style_nll_per_class = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=4)
+                style_nll = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=4)
+                # NOTE: Only 2/4 (if num_classes=4) NLL losses are non-zero, others are masked.
+                #style_nll = target_dict['garment_labels'] * style_nll_per_class                                    # (batch_size, num_classes=4)
+                if self.loss_config.REDUCTION == 'mean':
+                    style_nll = torch.mean(style_nll)
+                elif self.loss_config.REDUCTION == 'sum':
+                    style_nll = torch.sum(style_nll)
+            else:
+                style_nll = 0.
+
+            # Joints2D MSE
+            target_joints2D = target_dict['joints2D']
+            target_joints2D_vis = target_dict['joints2D_vis']
+            pred_joints2D = pred_dict['joints2D']
+
+            target_joints2D = target_joints2D[:, None, :, :].expand_as(pred_joints2D)  # Selecting visible 2D joint targets and predictions
+            target_joints2D_vis = target_joints2D_vis[:, None, :].expand(-1, pred_joints2D.shape[1], -1)
+            pred_joints2D = pred_joints2D[target_joints2D_vis, :]
+            target_joints2D = target_joints2D[target_joints2D_vis, :]
+
+            target_joints2D = (2.0 * target_joints2D) / self.img_wh - 1.0  # normalising joints to [-1, 1] range.
+            joints2D_loss = self.joints2D_loss(pred_joints2D, target_joints2D)
+
+            # Glob Rotmats MSE
+            glob_rotmats_loss = self.glob_rotmats_loss(pred_dict['glob_rotmats'], target_dict['glob_rotmats'])
+
+            # Joints3D MSE
+            joints3D_loss = self.joints3D_loss(pred_dict['joints3D'], target_dict['joints3D'])
+
+            total_loss = pose_nll * self.loss_config.WEIGHTS.POSE \
+                        + shape_nll * self.loss_config.WEIGHTS.SHAPE \
+                        + style_nll * self.loss_config.WEIGHTS.STYLE \
+                        + joints2D_loss * self.loss_config.WEIGHTS.JOINTS2D \
+                        + glob_rotmats_loss * self.loss_config.WEIGHTS.GLOB_ROTMATS \
+                        + joints3D_loss * self.loss_config.WEIGHTS.JOINTS3D
             
-        # Style NLL
-        if pred_dict['style_params'] is not None:
-            #style_nll_per_class = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=4)
+        elif self.model_config.OUTPUT_SET == 'style':
             style_nll = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=4)
-            # NOTE: Only 2/4 (if num_classes=4) NLL losses are non-zero, others are masked.
-            #style_nll = target_dict['garment_labels'] * style_nll_per_class                                    # (batch_size, num_classes=4)
             if self.loss_config.REDUCTION == 'mean':
                 style_nll = torch.mean(style_nll)
-                #style_nll_primary = torch.mean(style_nll[:, :2])
-                #style_nll_secondary = torch.mean(style_nll[:, 2:])
             elif self.loss_config.REDUCTION == 'sum':
                 style_nll = torch.sum(style_nll)
-                #style_nll_primary = torch.sum(style_nll[:, :2])
-                #style_nll_secondary = torch.sum(style_nll[:, 2:])
+
+            total_loss = style_nll
+        
+        elif self.model_config.OUTPUT_SET == 'shape':
+            shape_nll = -(pred_dict['shape_params'].log_prob(target_dict['shape_params']).sum(dim=1))  # (batch_size,)
+            if self.loss_config.REDUCTION == 'mean':
+                shape_nll = torch.mean(shape_nll)
+            elif self.loss_config.REDUCTION == 'sum':
+                shape_nll = torch.sum(shape_nll)
+
+            total_loss = shape_nll
+
         else:
-            style_nll = 0.
+            style_nll = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=4)
+            if self.loss_config.REDUCTION == 'mean':
+                style_nll = torch.mean(style_nll)
+            elif self.loss_config.REDUCTION == 'sum':
+                style_nll = torch.sum(style_nll)
 
-        # Joints2D MSE
-        target_joints2D = target_dict['joints2D']
-        target_joints2D_vis = target_dict['joints2D_vis']
-        pred_joints2D = pred_dict['joints2D']
+            shape_nll = -(pred_dict['shape_params'].log_prob(target_dict['shape_params']).sum(dim=1))  # (batch_size,)
+            if self.loss_config.REDUCTION == 'mean':
+                shape_nll = torch.mean(shape_nll)
+            elif self.loss_config.REDUCTION == 'sum':
+                shape_nll = torch.sum(shape_nll)
 
-        target_joints2D = target_joints2D[:, None, :, :].expand_as(pred_joints2D)  # Selecting visible 2D joint targets and predictions
-        target_joints2D_vis = target_joints2D_vis[:, None, :].expand(-1, pred_joints2D.shape[1], -1)
-        pred_joints2D = pred_joints2D[target_joints2D_vis, :]
-        target_joints2D = target_joints2D[target_joints2D_vis, :]
-
-        target_joints2D = (2.0 * target_joints2D) / self.img_wh - 1.0  # normalising joints to [-1, 1] range.
-        joints2D_loss = self.joints2D_loss(pred_joints2D, target_joints2D)
-
-        # Glob Rotmats MSE
-        glob_rotmats_loss = self.glob_rotmats_loss(pred_dict['glob_rotmats'], target_dict['glob_rotmats'])
-
-        # Joints3D MSE
-        joints3D_loss = self.joints3D_loss(pred_dict['joints3D'], target_dict['joints3D'])
-
-        total_loss = pose_nll * self.loss_config.WEIGHTS.POSE \
-                     + shape_nll * self.loss_config.WEIGHTS.SHAPE \
-                     + style_nll * self.loss_config.WEIGHTS.STYLE \
-                     + joints2D_loss * self.loss_config.WEIGHTS.JOINTS2D \
-                     + glob_rotmats_loss * self.loss_config.WEIGHTS.GLOB_ROTMATS \
-                     + joints3D_loss * self.loss_config.WEIGHTS.JOINTS3D
+            total_loss = style_nll * 2 + shape_nll
 
         return total_loss
 
