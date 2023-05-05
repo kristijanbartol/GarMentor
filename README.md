@@ -28,12 +28,13 @@
     ```
     git submodule update --recursive --remote
     ```
-5) Setup data required by TailorNet and HierProb3D:
+4) Setup data required by TailorNet and HierProb3D:
     * TailorNet: Please refer to [this document](docs/tailornet_preparation.md)
     * HierProb3D: Please refer to [this document](docs/hierprob3d_preparation.md)
-6) Setup 3DPW and SSP-3D datasets:
+5) Setup 3DPW and SSP-3D datasets:
     * 3DPW: Please refer to [this document](docs/3dpw_preparation.md)
     * SSP-3D: Please refer to [this document](docs/ssp-3d_preparation.md)
+6) Make sure that the paths in `garmentor/data/const.py` correspond to the locations in your installation
 7) Adapt the `docker/run.sh` script to mount the root directories that you previously created into the docker container
     * `REPO_DIR` should point to the garmentor repository
     * `PW3D_DIR` should point to `<3dpw_root>`

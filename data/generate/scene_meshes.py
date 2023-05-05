@@ -408,8 +408,8 @@ def generate_scene_samples(
                 osp.splitext(osp.relpath(gt_path_smplx, 'smplx_gt'))[0]
             )
             subject_garments.append({
-                'upper': selected_garments.split('_')[0],
-                'lower': selected_garments.split('_')[1]
+                'upper': selected_garments.split('+')[0],
+                'lower': selected_garments.split('+')[1]
             })
             # Load garment style vectors
             style_params = _read_subject_style_params(
@@ -546,9 +546,7 @@ if __name__ == '__main__':
             args.number_scenes[0] for _ in range(len(args.scene_names))
         ]
     else:
-        assert len(args.number_scenes) == len(args.scene_names), "number-scene"
-        "s must have length 1 or same length as scene-name: "
-        f"{len(args.number_scenes)} vs {len(args.scene_name)}"
+        assert len(args.number_scenes) == len(args.scene_names), f"number-scenes must have length 1 or same length as scene-names: {len(args.number_scenes)} vs {len(args.scene_names)}"
 
     for scene_idx in range(len(args.scene_names)):
         generate_scene_samples(

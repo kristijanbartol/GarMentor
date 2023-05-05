@@ -15,8 +15,13 @@ GARMENT_CLASSES = ['pant', 'short-pant', 'shirt', 't-shirt']
 DATA_DIR = '/data/'
 
 AGORA_DIR = os.path.join(DATA_DIR, 'agora/')
+
+# This doesn't need to be the same directory as the git repository
+# it will contain the generated characters and scene configurations
 GARMENTOR_DIR = os.path.join(DATA_DIR, 'garmentor/')
+
 MGN_DIR = os.path.join(DATA_DIR, 'mgn/')
+HIERPROB3D_DIR = os.path.join(DATA_DIR, 'HierProb3D/')
 
 SCANS_DIR = os.path.join(AGORA_DIR, 'smplx_gt/')
 MGN_DATASET = os.path.join(MGN_DIR, 'Multi-Garment_dataset/')

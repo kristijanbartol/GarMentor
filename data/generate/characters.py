@@ -18,7 +18,8 @@ from data.const import (
     GARMENTOR_DIR,
     SUBJECT_OBJ_SAVEDIR,
     MGN_DATASET,
-    SCANS_DIR
+    SCANS_DIR,
+    HIERPROB3D_DIR
 )
 
 
@@ -117,7 +118,7 @@ if __name__ == '__main__':
         os.path.join(MGN_DATASET, x) for x in os.listdir(MGN_DATASET)
     ]
 
-    textured_mesh_manager = TexturedGarmentsMeshManager(store_maps_to_disk=True)
+    textured_mesh_manager = TexturedGarmentsMeshManager(save_maps_to_disk=True)
     
     if not os.path.exists(GARMENTOR_DIR):
         os.makedirs(GARMENTOR_DIR)
@@ -166,8 +167,8 @@ if __name__ == '__main__':
                     continue
                 
             beta, theta = smplx2smpl(
-                '/data/hierprob3d/',
-                '/data/garmentor/conversion_output/',
+                HIERPROB3D_DIR,
+                os.path.join(GARMENTOR_DIR, 'conversion_output'),
                 beta,
                 theta,
                 gender=gender,
@@ -214,7 +215,7 @@ if __name__ == '__main__':
             mesh_basepath = os.path.join(mesh_dir, mesh_basename)
             textured_mesh_manager.save_meshes(
                 meshes=textured_meshes,
-                rel_path=mesh_basepath
+                save_basepath=mesh_basepath
             )
             textured_mesh_manager.add_usemtl(mesh_basepath)
 
