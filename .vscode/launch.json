@@ -136,7 +136,9 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--predZip", "/garmentor/frankmocap/output/agora/predictions/frankmocap/valid.zip",
+                "--baseline", "frankmocap",
+                "--data_split", "test",
+                "--predZip", "/garmentor/frankmocap/output/agora/predictions/{baseline}/{data_split}.zip",
                 "--extractZipFolder", "/garmentor/frankmocap/output/agora/tmp/",
                 "--modeltype", "SMPL"
             ]
@@ -152,15 +154,16 @@
             "args": [
                 //"--pose_shape_weights", "/garmentor/experiments/res50-400k-t+p-nostyle-proper-metrics-noedges/saved_models/epoch_030.tar",
                 //"--pose_shape_weights", "/garmentor/experiments/res50-400k-t+p-proper/saved_models/epoch_050.tar",
-                "--pose_shape_weights", "/data/hierprob3d/poseMF_shapeGaussian_net_weights.tar",
+                //"--pose_shape_weights", "/data/hierprob3d/poseMF_shapeGaussian_net_weights.tar",
                 //"--regenerate",
                 //"--single_person,
-                "--pred_path", "/garmentor/frankmocap/output/agora/predictions/{method}/valid/",
+                "--data_split", "valid",
+                "--pred_path", "/garmentor/frankmocap/output/agora/predictions/{method}/{data_split}/",
                 "--result_savePath", "/garmentor/frankmocap/output/agora/results/{method}/valid",
-                "--imgFolder", "/data/agora/images/valid/",
+                "--imgFolder", "/data/agora/images/{data_split}/",
                 "--loadPrecomputed", "/data/agora/gt/camera/valid/",
-                "--baseline", "hierprob-zeroedges",
-                //"--baseline", "frankmocap",
+                //"--baseline", "zero",
+                "--baseline", "zero",
                 "--modeltype", "SMPL",
                 "--indices_path", "/garmentor/agora_for_garmentor/utils/",
                 "--kid_template_path", "/data/agora/smpl/smpl_kid_template.npy",

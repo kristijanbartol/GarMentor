@@ -124,7 +124,7 @@ class Visualizer2D(Visualizer):
         """
         Add random 2D background "behind" rendered person based on mask.
         """
-        if self.background_paths is not None and back_img is not None:
+        if self.background_paths is not None or back_img is not None:
             if back_img is None:
                 back_img = load_background(
                     backgrounds_paths=self.backgrounds_paths,

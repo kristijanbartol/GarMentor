@@ -62,6 +62,8 @@ def parse_args():
                         help='Whether to regenerate the predictions')
     parser.add_argument('--single_person', action='store_true', default=False,
                         help='Used in case of single-person crops which will be used for CAT-3D eval.')
+    parser.add_argument('--data_split', type=str, default='valid',
+                        help='data split (either valid or test)')
     parser.add_argument('--pred_path', type=str, default=None,
                         help='Path containing the predicitons')
     parser.add_argument('--debug_path', type=str, default=None,
@@ -326,25 +328,29 @@ if __name__ == '__main__':
     device = torch.device('cuda')
 
     # Our method initialization.
-    edge_detector = CannyEdgeDetector(
-        non_max_suppression=pose_shape_cfg.DATA.EDGE_NMS,
-        gaussian_filter_std=pose_shape_cfg.DATA.EDGE_GAUSSIAN_STD,
-        gaussian_filter_size=pose_shape_cfg.DATA.EDGE_GAUSSIAN_SIZE,
-        threshold=pose_shape_cfg.DATA.EDGE_THRESHOLD
-    ).to(device)
-    smpl_model = SMPL(
-        paths.SMPL,
-        batch_size=1,
-        num_betas=pose_shape_cfg.MODEL.NUM_SMPL_BETAS
-    ).to(device)
-    smpl_immediate_parents = smpl_model.parents.tolist()
-    pose_shape_dist_model = PoseMFShapeGaussianNet(
-        smpl_parents=smpl_immediate_parents,
-        config=pose_shape_cfg
-    ).to(device).eval()
-    checkpoint = torch.load(args.pose_shape_weights, map_location=device)
-    pose_shape_dist_model.load_state_dict(checkpoint['best_model_state_dict'])
-    print('\nLoaded Distribution Predictor weights from', args.pose_shape_weights)
+    if args.baseline != 'frankmocap' and args.baseline != 'zero':
+        edge_detector = CannyEdgeDetector(
+            non_max_suppression=pose_shape_cfg.DATA.EDGE_NMS,
+            gaussian_filter_std=pose_shape_cfg.DATA.EDGE_GAUSSIAN_STD,
+            gaussian_filter_size=pose_shape_cfg.DATA.EDGE_GAUSSIAN_SIZE,
+            threshold=pose_shape_cfg.DATA.EDGE_THRESHOLD
+        ).to(device)
+        smpl_model = SMPL(
+            paths.SMPL,
+            batch_size=1,
+            num_betas=pose_shape_cfg.MODEL.NUM_SMPL_BETAS
+        ).to(device)
+        smpl_immediate_parents = smpl_model.parents.tolist()
+        pose_shape_dist_model = PoseMFShapeGaussianNet(
+            smpl_parents=smpl_immediate_parents,
+            config=pose_shape_cfg
+        ).to(device).eval()
+        checkpoint = torch.load(args.pose_shape_weights, map_location=device)
+        pose_shape_dist_model.load_state_dict(checkpoint['best_model_state_dict'])
+        print('\nLoaded Distribution Predictor weights from', args.pose_shape_weights)
+    else:
+        edge_detector = None
+        pose_shape_dist_model = None
 
     kpt_detector, kpt_detector_cfg = get_pretrained_detector()
 
@@ -357,12 +363,15 @@ if __name__ == '__main__':
         use_smplx=args.use_smplx
     )
 
-    args.pred_path = args.pred_path.format(method=args.baseline)
+    args.pred_path = args.pred_path.format(
+        method=args.baseline,
+        data_split=args.data_split
+    )
     args.result_savePath = args.result_savePath.format(method=args.baseline)
 
     # Predict using the provided models and data.
     predict(
-        img_dir=args.imgFolder,
+        img_dir=args.imgFolder.format(data_split=args.data_split),
         pred_dir=args.pred_path,
         edge_detector=edge_detector,
         kpt_detector=kpt_detector,
@@ -377,5 +386,6 @@ if __name__ == '__main__':
         device=device
     )
 
-    # Evaluate AGORA predictions.
-    run_evaluation(args)
+    if args.data_split == 'valid':
+        # Evaluate AGORA predictions.
+        run_evaluation(args)
