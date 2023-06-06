@@ -55,20 +55,21 @@ class PoseMFShapeGaussianNet(nn.Module):
         init_cam = torch.tensor(self.config.MODEL.WP_CAM).float()  # Initialise weak-perspective camera scale at 0.9
         self.register_buffer('init_cam', init_cam)
 
+        self.conv0 = nn.Conv2d(self.config.MODEL.NUM_IN_CHANNELS, 3, 1)
         # ResNet Image Encoder
         if self.config.MODEL.NUM_RESNET_LAYERS == 18:
             self.image_encoder = resnet18(in_channels=self.config.MODEL.NUM_IN_CHANNELS,
-                                          pretrained=False)
+                                          pretrained=self.config.MODEL.PRETRAINED)
             num_image_features = 512
             fc1_dim = 512
         elif self.config.MODEL.NUM_RESNET_LAYERS == 50:
             self.image_encoder = resnet50(in_channels=self.config.MODEL.NUM_IN_CHANNELS,
-                                          pretrained=False)
+                                          pretrained=self.config.MODEL.PRETRAINED)
             num_image_features = 2048
             fc1_dim = 1024
         elif self.config.MODEL.NUM_RESNET_LAYERS == 101:
             self.image_encoder = resnet101(in_channels=self.config.MODEL.NUM_IN_CHANNELS,
-                                          pretrained=False)
+                                          pretrained=self.config.MODEL.PRETRAINED)
             num_image_features = 2048
             fc1_dim = 1024
 
@@ -117,6 +118,8 @@ class PoseMFShapeGaussianNet(nn.Module):
         input: (B, C, D, D) where B is batch size, C is number of channels and
         D is height and width.
         """
+        if self.config.MODEL.PRETRAINED == True:
+            input = self.conv0(input)
         if input_feats is None:
             input_feats = self.image_encoder(input)
         batch_size = input_feats.shape[0]
