@@ -42,12 +42,6 @@ def get_kp_locations_confs_from_heatmaps(batch_heatmaps):
     return pred_kps, max_confs
 
 
-def tmp_debug(heatmaps, img_tensor):
-    heatmap_img = keypoints_visualizer.vis_heatmap_torch(heatmaps[0], heatmaps.shape[2], heatmaps.shape[3])
-    cv2.imwrite('heatmap_hrnet.png', np.swapaxes(heatmap_img.detach().cpu().numpy(), 0, 2))
-    cv2.imwrite('rgb_hrnet.png', np.swapaxes(img_tensor.detach().cpu().numpy(), 0, 2) * 255)
-
-
 def predict_hrnet(hrnet_model,
                   hrnet_config,
                   image,

@@ -61,6 +61,7 @@ def run_train(device,
     train_dataset = SurrealDataset(
         gender=gender,
         data_split='train',
+        garment_dirnames=pose_shape_cfg.GARMENT_DIRNAMES,
         train_val_ratio=0.8,
         backgrounds_dir_path=paths.TRAIN_BACKGROUNDS_PATH
     )

@@ -8,7 +8,8 @@ from data.mesh_managers.common import (
     MeshManager,
     default_upper_color,
     default_lower_color,
-    default_body_color
+    default_body_color,
+    random_pallete_color
 )
 from utils.mesh_utils import concatenate_meshes
 from vis.colors import GarmentColors, BodyColors
@@ -25,8 +26,11 @@ class ColoredGarmentsMeshManager(MeshManager):
         such as when generating the training data.
     '''
 
-    def __init__(self):
+    def __init__(
+            self,
+            config):
         super().__init__()
+        self.config = config
 
     def create_meshes(
             self,
@@ -56,15 +60,18 @@ class ColoredGarmentsMeshManager(MeshManager):
             smpl_output_dict['lower'].garment_faces
         ]
         
-        #body_colors = np.ones_like(verts_list[0]) * \
-        #    random_pallete_color(BodyColors)
-        body_colors = np.ones_like(verts_list[0]) * \
-            default_body_color(BodyColors)
+        if self.config.DEFAULT_MESH_COLORS:
+            body_colors = np.ones_like(verts_list[0]) * \
+                default_body_color(BodyColors)
+        else:
+            body_colors = np.ones_like(verts_list[0]) * \
+                random_pallete_color(BodyColors)
         
-        part_colors_list = [
-            np.ones_like(verts_list[1]) * default_upper_color(GarmentColors),
-            np.ones_like(verts_list[2]) * default_lower_color(GarmentColors),
-        ]
+        if self.config.DEFAULT_MESH_COLORS:
+            part_colors_list = [
+                np.ones_like(verts_list[1]) * default_upper_color(GarmentColors),
+                np.ones_like(verts_list[2]) * default_lower_color(GarmentColors),
+            ]
         
         concat_verts_list = [verts_list[0]]
         concat_faces_list = [faces_list[0]]
@@ -77,9 +84,14 @@ class ColoredGarmentsMeshManager(MeshManager):
             concat_verts_list.append(concat_verts)
             concat_faces_list.append(concat_faces)
             
+            if self.config.DEFAULT_MESH_COLORS:
+                part_colors = part_colors_list[idx]
+            else:
+                part_colors = np.ones_like(verts_list[idx+1]) * \
+                    random_pallete_color(GarmentColors)
             
             concat_color_list.append(
-                np.concatenate([concat_color_list[idx], part_colors_list[idx]], axis=0))
+                np.concatenate([concat_color_list[idx], part_colors], axis=0))
         
         meshes = []
         for idx in range(len(verts_list)):
