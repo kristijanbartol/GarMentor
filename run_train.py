@@ -61,6 +61,7 @@ def run_train(device,
     train_dataset = SurrealDataset(
         gender=gender,
         data_split='train',
+        garment_dirnames=pose_shape_cfg.GARMENT_DIRNAMES,
         train_val_ratio=0.8,
         backgrounds_dir_path=paths.TRAIN_BACKGROUNDS_PATH
     )
@@ -104,6 +105,7 @@ def run_train(device,
 
     # ------------------------- Loss Function + Optimiser -------------------------
     criterion = PoseMFShapeGaussianLoss(loss_config=pose_shape_cfg.LOSS.STAGE1,
+                                        model_config=pose_shape_cfg.MODEL,
                                         img_wh=pose_shape_cfg.DATA.PROXY_REP_SIZE)
     optimiser = optim.Adam(pose_shape_model.parameters(),
                            lr=pose_shape_cfg.TRAIN.LR)
@@ -112,6 +114,10 @@ def run_train(device,
     if resume_from_epoch is not None:
         pose_shape_model.load_state_dict(checkpoint['model_state_dict']) # type: ignore
         optimiser.load_state_dict(checkpoint['optimiser_state_dict']) # type: ignore
+
+    metrics = ['PVE', 'PVE-SC', 'PVE-T-SC', 'shape', 'MPJPE', 'MPJPE-SC', 'MPJPE-PA', 'joints2D-L2E']
+    if pose_shape_cfg.MODEL.USE_STYLE is True:
+        metrics.append('style')
 
     train_poseMF_shapeGaussian_net(pose_shape_model=pose_shape_model,
                                    pose_shape_cfg=pose_shape_cfg,
@@ -122,7 +128,7 @@ def run_train(device,
                                    val_dataset=val_dataset,
                                    criterion=criterion,
                                    optimiser=optimiser,
-                                   metrics=['PVE', 'PVE-SC', 'PVE-T-SC', 'MPJPE', 'MPJPE-SC', 'MPJPE-PA', 'joints2D-L2E'],
+                                   metrics=metrics,
                                    model_save_dir=model_save_dir,
                                    logs_save_path=logs_save_path,
                                    checkpoint=checkpoint,
@@ -131,7 +137,7 @@ def run_train(device,
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--gender', '-G', type=str, choices=['male', 'female'], default='male',
+    parser.add_argument('--gender', '-G', type=str, choices=['male', 'female', 'neutral'], default='male',
                         help='Select gender (both training data and SMPL model will be of that gender).')
     parser.add_argument('--experiment_dir', '-E', type=str,
                         help='Path to directory where logs and checkpoints are saved.')

@@ -17,7 +17,7 @@
         },
 
         {
-            "name": "Python: Train (Debug)",
+            "name": "Train (Debug)",
             "type": "python",
             "request": "launch",
             "program": "${file}",
@@ -31,7 +31,7 @@
         },
 
         {
-            "name": "Python: Train",
+            "name": "Train",
             "type": "python",
             "request": "launch",
             "program": "${file}",
@@ -39,12 +39,13 @@
             "justMyCode": false,
             "args": [
                 "-E", "experiments/tmp", 
-                "--gpu", "0"
+                "--gpu", "0",
+                "-G", "male"
             ]
         },
 
         {
-            "name": "Python: Pregenerate (TailorNet)",
+            "name": "Pregenerate (TailorNet)",
             "type": "python",
             "request": "launch",
             "program": "${file}",
@@ -59,8 +60,21 @@
             ]
         },
 
+
         {
-            "name": "Python: Copy LSUN",
+            "name": "Prepare (CAT-3D)",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "-D", "test"
+            ]
+        },
+
+        {
+            "name": "Copy LSUN",
             "type": "python",
             "request": "launch",
             "program": "${file}",
@@ -73,7 +87,7 @@
         },
 
         {
-            "name": "Python: Predict",
+            "name": "Predict",
             "type": "python",
             "request": "launch",
             "program": "${file}",
@@ -90,14 +104,88 @@
         },
 
         {
-            "name": "Python: Evaluate",
+            "name": "Evaluate",
             "type": "python",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--pose_shape_weights", "experiments/resnet50-style-params/saved_models/epoch_095.tar"
+                "--pose_shape_weights", "/data/hierprob3d/poseMF_shapeGaussian_net_weights.tar",
+                "--dataset", "3dpw"
+            ]
+        },
+
+        {
+            "name": "(Pre-Process) Evaluate",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--dataset_path", "/data/3DPW/",
+            ]
+        },
+
+        {
+            "name": "Check pred format (AGORA)",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--baseline", "frankmocap",
+                "--data_split", "test",
+                "--predZip", "/garmentor/frankmocap/output/agora/predictions/{baseline}/{data_split}.zip",
+                "--extractZipFolder", "/garmentor/frankmocap/output/agora/tmp/",
+                "--modeltype", "SMPL"
+            ]
+        },
+
+        {
+            "name": "Evaluate AGORA",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                //"--pose_shape_weights", "/garmentor/experiments/res50-400k-t+p-nostyle-proper-metrics-noedges/saved_models/epoch_030.tar",
+                //"--pose_shape_weights", "/garmentor/experiments/res50-400k-t+p-proper/saved_models/epoch_050.tar",
+                //"--pose_shape_weights", "/data/hierprob3d/poseMF_shapeGaussian_net_weights.tar",
+                //"--regenerate",
+                //"--single_person,
+                "--data_split", "valid",
+                "--pred_path", "/garmentor/frankmocap/output/agora/predictions/{method}/{data_split}/",
+                "--result_savePath", "/garmentor/frankmocap/output/agora/results/{method}/valid",
+                "--imgFolder", "/data/agora/images/{data_split}/",
+                "--loadPrecomputed", "/data/agora/gt/camera/valid/",
+                //"--baseline", "zero",
+                "--baseline", "zero",
+                "--modeltype", "SMPL",
+                "--indices_path", "/garmentor/agora_for_garmentor/utils/",
+                "--kid_template_path", "/data/agora/smpl/smpl_kid_template.npy",
+                "--modelFolder", "/data/hierprob3d/",
+                "--num_in_channels", "18"
+                //"--num_in_channels", "17"
+            ]
+        },
+
+        {
+            "name": "Run FrankMocap",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--input_path", "/data/agora/validation/",
+                "--smpl_dir", "/data/hierprob3d/smpl/",
+                "--no_display",
+                "--out_dir", "/frankmocap/agora/results/",
+                "--save_pred_pkl"
             ]
         }
     ]

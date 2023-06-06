@@ -93,19 +93,24 @@ class KeypointsVisualizer(Visualizer2D):
 
     def vis_heatmap_torch(
             self,
-            heatmap: torch.Tensor
+            heatmap: torch.Tensor,
+            height: Optional[int] = None,
+            width: Optional[int] = None
     ) -> torch.Tensor:
         """
         Visualize a colored heatmap based on given heatmap in Torch.
         """
-        colored_heatmap = torch.zeros(3, self.img_wh, self.img_wh).to(self.device)
+        if height is not None and width is not None:
+            colored_heatmap = torch.zeros(3, height, width).to(self.device)
+        else:
+            colored_heatmap = torch.zeros(3, self.img_wh, self.img_wh).to(self.device)
         for color_idx, color_key in enumerate(KPT_COLORS):
-            heatmap = torch.stack((heatmap[color_idx],) * 3, dim=1)
+            _heatmap = torch.stack((heatmap[color_idx],) * 3, dim=0)
             color_tensor = torch.tensor(KPT_COLORS[color_key])
-            heatmap[0] *= color_tensor[0]
-            heatmap[1] *= color_tensor[1]
-            heatmap[2] *= color_tensor[2]
-            colored_heatmaps += heatmap
+            _heatmap[0] *= color_tensor[0]
+            _heatmap[1] *= color_tensor[1]
+            _heatmap[2] *= color_tensor[2]
+            colored_heatmap += _heatmap
         return colored_heatmap
 
     def vis_heatmap_numpy(
@@ -117,11 +122,11 @@ class KeypointsVisualizer(Visualizer2D):
         """
         colored_heatmap = np.zeros((3, self.img_wh, self.img_wh))
         for color_idx, color_key in enumerate(KPT_COLORS):
-            heatmap = np.stack((heatmap[color_idx],) * 3, dim=1)
-            heatmap[0] *= KPT_COLORS[color_key][0]
-            heatmap[1] *= KPT_COLORS[color_key][1]
-            heatmap[2] *= KPT_COLORS[color_key][2]
-            colored_heatmaps += heatmap
+            _heatmap = np.stack((heatmap[color_idx],) * 3, dim=0)
+            _heatmap[0] *= KPT_COLORS[color_key][0]
+            _heatmap[1] *= KPT_COLORS[color_key][1]
+            _heatmap[2] *= KPT_COLORS[color_key][2]
+            colored_heatmap += _heatmap
         return colored_heatmap
     
     def vis_keypoints(

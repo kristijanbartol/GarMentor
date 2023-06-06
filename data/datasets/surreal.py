@@ -32,6 +32,7 @@ class SurrealDataset(Dataset):
     def __init__(self,
                  gender: str,
                  data_split: str,
+                 garment_dirnames: List[str],
                  train_val_ratio: float,
                  backgrounds_dir_path: str,
                  img_wh: int = 256):
@@ -41,24 +42,27 @@ class SurrealDataset(Dataset):
         super().__init__()
         print(f'Loading {data_split} data...')
         
-        dataset_gender_dir = os.path.join(
-            paths.DATA_ROOT_DIR,
-            self.DATASET_NAME,
-            gender)
+        if gender == 'neutral':
+            dataset_gender_dirs = [os.path.join(
+                paths.DATA_ROOT_DIR,
+                self.DATASET_NAME,
+                x) for x in ['male', 'female']]
+        else:
+            dataset_gender_dirs = [os.path.join(
+                paths.DATA_ROOT_DIR,
+                self.DATASET_NAME,
+                gender)]
 
-        self.garment_class_list, garment_dirnames = self._get_all_garment_pairs(
-            dataset_gender_dir=dataset_gender_dir
+        garment_dirpaths = self._get_all_garment_pairs(
+            dataset_gender_dirs=dataset_gender_dirs,
+            query_dirnames=garment_dirnames
         )
-        garment_dirpaths = [
-            os.path.join(dataset_gender_dir, x) for x in garment_dirnames]
-        
         data_split_slices_list = self._get_slices(
             garment_dirpaths=garment_dirpaths,
             values_fname=paths.VALUES_FNAME,
             data_split=data_split,
             train_val_ratio=train_val_ratio
         )
-        
         self.values = self._load_values(
             garment_dirpaths,
             slice_list=data_split_slices_list
@@ -81,8 +85,9 @@ class SurrealDataset(Dataset):
         
     @staticmethod
     def _get_all_garment_pairs(
-            dataset_gender_dir
-        ) -> Tuple[List[GarmentClasses], List[str]]:
+            dataset_gender_dirs: List[str],
+            query_dirnames: List[str]
+        ) -> List[str]:
         """
         Collects all the garment class pairs based on directory names.
 
@@ -90,16 +95,15 @@ class SurrealDataset(Dataset):
         combination is generated separately and it is simpler to determine
         the combination this way.
         """
-        garment_class_list, garment_dirnames = [], []
-        for garment_dirname in os.listdir(dataset_gender_dir):
-            garment_dirnames.append(garment_dirname)
-            garment_class_pair = garment_dirname.split('+')
-            garment_class_list.append(GarmentClasses(
-                upper_class=garment_class_pair[0],
-                lower_class=garment_class_pair[1]
-            ))
-        print(f'Found dirnames: {garment_dirnames}')
-        return garment_class_list, garment_dirnames
+        garment_dirpaths = []
+        for dataset_gender_dir in dataset_gender_dirs:
+            for query_dirname in query_dirnames:
+                query_dirpath = os.path.join(dataset_gender_dir, query_dirname)
+                if not os.path.exists(query_dirpath):
+                    raise FileNotFoundError(f'Not found generated data dir: {query_dirpath}')
+                print(f'Found directory: {query_dirpath}')
+                garment_dirpaths.append(query_dirpath)
+        return garment_dirpaths
     
     @staticmethod
     def _get_slices(
@@ -228,18 +232,20 @@ class SurrealDataset(Dataset):
         Get the sample based on index, which can be a list of indices.
         """
         seg_maps = np.load(self.seg_maps_paths[idx])['seg_maps']
-        rgb_img = imageio.imread(self.rgb_img_paths[idx]).transpose(2, 0, 1)
+        seg_maps = np.flip(seg_maps, axis=1)
+        rgb_img = imageio.imread(self.rgb_img_paths[idx]).transpose(2, 0, 1)[::-1] / 255
+        style_vector = self.values.style_vectors[idx][self.values.garment_labelss[idx]]
 
         return {
             'pose': self._to_tensor(self.values.poses[idx]),
             'shape': self._to_tensor(self.values.shapes[idx]),
-            'style_vector': self._to_tensor(self.values.style_vectors[idx]),
+            'style_vector': self._to_tensor(style_vector),
             'garment_labels': self._to_tensor(self.values.garment_labelss[idx]),
             'joints_3d': self._to_tensor(self.values.joints_3ds[idx]),
             'joints_2d': self._to_tensor(self.values.joints_2ds[idx]),
             'cam_t': self._to_tensor(self.values.cam_ts[idx]),
             'bbox': self._to_tensor(self.values.bboxs[idx]),
-            'rgb_img': self._to_tensor(rgb_img, type=np.uint8),
+            'rgb_img': self._to_tensor(rgb_img, type=np.float32),
             'seg_maps': self._to_tensor(seg_maps, type=bool),
             'background': self._load_background()
         }

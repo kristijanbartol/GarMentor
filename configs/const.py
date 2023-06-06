@@ -19,6 +19,7 @@ BACKGROUND_COLOR = (0.0, 0.0, 0.0)
 # Input data
 BBOX_SCALE_FACTOR = 1.2
 OBJECT_DETECT_THRESHOLD = 0.95
+HEATMAP_GAUSSIAN_STD = 4.0
 
 # Constant strings
 TRAIN = 'train'
