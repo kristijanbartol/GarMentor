@@ -49,6 +49,7 @@ def predict_poseMF_shapeGaussian_net(pose_shape_model,
                                             render_rgb=True,
                                             bin_size=32)
     surreal_renderer = ClothedRenderer(
+            config=pose_shape_cfg,
             device='cuda:0',
             batch_size=1
         )

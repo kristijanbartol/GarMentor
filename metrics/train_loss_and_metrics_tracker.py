@@ -22,6 +22,10 @@ class TrainingLossesAndMetricsTracker:
                                   'train_PVE-PA', 'val_PVE-PA',
                                   'train_PVE-T', 'val_PVE-T',
                                   'train_PVE-T-SC', 'val_PVE-T-SC',
+                                  'train_shape_method', 'val_shape_method',
+                                  'train_shape_baseline', 'val_shape_baseline',
+                                  'train_style_method', 'val_style_method',
+                                  'train_style_baseline', 'val_style_baseline',
                                   'train_MPJPE', 'val_MPJPE',
                                   'train_MPJPE-SC', 'val_MPJPE-SC',
                                   'train_MPJPE-PA', 'val_MPJPE-PA',
@@ -29,6 +33,14 @@ class TrainingLossesAndMetricsTracker:
                                   'train_joints2Dsamples-L2E', 'val_joints2Dsamples-L2E']
 
         self.metrics_to_track = metrics_to_track
+        if 'shape' in self.metrics_to_track:
+            self.metrics_to_track.remove('shape')
+            self.metrics_to_track.append('shape_method')
+            self.metrics_to_track.append('shape_baseline')
+        if 'style' in self.metrics_to_track:
+            self.metrics_to_track.remove('style')
+            self.metrics_to_track.append('style_method')
+            self.metrics_to_track.append('style_baseline')
         self.img_wh = img_wh
         self.log_save_path = log_save_path
 
@@ -149,6 +161,18 @@ class TrainingLossesAndMetricsTracker:
             pvet_sc_batch = np.linalg.norm(pred_reposed_vertices_sc - target_reposed_vertices, axis=-1)  # (bs, num_verts)
             self.loss_metric_sums[split + '_PVE-T-SC'] += np.sum(pvet_sc_batch)  # scalar
 
+        if 'shape_method' in self.metrics_to_track:
+            shape_params_method_batch = np.mean(np.abs(pred_dict['shape_params'] - target_dict['shape_params']), axis=-1)
+            shape_params_baseline_batch = np.mean(np.abs(np.zeros_like(pred_dict['shape_params']) - target_dict['shape_params']), axis=-1)
+            self.loss_metric_sums[split + '_shape_method'] += np.sum(shape_params_method_batch)
+            self.loss_metric_sums[split + '_shape_baseline'] += np.sum(shape_params_baseline_batch)
+
+        if 'style_method' in self.metrics_to_track:
+            style_params_method_batch = np.mean(np.mean(np.abs(pred_dict['style_params'] - target_dict['style_params']), axis=-1), axis=-1)
+            style_params_baseline_batch = np.mean(np.mean(np.abs(np.zeros_like(pred_dict['style_params']) - target_dict['style_params']), axis=-1), axis=-1)
+            self.loss_metric_sums[split + '_style_method'] += np.sum(style_params_method_batch)
+            self.loss_metric_sums[split + '_style_baseline'] += np.sum(style_params_baseline_batch)
+
         if 'MPJPE' in self.metrics_to_track:
             mpjpe_batch = np.linalg.norm(pred_dict['joints3D'] - target_dict['joints3D'], axis=-1)  # (bsize, njoints) or (bsize, njoints)
             self.loss_metric_sums[split + '_MPJPE'] += np.sum(mpjpe_batch)  # scalar
@@ -215,6 +239,8 @@ class TrainingLossesAndMetricsTracker:
                         num_per_sample = 14  # num 2D joints per sample
                     elif 'joints2D' in metric_type:
                         num_per_sample = 17  # num 3D joints per sample
+                    else:
+                        num_per_sample = 1
 
                     self.epochs_history[metric_type].append(self.loss_metric_sums[metric_type] / (self.loss_metric_sums[split + '_num_samples'] * num_per_sample))
             else:

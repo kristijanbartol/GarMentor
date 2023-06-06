@@ -14,6 +14,12 @@ def undo_keypoint_normalisation(normalised_keypoints, img_wh):
     return keypoints
 
 
+# NOTE: Used just when the ground truth poses are used in training time.
+def normalize_keypoints(keypoints, img_wh):
+    normalized_keypoints = (2 * keypoints) / img_wh - 1
+    return normalized_keypoints
+
+
 def check_joints2d_visibility_torch(joints2d,
                                     img_wh,
                                     visibility=None):

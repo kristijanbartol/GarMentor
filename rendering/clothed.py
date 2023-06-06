@@ -1,10 +1,18 @@
 from typing import Dict, Tuple, List
 import torch
 import numpy as np
+from pytorch3d.structures import Meshes
+from pytorch3d.renderer import Textures
 
 from data.mesh_managers.colored_garments import ColoredGarmentsMeshManager
+from data.mesh_managers.common import (
+    MeshManager,
+    default_upper_color,
+    default_lower_color
+)
 from rendering.common import Renderer
 from utils.garment_classes import GarmentClasses
+from vis.colors import GarmentColors
 
 from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
 
@@ -23,12 +31,13 @@ class ClothedRenderer(Renderer):
 
     def __init__(
             self,
+            config,
             *args,
             **kwargs
         ) -> None:
         ''' The clothed renderer constructor.'''
         super().__init__(*args, **kwargs)
-        self.mesh_manager = ColoredGarmentsMeshManager()
+        self.mesh_manager = ColoredGarmentsMeshManager(config=config)
     
     def _extract_seg_maps(
             self, 
@@ -103,3 +112,52 @@ class ClothedRenderer(Renderer):
         feature_maps = self._organize_seg_maps(seg_maps, garment_classes)
 
         return final_rgb, feature_maps
+    
+    @staticmethod
+    def _simple_extract_seg_map(rgb):
+        return ~np.all(np.isclose(np.zeros_like(rgb), rgb, atol=1e-3), axis=-1)
+
+    def special_rendering(
+            self,
+            smpl_output_dict: Dict[str, SMPL4GarmentOutput],
+            garment_classes: GarmentClasses,
+            device: str,
+    ):
+        upper_verts = torch.from_numpy(smpl_output_dict['upper'].garment_verts).float().unsqueeze(0).to(device)
+        upper_faces = torch.from_numpy(smpl_output_dict['upper'].garment_faces.astype(np.int32)).unsqueeze(0).to(device)
+        upper_color = torch.tensor(default_upper_color(GarmentColors)).float().to(device)
+        upper_mesh_color = (torch.ones_like(upper_verts) * \
+            upper_color).float().to(device)
+        upper_mesh = Meshes(
+            verts=upper_verts,
+            faces=upper_faces,
+            textures=Textures(verts_rgb=upper_mesh_color)
+        )
+        lower_verts = torch.from_numpy(smpl_output_dict['lower'].garment_verts).float().unsqueeze(0).to(device)
+        lower_faces = torch.from_numpy(smpl_output_dict['lower'].garment_faces.astype(np.int32)).unsqueeze(0).to(device)
+        lower_color = torch.tensor(default_lower_color(GarmentColors)).float().to(device)
+        lower_mesh_color = (torch.ones_like(lower_verts) * \
+            lower_color).float().to(device)
+        lower_mesh = Meshes(
+            verts=lower_verts,
+            faces=lower_faces,
+            textures=Textures(verts_rgb=lower_mesh_color)
+        )
+
+        rgbs = []
+        for mesh in [upper_mesh, lower_mesh]:
+            fragments = self.rasterizer(
+                mesh, 
+                cameras=self.cameras
+            )
+            rgb_image = self.rgb_shader(
+                fragments, 
+                mesh, 
+                lights=self.lights_rgb_render
+            )[:, :, :, :3]
+            rgbs.append(rgb_image[0])
+            
+        #upper_seg_map = self._simple_extract_seg_map(rgbs[0])
+        #lower_seg_map = self._simple_extract_seg_map(rgbs[1])
+
+        return rgbs[0], rgbs[1]

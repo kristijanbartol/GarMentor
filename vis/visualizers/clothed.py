@@ -117,6 +117,24 @@ class ClothedVisualizer(Visualizer2D):
             smpl_output_dict['upper'].joints
         )
     
+    def vis_garments_only(
+            self,
+            pose,
+            shape,
+            style_vector
+        ):
+        smpl_output_dict = self.parametric_model.run(
+            pose=pose,
+            shape=shape,
+            style_vector=style_vector
+        )
+        upper_rgb, lower_rgb = self.renderer.special_rendering(
+            smpl_output_dict=smpl_output_dict,
+            garment_classes=self.parametric_model.garment_classes,
+            device=self.device,
+        )
+        return upper_rgb, lower_rgb
+
     @staticmethod
     def save_vis(
             rgb_img: np.ndarray,

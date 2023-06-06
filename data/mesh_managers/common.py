@@ -14,6 +14,18 @@ def random_pallete_color(pallete):
     return np.array(norm_color(list(pallete)[randint(0, len(pallete) - 1)].value))
 
 
+def default_body_color(pallete):
+    return np.array(norm_color(list(pallete)[0].value))
+
+
+def default_upper_color(pallete):
+    return np.array(norm_color(list(pallete)[4].value))
+
+
+def default_lower_color(pallete):
+    return np.array(norm_color(list(pallete)[7].value))
+
+
 def create_psbody_meshes(smpl_output_dict: SMPL4GarmentOutput
                     ) -> Tuple[Mesh, Mesh, Mesh]:
     ''' Create psbody.Meshes objects given SMPL4Garment output.
