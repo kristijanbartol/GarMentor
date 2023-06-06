@@ -57,7 +57,6 @@ def _sample_scene_data(
         # Only get the rows which contain entries for the specified scene
         df_scene = pd.concat([
             df_scene,
-            #df[df['imgPath'] == "ag_trainset_3dpeople_bfh_archviz_5_10_cam00_00003.png"]
             df[df['imgPath'].str.contains(scene_name)]
         ])
     # df_scene now contains all entries for the given scene
@@ -388,12 +387,6 @@ def generate_scene_samples(
         transformation_info[osp.splitext(img_path)[0]] = {
             'camera': {'x': camX, 'y': camY, 'z': camZ, 'yaw': camYaw}
         }
-        #camera_information[osp.splitext(img_path)[0]] = {
-        #    'x': camX,
-        #    'y': camY,
-        #    'z': camZ,
-        #    'yaw': camYaw
-        #}
 
         output_dirpath = osp.join(
             SCENE_OBJ_SAVEDIR,
@@ -415,8 +408,8 @@ def generate_scene_samples(
                 osp.splitext(osp.relpath(gt_path_smplx, 'smplx_gt'))[0]
             )
             subject_garments.append({
-                'upper': selected_garments.split('_')[0],
-                'lower': selected_garments.split('_')[1]
+                'upper': selected_garments.split('+')[0],
+                'lower': selected_garments.split('+')[1]
             })
             # Load garment style vectors
             style_params = _read_subject_style_params(
@@ -437,14 +430,6 @@ def generate_scene_samples(
                 subject_styles.append(None)
                 continue
             subject_styles.append(style_params)
-
-            # Not relevant here, as translations are given in unreal coordinate
-            # space
-            #trans = np.array([
-            #    Xs[subject_idx],
-            #    Ys[subject_idx],
-            #    Zs[subject_idx]
-            #]) / 100.0 # translations are given in cm, while blender uses m
 
             for mesh_type in ['body', 'upper', 'lower']:
                 shutil.copy(
@@ -475,7 +460,7 @@ def generate_scene_samples(
                 print(f"Subject {mesh_basepath} invalid, skipping...")
                 invalid_subjects.append(f"Image: {img_path}")
                 invalid_subjects.append(f"Subject: {mesh_basepath}")
-                invalid_subjects.append(f"Error: {e}")
+                invalid_subjects.append(f"Error: {e}\n")
                 for element in os.listdir(output_dirpath):
                     if _subject_idx_formatting(subject_idx) in element:
                         os.remove(osp.join(output_dirpath, element))
@@ -561,9 +546,7 @@ if __name__ == '__main__':
             args.number_scenes[0] for _ in range(len(args.scene_names))
         ]
     else:
-        assert len(args.number_scenes) == len(args.scene_names), "number-scene"
-        "s must have length 1 or same length as scene-name: "
-        f"{len(args.number_scenes)} vs {len(args.scene_name)}"
+        assert len(args.number_scenes) == len(args.scene_names), f"number-scenes must have length 1 or same length as scene-names: {len(args.number_scenes)} vs {len(args.scene_names)}"
 
     for scene_idx in range(len(args.scene_names)):
         generate_scene_samples(

@@ -28,14 +28,15 @@
     ```
     git submodule update --recursive --remote
     ```
-5) Setup data required by TailorNet, HierProb3D, and FrankMocap:
+4) Setup data required by TailorNet, HierProb3D, and FrankMocap:
     * TailorNet: Please refer to [this document](docs/tailornet_preparation.md)
     * HierProb3D: Please refer to [this document](docs/hierprob3d_preparation.md)
     * FrankMocap: Please refer to [this document](frankmocap/docs/INSTALL.md) (install body model for Garmentor)
-6) Setup AGORA, 3DPW, SSP-3D datasets:
+5) Setup AGORA, 3DPW, SSP-3D datasets:
     * AGORA: Please refer to [this document](agora_for_garmentor/README.md) (AGORA data (for Garmentor))
     * 3DPW: Please refer to [this document](docs/3dpw_preparation.md)
     * SSP-3D: Please refer to [this document](docs/ssp-3d_preparation.md)
+6) Make sure that the paths in `garmentor/data/const.py` correspond to the locations in your installation
 7) Adapt the `docker/run.sh` script to mount the root directories that you previously created into the docker container
     * `REPO_DIR` should point to the garmentor repository
     * `PW3D_DIR` should point to `<3dpw_root>`
