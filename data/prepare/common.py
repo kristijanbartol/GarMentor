@@ -11,79 +11,12 @@ from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
 from models.pose2D_hrnet import get_pretrained_detector
 from predict.predict_hrnet import predict_hrnet
 from utils.augmentation.cam_augmentation import augment_cam_t_numpy
-from utils.augmentation.smpl_augmentation import (
+from utils.sampling_utils import (
     normal_sample_shape_numpy,
     normal_sample_style_numpy
 )
 from utils.garment_classes import GarmentClasses
 from vis.visualizers.keypoints import KeypointsVisualizer
-
-
-def sample_zero_pose():
-    pass
-
-
-def sample_simple_pose():
-    pass
-
-
-def sample_all_poses():
-    pass
-
-
-def sample_fixed_global_orient():
-    pass
-
-
-def sample_frontal_global_orient():
-    pass
-
-
-def sample_limited_global_orient():
-    pass
-
-
-def sample_all_global_orients():
-    pass
-
-
-def sample_normal_shape_params():
-    pass
-
-
-def sample_trunc_normal_shape_params():
-    pass
-
-
-def sample_normal_style_params():
-    pass
-
-
-def sample_trunc_normal_style_params():
-    pass
-
-
-SAMPLE_DICT = {
-    'pose': {
-        'init': sample_zero_pose,
-        'easy': sample_simple_pose,
-        'hard': sample_all_poses,
-    },
-    'global_orient': {
-        'init': sample_fixed_global_orient,
-        'easy': sample_frontal_global_orient,
-        'medium': sample_limited_global_orient,
-        'hard': sample_all_global_orients
-    },
-    'shape': {
-        'normal': sample_normal_shape_params,
-        'trunc': sample_trunc_normal_shape_params
-    },
-    'style': {
-        'normal': sample_normal_style_params,
-        'trunc': sample_trunc_normal_style_params
-    }
-}
 
 
 @dataclass
@@ -218,6 +151,28 @@ class DataGenerator(object):
                     segmentations/
                         {idx:5d}_{garment_class}.png
     """
+    
+    SAMPLE_DICT = {
+        'pose': {
+            'init': sample_zero_pose,
+            'easy': sample_simple_pose,
+            'hard': sample_all_poses,
+        },
+        'global_orient': {
+            'init': sample_fixed_global_orient,
+            'easy': sample_frontal_global_orient,
+            'medium': sample_limited_global_orient,
+            'hard': sample_all_global_orients
+        },
+        'shape': {
+            'normal': sample_normal_shape_params,
+            'trunc': sample_trunc_normal_shape_params
+        },
+        'style': {
+            'normal': sample_normal_style_params,
+            'trunc': sample_trunc_normal_style_params
+        }
+    }
 
     def __init__(
             self,

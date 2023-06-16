@@ -1,3 +1,4 @@
+from typing import Optional
 import torch
 import numpy as np
 
@@ -5,6 +6,117 @@ from utils.rigid_transform_utils import quat_to_rotmat, aa_rotate_translate_poin
 from utils.cam_utils import orthographic_project_torch
 from utils.joints2d_utils import undo_keypoint_normalisation
 from utils.label_conversions import convert_heatmaps_to_2Djoints_coordinates_torch, ALL_JOINTS_TO_COCO_MAP
+
+
+def sample_zero_pose():
+    return np.zeros((69,))
+
+
+def sample_simple_pose():
+    pass
+
+
+def sample_all_poses():
+    pass
+
+
+def sample_fixed_global_orient():
+    return np.zeros((3,))
+
+
+def sample_frontal_global_orient():
+    pass
+
+
+def sample_limited_global_orient():
+    pass
+
+
+def sample_all_global_orients():
+    pass
+
+
+def uniform_sample_shape(
+        min_value: Optional[float] = None,
+        max_value: Optional[float] = None
+    ) -> np.ndarray:                  # (10,)
+    """
+    Uniform sampling of shape parameters.
+    """
+    style = (max_value - min_value) * np.rand((10,)) + min_value
+    return style
+
+
+def sample_normal_shape(
+        mean_params: np.ndarray,      # (10,)
+        std_vector: np.ndarray,       # (10,)        
+        min_value: Optional[float] = None,
+        max_value: Optional[float] = None
+    ) -> np.ndarray:             # (10,)
+    """
+    (Truncated) normal sampling of shape parameter deviations from the mean.
+    """
+    shape = mean_params + np.random.randn(mean_params.shape[0]) * std_vector
+    clip_min = min_value if min_value is not None else np.min(shape)
+    clip_max = max_value if max_value is not None else np.max(shape)
+    return shape
+
+
+def sample_uniform_shape(
+        min_value: float,
+        max_value: float       
+    ) -> np.ndarray:             # (10,)
+    """
+    Uniform sampling of shape parameters.
+    """
+    shape = (max_value - min_value) * np.random.randn(10,) + min_value
+    return shape
+
+
+def sample_normal_style(
+        num_garment_classes: int,     
+        mean_params: np.ndarray,      # (4,)
+        std_vector: np.ndarray,       # (4,)
+        min_value: Optional[float] = None,
+        max_value: Optional[float] = None
+    ) -> np.ndarray:                  # (num_garment_classes, 4)
+    """
+    (Truncated) normal sampling of style parameter deviations from the mean, for each garment.
+    """
+    style = mean_params + np.random.randn(num_garment_classes, mean_params.shape[0]) * std_vector
+    clip_min = min_value if min_value is not None else np.min(style)
+    clip_max = max_value if max_value is not None else np.max(style)
+    return np.clip(style, a_min=clip_min, a_max=clip_max)
+
+
+def sample_uniform_style(
+        num_garment_classes: int,
+        min_value: Optional[float] = None,
+        max_value: Optional[float] = None
+    ) -> np.ndarray:                  # (num_garment_classes, 4)
+    """
+    Uniform sampling of style parameters, for each garment.
+    """
+    style = (max_value - min_value) * np.random.randn((num_garment_classes, 4)) + min_value
+    return style
+
+
+def uniform_random_unit_vector(num_vectors):
+    """
+    Uniform sampling random 3D unit-vectors, i.e. points on unit sphere.
+    """
+    e = torch.randn(num_vectors, 3)
+    e = torch.div(e, torch.norm(e, dim=-1, keepdim=True))
+    return e  # (num_vectors, 3)
+
+
+@DeprecationWarning
+def normal_sample_params_deprecated(batch_size, mean_params, std_vector):
+    """
+    Gaussian sampling of shape parameter deviations from the mean.
+    """
+    shape = mean_params + torch.randn(batch_size, mean_params.shape[0], device=mean_params.device)*std_vector
+    return shape  # (bs, num_smpl_betas)
 
 
 def bingham_sampling_for_matrix_fisher_torch(A,
