@@ -67,6 +67,14 @@ _C.TRAIN.SYNTH_DATA.CROP_INPUT = True
 _C.VISUALIZATION = CfgNode()
 _C.VISUALIZATION.DEFAULT_MESH_COLORS = False
 
+# Train - Synthetic Data - Sampling
+_C.TRAIN.SYNTH_DATA.SAMPLING = CfgNode()
+
+_C.TRAIN.SYNTH_DATA.SAMPLING.POSE = 'all'           # ['zero', 'simple', 'all']
+_C.TRAIN.SYNTH_DATA.SAMPLING.GLOBAL_ORIENT = 'all'   # ['fixed', 'frontal', 'diverse', 'all']
+_C.TRAIN.SYNTH_DATA.SAMPLING.SHAPE = 'normal'   # ['normal', 'uniform']
+_C.TRAIN.SYNTH_DATA.SAMPLING.STYLE = 'normal'   # ['normal', 'uniform']
+
 # Train - Synthetic Data - Augmentation
 _C.TRAIN.SYNTH_DATA.AUGMENT = CfgNode()
 

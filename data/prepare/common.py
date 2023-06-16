@@ -1,4 +1,4 @@
-from typing import Any, Iterator, List, Tuple, Optional, Dict, Union
+from typing import Any, Iterator, Tuple, Optional, Dict, Union
 from dataclasses import dataclass, fields
 import numpy as np
 import os
@@ -6,14 +6,22 @@ import torch
 from random import randrange
 
 from configs import paths
-from configs.const import BBOX_SCALE_FACTOR
 from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
 from models.pose2D_hrnet import get_pretrained_detector
 from predict.predict_hrnet import predict_hrnet
 from utils.augmentation.cam_augmentation import augment_cam_t_numpy
 from utils.sampling_utils import (
-    normal_sample_shape_numpy,
-    normal_sample_style_numpy
+    sample_zero_pose,
+    sample_simple_pose,
+    sample_all_pose,
+    sample_fixed_global_orient,
+    sample_frontal_global_orient,
+    sample_diverse_global_orient,
+    sample_all_global_orient,
+    sample_normal_shape,
+    sample_uniform_shape,
+    sample_normal_style,
+    sample_uniform_style
 )
 from utils.garment_classes import GarmentClasses
 from vis.visualizers.keypoints import KeypointsVisualizer
@@ -151,32 +159,11 @@ class DataGenerator(object):
                     segmentations/
                         {idx:5d}_{garment_class}.png
     """
-    
-    SAMPLE_DICT = {
-        'pose': {
-            'init': sample_zero_pose,
-            'easy': sample_simple_pose,
-            'hard': sample_all_poses,
-        },
-        'global_orient': {
-            'init': sample_fixed_global_orient,
-            'easy': sample_frontal_global_orient,
-            'medium': sample_limited_global_orient,
-            'hard': sample_all_global_orients
-        },
-        'shape': {
-            'normal': sample_normal_shape_params,
-            'trunc': sample_trunc_normal_shape_params
-        },
-        'style': {
-            'normal': sample_normal_style_params,
-            'trunc': sample_trunc_normal_style_params
-        }
-    }
 
     def __init__(
             self,
-            preextract_kpt=False
+            data_split,
+            preextract_kpt=False,
         ):
         self.dataset_path_template = os.path.join(
             paths.DATA_ROOT_DIR,
@@ -185,9 +172,13 @@ class DataGenerator(object):
             '{upper_garment_class}+{lower_garment_class}'
         )
         self.cfg = get_cfg_defaults()
+        self._init_sampling_methods()
         self._init_useful_arrays()
-        self.poses = self._load_poses()
-        self.num_poses = self.poses.shape[0]
+        self.data_split = data_split
+        if self.cfg.TRAIN.SYNTH_DATA.SAMPLING.POSE == 'all':
+            self.poses = self._load_poses()
+        else:
+            self.poses = None
         self.preextract_kpt = preextract_kpt
         if preextract_kpt:
             self.kpt_model, self.kpt_cfg = get_pretrained_detector()
@@ -202,7 +193,9 @@ class DataGenerator(object):
         poses = data['poses']
         indices = [i for i, x in enumerate(fnames)
                     if (x.startswith('h36m') or x.startswith('up3d') or x.startswith('3dpw'))]
-        return np.stack([poses[i] for i in indices], axis=0)
+        poses_array = np.stack([poses[i] for i in indices], axis=0)
+        # TODO: Split into train and validation.
+        return poses_array
     
     def _init_useful_arrays(self) -> None:
         """
@@ -225,6 +218,13 @@ class DataGenerator(object):
         self.mean_cam_t = np.array(
             self.cfg.TRAIN.SYNTH_DATA.MEAN_CAM_T, 
             dtype=np.float32)
+        
+    def _init_sampling_methods(self):
+        sampling_cfg = self.cfg.TRAIN.SYNTH_DATA.SAMPLING
+        self.pose_sampler = globals()[f'sample_{sampling_cfg.POSE}_pose']
+        self.global_orient_sampler = globals()[f'sample_{sampling_cfg.GLOBAL_ORIENT}_global_orient']
+        self.shape_sampler = globals()[f'sample_{sampling_cfg.SHAPE}_shape']
+        self.style_sampler = globals()[f'sample_{sampling_cfg.STYLE}_style']
         
     @staticmethod
     def _create_values_array(
@@ -298,9 +298,10 @@ class DataGenerator(object):
         """
         Generate random pose, shape, camera T, and style vector.
         """
-        if idx is None:
-            idx = randrange(self.num_poses)
-        pose = self.poses[idx % self.num_poses]
+        #if idx is None:
+        #    idx = randrange(self.num_poses)
+        #pose = self.poses[idx % self.num_poses]
+        pose = self.pose_sampler(self.poses)
 
         shape = normal_sample_shape_numpy(
             mean_params=self.mean_shape,

@@ -50,6 +50,7 @@ class SurrealDataGenerator(DataGenerator):
         """
         Generate a single training sample.
         """
+        # TODO: Implement split between train and validation poses using idx and num_poses.
         pose, shape, style_vector, cam_t = self.generate_random_params(idx)
 
         print(f'Sample #{idx} ({gender}):')

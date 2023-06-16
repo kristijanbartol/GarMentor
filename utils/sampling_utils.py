@@ -1,6 +1,7 @@
 from typing import Optional
 import torch
 import numpy as np
+from random import randint
 
 from utils.rigid_transform_utils import quat_to_rotmat, aa_rotate_translate_points_pytorch3d
 from utils.cam_utils import orthographic_project_torch
@@ -8,35 +9,35 @@ from utils.joints2d_utils import undo_keypoint_normalisation
 from utils.label_conversions import convert_heatmaps_to_2Djoints_coordinates_torch, ALL_JOINTS_TO_COCO_MAP
 
 
-def sample_zero_pose():
+def sample_zero_pose(_=None):
     return np.zeros((69,))
 
 
-def sample_simple_pose():
+def sample_simple_pose(_=None):
     pass
 
 
-def sample_all_poses():
-    pass
+def sample_all_pose(all_poses):
+    return all_poses[randint(all_poses.shape[0])][3:]
 
 
-def sample_fixed_global_orient():
+def sample_fixed_global_orient(_=None):
     return np.zeros((3,))
 
 
-def sample_frontal_global_orient():
+def sample_frontal_global_orient(_=None):
     pass
 
 
-def sample_limited_global_orient():
+def sample_diverse_global_orient(_=None):
     pass
 
 
-def sample_all_global_orients():
-    pass
+def sample_all_global_orient(all_poses):
+    return all_poses[randint(all_poses.shape[0])][:3]
 
 
-def uniform_sample_shape(
+def sample_uniform_shape(
         min_value: Optional[float] = None,
         max_value: Optional[float] = None
     ) -> np.ndarray:                  # (10,)
