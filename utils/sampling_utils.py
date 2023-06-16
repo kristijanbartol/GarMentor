@@ -59,7 +59,7 @@ def sample_normal_shape(
     shape = mean_params + np.random.randn(mean_params.shape[0]) * std_vector
     clip_min = min_value if min_value is not None else np.min(shape)
     clip_max = max_value if max_value is not None else np.max(shape)
-    return shape
+    return np.clip(shape, a_min=clip_min, a_max=clip_max)
 
 
 def sample_uniform_shape(
