@@ -9,43 +9,44 @@ from utils.joints2d_utils import undo_keypoint_normalisation
 from utils.label_conversions import convert_heatmaps_to_2Djoints_coordinates_torch, ALL_JOINTS_TO_COCO_MAP
 
 
-def sample_zero_pose(_=None):
+def sample_zero_pose(
+        all_poses: Optional[np.ndarray] = None
+    ) -> np.ndarray:
     return np.zeros((69,))
 
 
-def sample_simple_pose(_=None):
-    pass
+def sample_simple_pose(
+        all_poses: Optional[np.ndarray] = None
+    ) -> np.ndarray:
+    return np.zeros(0,)
 
 
-def sample_all_pose(all_poses):
-    return all_poses[randint(all_poses.shape[0])][3:]
+def sample_all_pose(
+        all_poses: np.ndarray
+    ) -> np.ndarray:
+    return all_poses[randint(0, all_poses.shape[0])][3:]
 
 
-def sample_fixed_global_orient(_=None):
+def sample_fixed_global_orient(
+        all_poses: Optional[np.ndarray] = None
+    ) -> np.ndarray:
     return np.zeros((3,))
 
 
-def sample_frontal_global_orient(_=None):
-    pass
+def sample_frontal_global_orient(
+        all_poses: Optional[np.ndarray] = None
+    ) -> np.ndarray:
+    return np.empty(0,)
 
 
-def sample_diverse_global_orient(_=None):
-    pass
+def sample_diverse_global_orient(
+        all_poses: Optional[np.ndarray] = None
+    ) -> np.ndarray:
+    return np.empty(0,)
 
 
 def sample_all_global_orient(all_poses):
-    return all_poses[randint(all_poses.shape[0])][:3]
-
-
-def sample_uniform_shape(
-        min_value: Optional[float] = None,
-        max_value: Optional[float] = None
-    ) -> np.ndarray:                  # (10,)
-    """
-    Uniform sampling of shape parameters.
-    """
-    style = (max_value - min_value) * np.rand((10,)) + min_value
-    return style
+    return all_poses[randint(0, all_poses.shape[0])][:3]
 
 
 def sample_normal_shape(
@@ -92,13 +93,13 @@ def sample_normal_style(
 
 def sample_uniform_style(
         num_garment_classes: int,
-        min_value: Optional[float] = None,
-        max_value: Optional[float] = None
+        min_value: float,
+        max_value: float
     ) -> np.ndarray:                  # (num_garment_classes, 4)
     """
     Uniform sampling of style parameters, for each garment.
     """
-    style = (max_value - min_value) * np.random.randn((num_garment_classes, 4)) + min_value
+    style = (max_value - min_value) * np.random.randn(num_garment_classes, 4) + min_value
     return style
 
 

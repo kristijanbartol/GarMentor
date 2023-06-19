@@ -3,6 +3,7 @@ from dataclasses import dataclass, fields
 import numpy as np
 import os
 import torch
+import utils.sampling_utils
 from random import randrange
 
 from configs import paths
@@ -10,19 +11,6 @@ from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
 from models.pose2D_hrnet import get_pretrained_detector
 from predict.predict_hrnet import predict_hrnet
 from utils.augmentation.cam_augmentation import augment_cam_t_numpy
-from utils.sampling_utils import (
-    sample_zero_pose,
-    sample_simple_pose,
-    sample_all_pose,
-    sample_fixed_global_orient,
-    sample_frontal_global_orient,
-    sample_diverse_global_orient,
-    sample_all_global_orient,
-    sample_normal_shape,
-    sample_uniform_shape,
-    sample_normal_style,
-    sample_uniform_style
-)
 from utils.garment_classes import GarmentClasses
 from vis.visualizers.keypoints import KeypointsVisualizer
 
@@ -208,6 +196,8 @@ class DataGenerator(object):
         self.mean_shape = np.zeros(
             self.cfg.MODEL.NUM_SMPL_BETAS, 
             dtype=np.float32)
+        self.shape_min: Optional[float] = self.cfg.TRAIN.SYNTH_DATA.AUGMENT.SMPL.SHAPE_MIN
+        self.shape_max: Optional[float] = self.cfg.TRAIN.SYNTH_DATA.AUGMENT.SMPL.SHAPE_MAX
         self.delta_style_std_vector = np.ones(
             self.cfg.MODEL.NUM_STYLE_PARAMS, 
             dtype=np.float32) * \
@@ -215,16 +205,18 @@ class DataGenerator(object):
         self.mean_style = np.zeros(
             self.cfg.MODEL.NUM_STYLE_PARAMS, 
             dtype=np.float32)
+        self.style_min: Optional[float] = self.cfg.TRAIN.SYNTH_DATA.AUGMENT.GARMENTOR.STYLE_MIN
+        self.style_max: Optional[float] = self.cfg.TRAIN.SYNTH_DATA.AUGMENT.GARMENTOR.STYLE_MAX
         self.mean_cam_t = np.array(
             self.cfg.TRAIN.SYNTH_DATA.MEAN_CAM_T, 
             dtype=np.float32)
         
     def _init_sampling_methods(self):
         sampling_cfg = self.cfg.TRAIN.SYNTH_DATA.SAMPLING
-        self.pose_sampler = globals()[f'sample_{sampling_cfg.POSE}_pose']
-        self.global_orient_sampler = globals()[f'sample_{sampling_cfg.GLOBAL_ORIENT}_global_orient']
-        self.shape_sampler = globals()[f'sample_{sampling_cfg.SHAPE}_shape']
-        self.style_sampler = globals()[f'sample_{sampling_cfg.STYLE}_style']
+        self.pose_sampler = getattr(utils.sampling_utils, f'sample_{sampling_cfg.POSE}_pose')
+        self.global_orient_sampler = getattr(utils.sampling_utils, f'sample_{sampling_cfg.GLOBAL_ORIENT}_global_orient')
+        self.shape_sampler = getattr(utils.sampling_utils, f'sample_{sampling_cfg.SHAPE}_shape')
+        self.style_sampler = getattr(utils.sampling_utils, f'sample_{sampling_cfg.STYLE}_style')
         
     @staticmethod
     def _create_values_array(
@@ -298,28 +290,27 @@ class DataGenerator(object):
         """
         Generate random pose, shape, camera T, and style vector.
         """
-        #if idx is None:
-        #    idx = randrange(self.num_poses)
-        #pose = self.poses[idx % self.num_poses]
-        pose = self.pose_sampler(self.poses)
-
-        shape = normal_sample_shape_numpy(
+        pose = self.pose_sampler(
+            all_poses=self.poses
+        )
+        orient = self.global_orient_sampler(
+            all_poses=self.poses
+        )
+        shape = self.shape_sampler(
             mean_params=self.mean_shape,
-            std_vector=self.delta_betas_std_vector
+            std_vector=self.delta_betas_std_vector,
+            min_value=self.shape_min,
+            max_value=self.shape_max
         )
-        style_vector = normal_sample_style_numpy(
-            num_garment_classes=GarmentClasses.NUM_CLASSES,
+        style_vector = self.style_sampler(
             mean_params=self.mean_style,
-            std_vector=self.delta_style_std_vector
-        )
-        cam_t = augment_cam_t_numpy(
-            self.mean_cam_t,
-            xy_std=self.cfg.TRAIN.SYNTH_DATA.AUGMENT.CAM.XY_STD,
-            delta_z_range=self.cfg.TRAIN.SYNTH_DATA.AUGMENT.CAM.DELTA_Z_RANGE
+            std_vector=self.delta_style_std_vector,
+            min_value=self.style_min,
+            max_value=self.style_max
         )
         return (
             pose,
+            orient,
             shape,
-            style_vector,
-            cam_t
+            style_vector
         )
