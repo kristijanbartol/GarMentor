@@ -4,6 +4,7 @@ import numpy as np
 from pytorch3d.structures import Meshes
 from pytorch3d.renderer import Textures
 
+from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
 from data.mesh_managers.common import (
     MeshManager,
     default_upper_color,
@@ -26,11 +27,9 @@ class ColoredGarmentsMeshManager(MeshManager):
         such as when generating the training data.
     '''
 
-    def __init__(
-            self,
-            config):
+    def __init__(self):
         super().__init__()
-        self.config = config
+        self.config = get_cfg_defaults()
 
     def create_meshes(
             self,
@@ -60,14 +59,14 @@ class ColoredGarmentsMeshManager(MeshManager):
             smpl_output_dict['lower'].garment_faces
         ]
         
-        if self.config.DEFAULT_MESH_COLORS:
+        if self.config.VISUALIZATION.DEFAULT_MESH_COLORS:
             body_colors = np.ones_like(verts_list[0]) * \
                 default_body_color(BodyColors)
         else:
             body_colors = np.ones_like(verts_list[0]) * \
                 random_pallete_color(BodyColors)
         
-        if self.config.DEFAULT_MESH_COLORS:
+        if self.config.VISUALIZATION.DEFAULT_MESH_COLORS:
             part_colors_list = [
                 np.ones_like(verts_list[1]) * default_upper_color(GarmentColors),
                 np.ones_like(verts_list[2]) * default_lower_color(GarmentColors),
@@ -84,7 +83,7 @@ class ColoredGarmentsMeshManager(MeshManager):
             concat_verts_list.append(concat_verts)
             concat_faces_list.append(concat_faces)
             
-            if self.config.DEFAULT_MESH_COLORS:
+            if self.config.VISUALIZATION.DEFAULT_MESH_COLORS:
                 part_colors = part_colors_list[idx]
             else:
                 part_colors = np.ones_like(verts_list[idx+1]) * \

@@ -1,3 +1,5 @@
+import numpy as np
+
 # Rendering constants
 CAM_DIST = 2.7
 MEAN_CAM_Y_OFFSET = 0.2
@@ -20,6 +22,22 @@ BACKGROUND_COLOR = (0.0, 0.0, 0.0)
 BBOX_SCALE_FACTOR = 1.2
 OBJECT_DETECT_THRESHOLD = 0.95
 HEATMAP_GAUSSIAN_STD = 4.0
+
+# Sampling settings
+FRONTAL_ORIENT_RANGES = np.array([[-0.5, 0.4], [-0.6, 0.6], [0., 0.]])
+DIVERSE_ORIENT_RANGES = np.array([[-0.5, 0.4], [-3.0, 3.0], [-0.1, 0.1]])
+SIMPLE_POSE_RANGES = {
+    1 : np.array([[0, 0], [0, 0], [0, 0.5]]),     # left hip
+    2 : np.array([[0, 0], [0, 0], [-0.5, 0]]),    # right hip
+    7 : np.array([[0, 0], [0, 0], [-0.5, 0.2]]),  # left ankle
+    8 : np.array([[0, 0], [0, 0], [-0.2, 0.5]]),  # right ankle
+    16: np.array([[0, 0], [0, 0], [-1.3, 1]]),    # left shoulder
+    17: np.array([[-1, 1.3], [0, 0], [0, 0]]),    # right shoulder
+    18: np.array([[-1, 0.2], [0, 0], [0, 0]]),    # left elbow
+    19: np.array([[-1, 0.2], [0, 0], [0, 0]]),    # right elbow
+    20: np.array([(-0.5, 0.5), (0, 0), (0, 0)]),  # left wrist
+    21: np.array([(-0.5, 0.5), (0, 0), (0, 0)])   # right wrist
+}
 
 # Constant strings
 TRAIN = 'train'

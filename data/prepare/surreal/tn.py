@@ -50,20 +50,17 @@ class SurrealDataGenerator(DataGenerator):
         """
         Generate a single training sample.
         """
-        # TODO: Implement split between train and validation poses using idx and num_poses.
-        pose, shape, style_vector, cam_t = self.generate_random_params(idx)
+        pose, shape, style_vector = self.generate_random_params(idx)
 
         print(f'Sample #{idx} ({gender}):')
         print(f'\tPose: {pose}')
         print(f'\tShape: {shape}')
-        print(f'\tCam T: {cam_t}')
         print(f'\tStyle: {style_vector}')
 
         rgb_img, seg_maps, joints_3d = clothed_visualizer.vis_from_params(
             pose=pose,
             shape=shape,
-            style_vector=style_vector,
-            cam_t=cam_t,     # TODO: Might remove cam_t as a parameter here.
+            style_vector=style_vector
         )
         joints_2d, joints_conf, bbox = self._predict_joints(
             rgb_tensor=torch.swapaxes(rgb_img, 0, 2),
@@ -78,7 +75,6 @@ class SurrealDataGenerator(DataGenerator):
             joints_3d=joints_3d,
             joints_conf=joints_conf,
             joints_2d=joints_2d,
-            cam_t=cam_t,
             bbox=bbox
         )
         return (

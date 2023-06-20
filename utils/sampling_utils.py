@@ -1,12 +1,34 @@
-from typing import Optional
+from typing import Optional, Tuple
 import torch
 import numpy as np
 from random import randint
 
+from configs.const import (
+    FRONTAL_ORIENT_RANGES,
+    DIVERSE_ORIENT_RANGES,
+    SIMPLE_POSE_RANGES
+)
 from utils.rigid_transform_utils import quat_to_rotmat, aa_rotate_translate_points_pytorch3d
 from utils.cam_utils import orthographic_project_torch
 from utils.joints2d_utils import undo_keypoint_normalisation
 from utils.label_conversions import convert_heatmaps_to_2Djoints_coordinates_torch, ALL_JOINTS_TO_COCO_MAP
+
+
+def _ranges_to_sizes_and_offsets(
+        ranges: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
+    sizes = ranges[:, 1] - ranges[:, 0] # type: ignore
+    offsets = ranges[:, 0]
+    return sizes, offsets
+
+
+def _ranges_to_scaled_rand_array(
+        ranges: np.ndarray
+    ) -> np.ndarray:
+    sizes, offsets = _ranges_to_sizes_and_offsets(ranges)
+    rand_values = np.random.rand(3,)
+    scaled_values = rand_values * sizes + offsets
+    return scaled_values
 
 
 def sample_zero_pose(
@@ -18,7 +40,12 @@ def sample_zero_pose(
 def sample_simple_pose(
         all_poses: Optional[np.ndarray] = None
     ) -> np.ndarray:
-    return np.zeros(0,)
+    pose_sample = np.zeros(69,)
+    for joint_idx in SIMPLE_POSE_RANGES:
+        joint_ranges = SIMPLE_POSE_RANGES[joint_idx]
+        rand_values = _ranges_to_scaled_rand_array(joint_ranges)
+        pose_sample[joint_idx*3:(joint_idx+1)*3] = rand_values
+    return pose_sample
 
 
 def sample_all_pose(
@@ -36,13 +63,19 @@ def sample_fixed_global_orient(
 def sample_frontal_global_orient(
         all_poses: Optional[np.ndarray] = None
     ) -> np.ndarray:
-    return np.empty(0,)
+    rand_values = np.random.rand(3,)
+    ranges = FRONTAL_ORIENT_RANGES
+    sizes, offsets = _ranges_to_sizes_and_offsets(ranges)
+    return rand_values * sizes + offsets
 
 
 def sample_diverse_global_orient(
         all_poses: Optional[np.ndarray] = None
     ) -> np.ndarray:
-    return np.empty(0,)
+    rand_values = np.random.rand(3,)
+    ranges = DIVERSE_ORIENT_RANGES
+    sizes, offsets = _ranges_to_sizes_and_offsets(ranges)
+    return rand_values * sizes + offsets
 
 
 def sample_all_global_orient(all_poses):

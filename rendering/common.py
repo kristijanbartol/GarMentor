@@ -29,8 +29,8 @@ from pytorch3d.renderer import (
 class Renderer(nn.Module):
 
     default_cam_R, default_cam_t = look_at_view_transform(
-        #dist=CAM_DIST,
-        dist=-2.7,
+        dist=CAM_DIST,
+        #dist=-2.7,
         elev=0,
         azim=0,
         degrees=True
@@ -57,7 +57,8 @@ class Renderer(nn.Module):
             cull_backfaces: bool = False,
             clip_barycentric_coords: bool = None,
             #light_t: Tuple[float] = LIGHT_T,
-            light_t: Tuple[float] = ((0.0, 0.0, -2.0),),
+            #light_t: Tuple[float] = ((0.0, 0.0, -2.0),),
+            light_t: Tuple[float] = ((0.0, 0.0, 2.0),),
             light_ambient_color: Tuple[float] = LIGHT_AMBIENT_COLOR,
             light_diffuse_color: Tuple[float] = LIGHT_DIFFUSE_COLOR,
             light_specular_color: Tuple[float] = LIGHT_SPECULAR_COLOR,

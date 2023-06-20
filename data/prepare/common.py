@@ -198,6 +198,7 @@ class DataGenerator(object):
             dtype=np.float32)
         self.shape_min: Optional[float] = self.cfg.TRAIN.SYNTH_DATA.AUGMENT.SMPL.SHAPE_MIN
         self.shape_max: Optional[float] = self.cfg.TRAIN.SYNTH_DATA.AUGMENT.SMPL.SHAPE_MAX
+        self.num_garment_classes = self.cfg.TRAIN.SYNTH_DATA.AUGMENT.GARMENTOR.NUM_GARMENT_CLASSES
         self.delta_style_std_vector = np.ones(
             self.cfg.MODEL.NUM_STYLE_PARAMS, 
             dtype=np.float32) * \
@@ -286,7 +287,7 @@ class DataGenerator(object):
     def generate_random_params(
             self, 
             idx: Optional[int] = None
-        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Generate random pose, shape, camera T, and style vector.
         """
@@ -296,6 +297,8 @@ class DataGenerator(object):
         orient = self.global_orient_sampler(
             all_poses=self.poses
         )
+        whole_pose = np.concatenate([pose, orient], axis=0)
+        
         shape = self.shape_sampler(
             mean_params=self.mean_shape,
             std_vector=self.delta_betas_std_vector,
@@ -303,14 +306,14 @@ class DataGenerator(object):
             max_value=self.shape_max
         )
         style_vector = self.style_sampler(
-            mean_params=self.mean_style,
+            num_garment_classes=self.num_garment_classes,
+            mean_params=self.mean_style
             std_vector=self.delta_style_std_vector,
             min_value=self.style_min,
             max_value=self.style_max
         )
         return (
-            pose,
-            orient,
+            whole_pose,
             shape,
             style_vector
         )

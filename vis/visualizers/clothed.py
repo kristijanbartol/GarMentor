@@ -68,7 +68,10 @@ class ClothedVisualizer(Visualizer2D):
         )
         assert(device != 'cpu')
         self.device = device
-        self.renderer = ClothedRenderer(device=self.device)
+        self.renderer = ClothedRenderer(
+            device=self.device,
+            img_wh=img_wh    
+        )
         self.img_wh = img_wh
 
     def vis(self,

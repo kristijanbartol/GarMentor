@@ -31,13 +31,12 @@ class ClothedRenderer(Renderer):
 
     def __init__(
             self,
-            config,
             *args,
             **kwargs
         ) -> None:
         ''' The clothed renderer constructor.'''
         super().__init__(*args, **kwargs)
-        self.mesh_manager = ColoredGarmentsMeshManager(config=config)
+        self.mesh_manager = ColoredGarmentsMeshManager()
     
     def _extract_seg_maps(
             self, 
