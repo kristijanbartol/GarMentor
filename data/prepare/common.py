@@ -4,14 +4,11 @@ import numpy as np
 import os
 import torch
 import utils.sampling_utils
-from random import randrange
 
 from configs import paths
 from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
 from models.pose2D_hrnet import get_pretrained_detector
 from predict.predict_hrnet import predict_hrnet
-from utils.augmentation.cam_augmentation import augment_cam_t_numpy
-from utils.garment_classes import GarmentClasses
 from vis.visualizers.keypoints import KeypointsVisualizer
 
 
@@ -163,32 +160,16 @@ class DataGenerator(object):
         self._init_sampling_methods()
         self._init_useful_arrays()
         self.data_split = data_split
-        if self.cfg.TRAIN.SYNTH_DATA.SAMPLING.POSE == 'all':
-            self.poses = self._load_poses()
-        else:
-            self.poses = None
         self.preextract_kpt = preextract_kpt
         if preextract_kpt:
             self.kpt_model, self.kpt_cfg = get_pretrained_detector()
         self.keypoints_visualizer = KeypointsVisualizer()
-
-    def _load_poses(self) -> np.ndarray:
-        """
-        Load poses. Adapted from the original HierProb3D code.
-        """
-        data = np.load(paths.TRAIN_POSES_PATH)
-        fnames = data['fnames']
-        poses = data['poses']
-        indices = [i for i, x in enumerate(fnames)
-                    if (x.startswith('h36m') or x.startswith('up3d') or x.startswith('3dpw'))]
-        poses_array = np.stack([poses[i] for i in indices], axis=0)
-        # TODO: Split into train and validation.
-        return poses_array
     
     def _init_useful_arrays(self) -> None:
         """
         These useful arrays are used to randomly sample data and transform points.
         """
+        # TODO: Put some of these configurations into the constant list.
         self.delta_betas_std_vector = np.ones(
             self.cfg.MODEL.NUM_SMPL_BETAS, 
             dtype=np.float32) * \
@@ -284,7 +265,8 @@ class DataGenerator(object):
         np.save(values_path, samples_values.get())
         print(f'Saved samples values to {values_path}!')
         
-    def generate_random_params(
+    #def generate_random_params(
+    def sample_params(
             self, 
             idx: Optional[int] = None
         ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
