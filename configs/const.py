@@ -38,6 +38,12 @@ SIMPLE_POSE_RANGES = {
     20: np.array([(-0.5, 0.5), (0, 0), (0, 0)]),  # left wrist
     21: np.array([(-0.5, 0.5), (0, 0), (0, 0)])   # right wrist
 }
+INTRA_ORIENT_INTERVALS = []
+EXTRA_ORIENT_INTERVALS = []
+INTRA_SHAPE_INTERVALS = []
+EXTRA_SHAPE_INTERVALS = []
+INTRA_STYLE_INTERVALS = []
+EXTRA_STYLE_INTERVALS = []
 
 # Constant strings
 TRAIN = 'train'

@@ -157,6 +157,7 @@ class DataGenerator(object):
             '{upper_garment_class}+{lower_garment_class}'
         )
         self.cfg = get_cfg_defaults()
+        self.sampling_cfg = self.cfg.TRAIN.SYNTH_DATA.SAMPLING
         self._init_sampling_methods()
         self._init_useful_arrays()
         self.data_split = data_split
@@ -164,6 +165,7 @@ class DataGenerator(object):
         if preextract_kpt:
             self.kpt_model, self.kpt_cfg = get_pretrained_detector()
         self.keypoints_visualizer = KeypointsVisualizer()
+        self.poses, self.global_orients, self.shapes, self.styles = [np.empty(0,)] * 4
     
     def _init_useful_arrays(self) -> None:
         """
@@ -194,11 +196,24 @@ class DataGenerator(object):
             dtype=np.float32)
         
     def _init_sampling_methods(self):
-        sampling_cfg = self.cfg.TRAIN.SYNTH_DATA.SAMPLING
-        self.pose_sampler = getattr(utils.sampling_utils, f'sample_{sampling_cfg.POSE}_pose')
-        self.global_orient_sampler = getattr(utils.sampling_utils, f'sample_{sampling_cfg.GLOBAL_ORIENT}_global_orient')
-        self.shape_sampler = getattr(utils.sampling_utils, f'sample_{sampling_cfg.SHAPE}_shape')
-        self.style_sampler = getattr(utils.sampling_utils, f'sample_{sampling_cfg.STYLE}_style')
+        self.samplers = {
+            'pose': getattr(
+                utils.sampling_utils, 
+                f'sample_{self.sampling_cfg.STRATEGY.POSE}_pose'
+            ),
+            'global_orient': getattr(
+                utils.sampling_utils, 
+                f'sample_{self.sampling_cfg.STRATEGY.GLOBAL_ORIENT}_global_orient'
+            ),
+            'shape': getattr(
+                utils.sampling_utils, 
+                f'sample_{self.sampling_cfg.STRATEGY.SHAPE}_shape'
+            ),
+            'style': getattr(
+                utils.sampling_utils, 
+                f'sample_{self.sampling_cfg.STRATEGY.STYLE}_style'
+            )
+        }
         
     @staticmethod
     def _create_values_array(
@@ -265,37 +280,48 @@ class DataGenerator(object):
         np.save(values_path, samples_values.get())
         print(f'Saved samples values to {values_path}!')
         
-    #def generate_random_params(
-    def sample_params(
+    def sample_all_params(
             self, 
-            idx: Optional[int] = None
-        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+            num_train: int,
+            num_valid: int
+        ) -> None:
         """
         Generate random pose, shape, camera T, and style vector.
         """
-        pose = self.pose_sampler(
-            all_poses=self.poses
+        self.poses = self.samplers['pose'](
+            num_train=num_train,
+            num_valid=num_valid
         )
-        orient = self.global_orient_sampler(
-            all_poses=self.poses
+        self.global_orients = self.samplers['global_orient'](
+            num_train=num_train,
+            num_valid=num_valid
         )
-        whole_pose = np.concatenate([pose, orient], axis=0)
-        
-        shape = self.shape_sampler(
+        self.shapes = self.samplers['shape'](
             mean_params=self.mean_shape,
             std_vector=self.delta_betas_std_vector,
-            min_value=self.shape_min,
-            max_value=self.shape_max
+            num_train=num_train,
+            num_valid=num_valid,
+            intervals_type=self.sampling_cfg.GENERALIZATION.SHAPE,
+            clip_min=self.sampling_cfg.CLIP_MIN.SHAPE,
+            clip_max=self.sampling_cfg.CLIP_MAX.SHAPE
         )
-        style_vector = self.style_sampler(
-            num_garment_classes=self.num_garment_classes,
-            mean_params=self.mean_style
+        self.styles = self.samplers['style'](
+            mean_params=self.mean_style,
             std_vector=self.delta_style_std_vector,
-            min_value=self.style_min,
-            max_value=self.style_max
+            num_train=num_train,
+            num_valid=num_valid,
+            intervals_type=self.sampling_cfg.GENERALIZATION.STYLE,
+            clip_min=self.sampling_cfg.CLIP_MIN.STYLE,
+            clip_max=self.sampling_cfg.CLIP_MAX.STYLE
         )
+
+    def get_params(
+            self,
+            idx
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         return (
-            whole_pose,
-            shape,
-            style_vector
+            self.poses[idx], 
+            self.global_orients[idx], 
+            self.shapes[idx], 
+            self.styles[idx]
         )
