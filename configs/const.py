@@ -24,6 +24,82 @@ OBJECT_DETECT_THRESHOLD = 0.95
 HEATMAP_GAUSSIAN_STD = 4.0
 
 # Sampling settings
+NUM_SHAPE_PARAMS = 10
+SHAPE_MEANS = np.zeros(NUM_SHAPE_PARAMS, dtype=np.float32)
+SHAPE_STDS = np.ones(NUM_SHAPE_PARAMS, dtype=np.float32) * 1.25
+NUM_STYLE_PARAMS = 4
+STYLE_MEANS = np.zeros(NUM_STYLE_PARAMS, dtype=np.float32)
+STYLE_STDS = np.ones(NUM_STYLE_PARAMS, dtype=np.float32) * 0.25
+
+SAMPLING_STRATEGIES = {
+    'pose': [
+        'zero',
+        'simple',
+        'mocap'
+    ],
+    'global_orient': [
+        'zero',
+        'frontal',
+        'diverse',
+        'mocap'
+    ],
+    'shape': [
+        'normal',
+        #'uniform'
+    ],
+    'style': [
+        'normal',
+        #'uniform'
+    ]
+}
+
+NUM_SAMPLES = {
+    'zero_pose': {
+        'train': 1,
+        'valid': 1
+    },
+    'simple_pose': {
+        'train': 20000,
+        'valid': 4000
+    },
+    'mocap_pose': {
+        'train': None,  # will be automatically determined
+        'valid': None   # will be automatically determined
+    },
+    'zero_global_orient': {
+        'train': 1,
+        'valid': 1
+    },
+    'frontal_global_orient': {
+        'train': 20000,
+        'valid': 4000
+    },
+    'diverse_global_orient': {
+        'train': 20000,
+        'valid': 4000
+    },
+    'mocap_global_orient': {
+        'train': None,  # will be automatically determined
+        'valid': None   # will be automatically determined
+    },
+    'normal_shape': {
+        'train': 100000,
+        'valid': 20000
+    },
+    'uniform_shape': {
+        'train': 100000,
+        'valid': 20000
+    },
+    'normal_style': {
+        'train': 100000,
+        'valid': 20000
+    },
+    'normal_style': {
+        'train': 100000,
+        'valid': 20000
+    },
+}
+
 FRONTAL_ORIENT_RANGES = np.array([[-0.5, 0.4], [-0.6, 0.6], [0., 0.]])
 DIVERSE_ORIENT_RANGES = np.array([[-0.5, 0.4], [-3.0, 3.0], [-0.1, 0.1]])
 SIMPLE_POSE_RANGES = {

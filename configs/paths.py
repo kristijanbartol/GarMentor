@@ -40,7 +40,9 @@ Folder hierarchy of the stored data.
                 <SEG_MAP_1_1>
                 ...
 """
-DATA_ROOT_DIR = '/data/garmentor/'
+#DATA_ROOT_DIR = '/data/garmentor/'
+DATA_ROOT_DIR = '/data/cat/tn/'
+PARAMS_DIR = 'params/'
 RGB_DIR = 'rgb/'
 VERIFY_DIR = 'verify/'
 SEG_MAPS_DIR = 'segmentations/'

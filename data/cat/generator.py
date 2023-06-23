@@ -1,7 +1,7 @@
-from typing import Tuple, Union
+from typing import Tuple, Union, Iterator, Any, Optional, Dict
+from dataclasses import dataclass, fields
 import numpy as np
 import torch
-from torch import Tensor
 import torch.cuda
 import os
 import sys
@@ -11,18 +11,131 @@ sys.path.append('/garmentor')
 
 from configs.const import SURREAL_DATASET_NAME
 import configs.paths as paths
-from data.prepare.common import (
-    PreparedSampleValues,
-    PreparedValuesArray
-)
-from data.prepare.common import DataGenerator
+from models.pose2D_hrnet import get_pretrained_detector
 from predict.predict_hrnet import predict_hrnet
 from utils.garment_classes import GarmentClasses
 from vis.visualizers.clothed import ClothedVisualizer
 from vis.visualizers.keypoints import KeypointsVisualizer
 
 
-class SurrealDataGenerator(DataGenerator):
+@dataclass
+class PreparedSampleValues:
+
+    """
+    A standard dataclass used to handle prepared sample values.
+
+    Note that cam_t was supposed to be deprecated, but it is actually
+    required by the SURREAL-based datasets for the keypoint strategy
+    which takes ground truth joints and projects them orthographically.
+    Then the cam_t is applied on top to properly place 2D keypoints.
+    For AGORA-like dataset it's a dummy value and it won't be used in
+    the training loop with the AGORA-like data. In case I decide that
+    the keypoint strategy (ground truth 3D -> projection -> cam_t) is
+    necessarily inferior, I will remove cam_t (kbartol).
+
+    Joints 2D data is common for all the datasets, but it differs
+    between SURREAL-like and AGORA-like dataset in a way that for 
+    SURREAL the 2D joints are used only if the keypoints are pre-
+    extracted using the 2D keypoint detector. In case of AGORA, 2D
+    joints are mandatory as they can't be projected afterwards (no
+    X, Y, Z camera locations in the training time). However, AGORA
+    can also create 2D joints by using 2D keypoint detector.
+
+    Bounding box information, on the other hand, is specific to AGORA-
+    like data.
+    """
+
+    pose: np.ndarray                        # (72,)
+    shape: np.ndarray                       # (10,)
+    style_vector: np.ndarray                # (4, 10)
+    garment_labels: np.ndarray              # (4,)
+    joints_3d: np.ndarray                   # (17, 3)
+    joints_conf: np.ndarray                 # (17,)
+    joints_2d: Optional[np.ndarray] = None  # (17, 2)
+    cam_t: Optional[np.ndarray] = None      # (3,)
+    bbox: Optional[np.ndarray] = None       # (2, 2)
+
+    def __getitem__(
+            self, 
+            key: str
+        ) -> np.ndarray:
+        return getattr(self, key)
+
+    def get(
+            self, 
+            key, 
+            default=None
+        ) -> Union[Any, None]:
+        return getattr(self, key, default)
+
+    def __iter__(self) -> Iterator[str]:
+        return self.keys()
+
+    def keys(self) -> Iterator[str]:
+        keys = [t.name for t in fields(self)]
+        return iter(keys)
+
+    def values(self) -> Iterator[Any]:
+        values = [getattr(self, t.name) for t in fields(self)]
+        return iter(values)
+
+    def items(self) -> Iterator[Tuple[str, Any]]:
+        data = [(t.name, getattr(self, t.name)) for t in fields(self)]
+        return iter(data)
+
+
+class PreparedValuesArray():
+
+    """
+    A class used to keep track of an array of prepared sampled values.
+    """
+
+    def __init__(
+            self, 
+            samples_dict: Optional[Dict[str, np.ndarray]] = None
+        ) -> None:
+        if samples_dict is not None:
+            self._samples_dict = {k: list(v) for k, v in samples_dict.items()}
+            self.keys = samples_dict.keys()
+        else:
+            self._samples_dict = {}
+            self.keys = []
+
+    def _set_dict_keys(
+            self, 
+            sample_dict_keys: Iterator[str]
+        ) -> None:
+        """
+        Add 's' to key name specify plural.
+        """
+        self.keys = [x + 's' for x in sample_dict_keys]
+
+    def append(
+            self, 
+            values: PreparedSampleValues
+        ) -> None:
+        """
+        Mimics adding to list of values to an array. Saves to latent dict.
+        """
+        if not self._samples_dict:
+            self._set_dict_keys(values.keys())
+            for k in self.keys:
+                self._samples_dict[k] = []
+        for ks, k in zip(self.keys, values.keys()):
+            self._samples_dict[ks].append(values[k])
+
+    def get(self) -> Dict[str, np.ndarray]:
+        """
+        Get the dictionary with all np.ndarray items.
+        """
+        return_dict = {k: np.empty(0,) for k, _ in self._samples_dict.items()}
+        for ks in self.keys:
+            return_dict[ks] = np.array(self._samples_dict[ks])
+        return return_dict
+
+
+
+class DataGenerator():
 
     """
     A data generation class specific to SURREAL dataset.
@@ -38,8 +151,31 @@ class SurrealDataGenerator(DataGenerator):
         """
         Initialize superclass and create clothed renderer.
         """
-        super().__init__(preextract_kpt=preextract_kpt)
+        self.preextract_kpt = preextract_kpt
         self.device = 'cuda:0'
+        if preextract_kpt:
+            self.kpt_model, self.kpt_cfg = get_pretrained_detector()
+        self.keypoints_visualizer = KeypointsVisualizer()
+
+    def _predict_joints(
+            self,
+            rgb_tensor: torch.Tensor
+        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        if self.preextract_kpt:
+            print('Running pose detection...')
+            hrnet_output = predict_hrnet(
+                hrnet_model=self.kpt_model,
+                hrnet_config=self.kpt_cfg,
+                image=rgb_tensor
+            )
+            joints_2d = hrnet_output['joints2D'].detach().cpu().numpy()[:, ::-1]
+            joints_conf = hrnet_output['joints2Dconfs'].detach().cpu().numpy()
+            bbox = hrnet_output['bbox']
+        else:
+            joints_2d = None
+            joints_conf = np.ones(17,)
+            bbox = None
+        return joints_2d, joints_conf, bbox # type:ignore
 
     def generate_sample(
             self, 
@@ -197,16 +333,18 @@ class SurrealDataGenerator(DataGenerator):
                 seg_maps=seg_maps,
                 clothed_visualizer=clothed_visualizer
             )
-            
-    def _create_values_array(self, dataset_dir: str
-                             ) -> Tuple[PreparedValuesArray, int]:
+
+    @staticmethod
+    def _create_values_array(
+            dataset_dir: str
+        ) -> Tuple[PreparedValuesArray, int]:
         """
         Create an array of prepared values, which consists of:
           - pose parameters
           - shape parameters
           - style vector
           - garment labels
-          - camera translations (deprecated - will remove)
+          - camera translations (needed for target 2D kpt projections)
           - 3D joints
 
         The array is of type PreparedValuesArray and it contains
@@ -226,6 +364,20 @@ class SurrealDataGenerator(DataGenerator):
             samples_values = PreparedValuesArray()
             num_generated = 0
         return samples_values, num_generated
+    
+    @staticmethod
+    def _save_values(
+            samples_values: PreparedValuesArray, 
+            dataset_dir: str,
+            sample_idx: int
+        ) -> None:
+        """
+        Save all sample values as a dictionary of numpy arrays.
+        """
+        print(f'Saving values on checkpoint #{sample_idx}')
+        values_path = os.path.join(dataset_dir, paths.VALUES_FNAME)
+        np.save(values_path, samples_values.get())
+        print(f'Saved samples values to {values_path}!')
     
     def _log_class(self, 
                    gender: str, 
@@ -315,12 +467,17 @@ if __name__ == '__main__':
                         help='Whether to pre-extract 2D joint using HRNet pose detector.')
     args = parser.parse_args()
     
-    surreal_generator = SurrealDataGenerator(
+    surreal_generator = DataGenerator(
         preextract_kpt=args.preextract
     )
+    #1 - sample set(s) of params
+
+    #2 - generate dataset(s)
+    '''
     surreal_generator.generate(
         gender=args.gender,
         upper_class=args.upper_class,
         lower_class=args.lower_class,
         num_samples_per_class=args.num_samples
     )
+    '''

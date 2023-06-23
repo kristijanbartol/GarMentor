@@ -5,7 +5,14 @@ from random import randint
 
 from configs import paths
 import configs.const
-from configs.const import SIMPLE_POSE_RANGES
+from configs.const import (
+    SIMPLE_POSE_RANGES,
+    SHAPE_MEANS,
+    SHAPE_STDS,
+    STYLE_MEANS,
+    STYLE_STDS,
+    NUM_SAMPLES
+)
 from utils.rigid_transform_utils import quat_to_rotmat, aa_rotate_translate_points_pytorch3d
 from utils.cam_utils import orthographic_project_torch
 from utils.joints2d_utils import undo_keypoint_normalisation
@@ -230,12 +237,12 @@ def _clip_samples(
 
 
 def _sample_normal_pc(
+        pc_type: str,           # ['shape', 'style']
         mean_params: np.ndarray,      # (10,) OR (4,4)
         std_vector: np.ndarray,       # (10,) OR (4,4)
         num_train: int,
         num_valid: int,
         intervals_type: str,    # ['intra', 'extra']
-        pc_type: str,           # ['shape', 'style']
         clip_min: Optional[float] = None,
         clip_max: Optional[float] = None
     ) -> Tuple[np.ndarray, np.ndarray]:             # (10,)
@@ -266,27 +273,19 @@ def _sample_normal_pc(
     return np.stack(train_samples, axis=0), np.stack(valid_samples, axis=0)
 
 
-def sample_normal_shape(
-        mean_params: np.ndarray,      # (10,)
-        std_vector: np.ndarray,       # (10,)
-        num_train: int,
-        num_valid: int,
-        intervals_type: str,    # ['intra', 'extra']
-        clip_min: Optional[float] = None,
-        clip_max: Optional[float] = None
-    ) -> Tuple[np.ndarray, np.ndarray]:             # (10,)
+def sample_normal_shape(sampling_cfg) -> Tuple[np.ndarray, np.ndarray]:
     """
     (Truncated) normal sampling of shape parameter deviations from the mean.
     """
     return _sample_normal_pc(
-        mean_params=mean_params,
-        std_vector=std_vector,
-        num_train=num_train,
-        num_valid=num_valid,
-        intervals_type=intervals_type,
         pc_type='shape',
-        clip_min=clip_min,
-        clip_max=clip_max
+        mean_params=SHAPE_MEANS,
+        std_vector=SHAPE_STDS,
+        num_train=NUM_SAMPLES['normal_shape']['train'],
+        num_valid=NUM_SAMPLES['normal_shape']['valid'],
+        intervals_type=sampling_cfg.POLATION.SHAPE,
+        clip_min=sampling_cfg.CLIP_MIN.SHAPE,
+        clip_max=sampling_cfg.CLIP_MAX.SHAPE
     )
 
 
@@ -302,27 +301,19 @@ def sample_uniform_shape(
     #return shape
 
 
-def sample_normal_style(
-        mean_params: np.ndarray,      # (4,4)
-        std_vector: np.ndarray,       # (4,4)
-        num_train: int,
-        num_valid: int,
-        intervals_type: str,    # ['intra', 'extra']
-        clip_min: Optional[float] = None,
-        clip_max: Optional[float] = None
-    ) -> Tuple[np.ndarray, np.ndarray]:                  # (num_garment_classes, 4)
+def sample_normal_style(sampling_cfg) -> Tuple[np.ndarray, np.ndarray]:
     """
     (Truncated) normal sampling of style parameter deviations from the mean, for each garment.
     """
     return _sample_normal_pc(
-        mean_params=mean_params,
-        std_vector=std_vector,
-        num_train=num_train,
-        num_valid=num_valid,
-        intervals_type=intervals_type,
         pc_type='style',
-        clip_min=clip_min,
-        clip_max=clip_max
+        mean_params=STYLE_MEANS,
+        std_vector=STYLE_STDS,
+        num_train=NUM_SAMPLES['normal_style']['train'],
+        num_valid=NUM_SAMPLES['normal_style']['valid'],
+        intervals_type=sampling_cfg.POLATION.STYLE,
+        clip_min=sampling_cfg.CLIP_MIN.STYLE,
+        clip_max=sampling_cfg.CLIP_MAX.STYLE
     )
 
 
