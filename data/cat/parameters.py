@@ -1,6 +1,9 @@
 from typing import Optional, Tuple
 import os
 import numpy as np
+import sys
+
+sys.path.append('/garmentor/')
 
 from configs import paths
 from configs.const import SAMPLING_STRATEGIES
@@ -26,13 +29,13 @@ class Parameters(object):
             self,
             param_type: str,
             sampling_strategy: str,
-            interval_type: Optional[str] = None
+            interval_type: str
         ) -> str:
         return os.path.join(
             self.params_dir,
             param_type,
             sampling_strategy,
-            interval_type if interval_type is not None else 'intra'
+            interval_type
         )
     
     def save_params(
@@ -41,8 +44,7 @@ class Parameters(object):
             params: Tuple[np.ndarray, np.ndarray],
         ) -> None:
         for split_idx, data_split in enumerate(['train', 'valid']):
-            if os.path.exists(save_dir):
-                os.makedirs(save_dir)
+            os.makedirs(save_dir, exist_ok=True)
             save_path = os.path.join(
                 save_dir,
                 f'{data_split}.npy'
@@ -52,15 +54,13 @@ class Parameters(object):
     def sample_params(
             self,
             param_type: str,
-            sampling_strategy: str
+            sampling_strategy: str,
+            interval_type: str
         ) -> Tuple[np.ndarray, np.ndarray]:
-        sampler_fun = getattr(
+        return getattr(
             utils.sampling_utils, 
             f'sample_{sampling_strategy}_{param_type}'
-        )
-        return sampler_fun(
-            self.sampling_cfg
-        )
+        )(interval_type)
 
     def sample_all_params(self) -> None:
         """
@@ -68,13 +68,22 @@ class Parameters(object):
         """
         for param_type in ['pose', 'global_orient', 'shape', 'style']:
             for sampling_strategy in SAMPLING_STRATEGIES[param_type]:
-                save_path = self.get_save_path(
-                    param_type=param_type,
-                    sampling_strategy=sampling_strategy
-                )
-                if not os.path.exists(save_path):
-                    params = self.sample_params(
+                for interval_type in ['intra', 'extra']:
+                    print(f'Sampling ({param_type}, {sampling_strategy}, {interval_type})...')
+                    save_path = self.get_save_path(
                         param_type=param_type,
-                        sampling_strategy=sampling_strategy
+                        sampling_strategy=sampling_strategy,
+                        interval_type=interval_type
                     )
-                    self.save_params(save_path, params)
+                    if not os.path.exists(save_path):
+                        params = self.sample_params(
+                            param_type=param_type,
+                            sampling_strategy=sampling_strategy,
+                            interval_type=interval_type
+                        )
+                        self.save_params(save_path, params)
+
+
+if __name__ == '__main__':
+    parameters = Parameters()
+    parameters.sample_all_params()

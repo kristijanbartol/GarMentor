@@ -1,7 +1,6 @@
 from typing import Optional, Tuple, List
 import torch
 import numpy as np
-from random import randint
 
 from configs import paths
 import configs.const
@@ -11,7 +10,11 @@ from configs.const import (
     SHAPE_STDS,
     STYLE_MEANS,
     STYLE_STDS,
-    NUM_SAMPLES
+    NUM_SAMPLES,
+    SHAPE_MIN,
+    SHAPE_MAX,
+    STYLE_MIN,
+    STYLE_MAX
 )
 from utils.rigid_transform_utils import quat_to_rotmat, aa_rotate_translate_points_pytorch3d
 from utils.cam_utils import orthographic_project_torch
@@ -39,31 +42,6 @@ def _ranges_to_scaled_rand_array(
     return scaled_values
 
 
-def sample_zero_pose(
-        num_train: int,
-        num_valid: int    
-    ) -> Tuple[np.ndarray, np.ndarray]:
-    return np.zeros((num_train, 69)), np.zeros((num_valid, 69))
-
-
-def sample_simple_pose(
-        num_train: int,
-        num_valid: int
-    ) -> Tuple[np.ndarray, np.ndarray]:
-    pose_samples = []
-    for _ in range(num_train + num_valid):
-        pose_sample = np.zeros(69,)
-        for joint_idx in SIMPLE_POSE_RANGES:
-            rand_values = _ranges_to_scaled_rand_array(
-                ranges=SIMPLE_POSE_RANGES[joint_idx],
-                num_samples=num_train+num_valid
-            )
-            pose_sample[joint_idx*3:(joint_idx+1)*3] = rand_values
-        pose_samples.append(pose_sample)
-    pose_samples = np.stack(pose_samples, axis=0)
-    return pose_samples[:num_train], pose_samples[:num_valid]
-
-
 def _load_poses(train_poses_path: str) -> np.ndarray:
     data = np.load(train_poses_path)
     fnames = data['fnames']
@@ -74,34 +52,7 @@ def _load_poses(train_poses_path: str) -> np.ndarray:
     return poses_array
 
 
-def _repeat_pose_arrays(
-        train_poses: np.ndarray,
-        valid_poses: np.ndarray,
-        num_train: int,
-        num_valid: int
-    ) -> Tuple[np.ndarray, np.ndarray]:
-    train_block_size = train_poses.shape[0]
-    valid_block_size = valid_poses.shape[0]
-    num_repeats = train_poses.shape[0] // num_train + 1
-    num_drop_last_train = (num_repeats + 1) * train_block_size - num_train
-    num_drop_last_valid = (num_repeats + 1) * valid_block_size - num_valid
-    train_poses = np.tile(
-        train_poses, 
-        (num_repeats, 1)
-    )[:-num_drop_last_train]
-    valid_poses = np.tile(
-        valid_poses, 
-        (num_repeats, 1)
-    )[:-num_drop_last_valid]
-    return train_poses, valid_poses
-
-
-# NOTE: Pose and global orients sampled separately.
-def _sample_all_pose_common(
-        num_train: int,
-        num_valid: int,
-        array_type: str     # ['pose', 'global_orient']
-    ) -> Tuple[np.ndarray, np.ndarray]:
+def _sample_mocap_pose_common() -> Tuple[np.ndarray, np.ndarray]:
     poses_array = _load_poses(paths.TRAIN_POSES_PATH)
     num_poses_loaded = poses_array.shape[0]
     num_train_loaded = int(num_poses_loaded * 0.85)
@@ -109,35 +60,9 @@ def _sample_all_pose_common(
         np.arange(poses_array.shape[0]), 
         size=num_train_loaded
     )
-    train_poses, valid_poses = _repeat_pose_arrays(
-        train_poses=poses_array[train_idxs],
-        valid_poses=poses_array[~train_idxs],
-        num_train=num_train,
-        num_valid=num_valid
-    )
-    if array_type == 'pose':
-        return train_poses[:, 3:], valid_poses[:, 3:]
-    else:   # 'global_orient'
-        return train_poses[:, :3], valid_poses[:, :3]
+    return poses_array[train_idxs], poses_array[~train_idxs]
 
-
-def sample_all_pose(
-        num_train: int,
-        num_valid: int
-    ) -> Tuple[np.ndarray, np.ndarray]:
-    return _sample_all_pose_common(
-        num_train=num_train,
-        num_valid=num_valid,
-        array_type='pose'
-    )
-
-
-def sample_fixed_global_orient(
-        train_samples: int,
-        valid_samples: int
-    ) -> Tuple[np.ndarray, np.ndarray]:
-    return np.zeros((train_samples, 3)), np.zeros((valid_samples, 3))
-
+    
 
 def _split_new_samples(
         new_samples: np.ndarray, 
@@ -149,11 +74,16 @@ def _split_new_samples(
     ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
     for sample in new_samples:
         for interval in intervals:
-            if interval[0] <= sample <= interval[1]:
-                if len(valid_samples) < num_train:
+            within_valid_interval = True
+            for cidx, component_interval in enumerate(interval):
+                if component_interval is not None:
+                    if not component_interval[0] <= sample[cidx] < component_interval[1]:
+                        within_valid_interval = False
+            if within_valid_interval:
+                if len(valid_samples) < num_valid:
                     valid_samples.append(sample)
             else:
-                if len(train_samples) < num_valid:
+                if len(train_samples) < num_train:
                     train_samples.append(sample)
     return train_samples, valid_samples
 
@@ -184,46 +114,9 @@ def _sample_global_orient(
             valid_samples=valid_samples,
             num_train=num_train,
             num_valid=num_valid,
-            intervals=intervals
+            intervals=intervals[range_type]
         )
     return np.stack(train_samples, axis=0), np.stack(valid_samples, axis=0)
-
-
-def sample_frontal_global_orient(
-        num_train: int,
-        num_valid: int,
-        intervals_type: str
-    ) -> Tuple[np.ndarray, np.ndarray]:
-    return _sample_global_orient(
-        num_train=num_train,
-        num_valid=num_valid,
-        intervals_type=intervals_type,
-        range_type='frontal'
-    )
-
-
-def sample_diverse_global_orient(
-        num_train: int,
-        num_valid: int,
-        intervals_type: str 
-    ) -> Tuple[np.ndarray, np.ndarray]:
-    return _sample_global_orient(
-        num_train=num_train,
-        num_valid=num_valid,
-        intervals_type=intervals_type,
-        range_type='diverse'
-    )
-
-
-def sample_all_global_orient(
-        num_train: int,
-        num_valid: int
-    ) -> Tuple[np.ndarray, np.ndarray]:
-    return _sample_all_pose_common(
-        num_train=num_train,
-        num_valid=num_valid,
-        array_type='global_orient'
-    )
 
 
 def _clip_samples(
@@ -273,7 +166,63 @@ def _sample_normal_pc(
     return np.stack(train_samples, axis=0), np.stack(valid_samples, axis=0)
 
 
-def sample_normal_shape(sampling_cfg) -> Tuple[np.ndarray, np.ndarray]:
+def sample_zero_pose(_) -> Tuple[np.ndarray, np.ndarray]:
+    return (
+        np.zeros((NUM_SAMPLES['zero_pose']['train'], 69)), 
+        np.zeros((NUM_SAMPLES['zero_pose']['valid'], 69))
+    )
+
+
+def sample_simple_pose(_) -> Tuple[np.ndarray, np.ndarray]:
+    pose_samples = []
+    num_train = NUM_SAMPLES['simple_pose']['train']
+    num_valid = NUM_SAMPLES['simple_pose']['valid']
+    pose_samples = np.zeros((num_train + num_valid, 69))
+    for joint_idx in SIMPLE_POSE_RANGES:
+        rand_values = _ranges_to_scaled_rand_array(
+            ranges=SIMPLE_POSE_RANGES[joint_idx],
+            num_samples=num_train+num_valid
+        )
+        pose_samples[:, joint_idx*3:(joint_idx+1)*3] = rand_values
+    return pose_samples[:num_train], pose_samples[:num_valid]
+
+
+def sample_mocap_pose(_) -> Tuple[np.ndarray, np.ndarray]:
+    train_poses, valid_poses = _sample_mocap_pose_common()
+    return train_poses[:, 3:], valid_poses[:, 3:]
+
+
+def sample_zero_global_orient(interval_type: str) -> Tuple[np.ndarray, np.ndarray]:
+    return (
+        np.zeros((NUM_SAMPLES['zero_global_orient']['train'], 3)), 
+        np.zeros((NUM_SAMPLES['zero_global_orient']['valid'], 3))
+    )
+
+
+def sample_frontal_global_orient(intervals_type: str) -> Tuple[np.ndarray, np.ndarray]:
+    return _sample_global_orient(
+        num_train=NUM_SAMPLES['frontal_global_orient']['train'],
+        num_valid=NUM_SAMPLES['frontal_global_orient']['valid'],
+        intervals_type=intervals_type,
+        range_type='frontal'
+    )
+
+
+def sample_diverse_global_orient(intervals_type: str) -> Tuple[np.ndarray, np.ndarray]:
+    return _sample_global_orient(
+        num_train=NUM_SAMPLES['diverse_global_orient']['train'],
+        num_valid=NUM_SAMPLES['diverse_global_orient']['valid'],
+        intervals_type=intervals_type,
+        range_type='diverse'
+    )
+
+
+def sample_mocap_global_orient(_) -> Tuple[np.ndarray, np.ndarray]:
+    train_orients, valid_orients = _sample_mocap_pose_common()
+    return train_orients[:, :3], valid_orients[:, :3]
+
+
+def sample_normal_shape(intervals_type: str) -> Tuple[np.ndarray, np.ndarray]:
     """
     (Truncated) normal sampling of shape parameter deviations from the mean.
     """
@@ -283,9 +232,9 @@ def sample_normal_shape(sampling_cfg) -> Tuple[np.ndarray, np.ndarray]:
         std_vector=SHAPE_STDS,
         num_train=NUM_SAMPLES['normal_shape']['train'],
         num_valid=NUM_SAMPLES['normal_shape']['valid'],
-        intervals_type=sampling_cfg.POLATION.SHAPE,
-        clip_min=sampling_cfg.CLIP_MIN.SHAPE,
-        clip_max=sampling_cfg.CLIP_MAX.SHAPE
+        intervals_type=intervals_type,
+        clip_min=SHAPE_MIN,
+        clip_max=SHAPE_MAX
     )
 
 
@@ -301,7 +250,7 @@ def sample_uniform_shape(
     #return shape
 
 
-def sample_normal_style(sampling_cfg) -> Tuple[np.ndarray, np.ndarray]:
+def sample_normal_style(intervals_type: str) -> Tuple[np.ndarray, np.ndarray]:
     """
     (Truncated) normal sampling of style parameter deviations from the mean, for each garment.
     """
@@ -311,9 +260,9 @@ def sample_normal_style(sampling_cfg) -> Tuple[np.ndarray, np.ndarray]:
         std_vector=STYLE_STDS,
         num_train=NUM_SAMPLES['normal_style']['train'],
         num_valid=NUM_SAMPLES['normal_style']['valid'],
-        intervals_type=sampling_cfg.POLATION.STYLE,
-        clip_min=sampling_cfg.CLIP_MIN.STYLE,
-        clip_max=sampling_cfg.CLIP_MAX.STYLE
+        intervals_type=intervals_type,
+        clip_min=STYLE_MIN,
+        clip_max=STYLE_MAX
     )
 
 

@@ -114,12 +114,51 @@ SIMPLE_POSE_RANGES = {
     20: np.array([(-0.5, 0.5), (0, 0), (0, 0)]),  # left wrist
     21: np.array([(-0.5, 0.5), (0, 0), (0, 0)])   # right wrist
 }
-INTRA_ORIENT_INTERVALS = []
-EXTRA_ORIENT_INTERVALS = []
-INTRA_SHAPE_INTERVALS = []
-EXTRA_SHAPE_INTERVALS = []
-INTRA_STYLE_INTERVALS = []
-EXTRA_STYLE_INTERVALS = []
+INTRA_ORIENT_INTERVALS = {
+    'frontal': [
+        [None, [-0.5, -0.45], None],
+        [None, [-0.3, -0.25], None],
+        [None, [0.25, 0.3], None],
+        [None, [0.45, 0.5], None]
+    ],
+    'diverse': [
+        [None, [-2.4, -2.1], None],
+        [None, [-1.2, -0.9], None],
+        [None, [0.9, 1.2], None],
+        [None, [2.1, 2.4], None]
+    ]
+}
+EXTRA_ORIENT_INTERVALS = {
+    'frontal': [
+        [None, [0.4, 0.6], None]
+    ],
+    'diverse': [
+        [None, [1.8, 3.0], None]
+    ]
+}
+INTRA_SHAPE_INTERVALS = [
+    [None, [-2.4, -1.5], [-2.4, -1.5]] + [None] * 7,
+    [None, [-1.0, -0.4], [-1.0, -0.4]] + [None] * 7,
+    [None, [0.4, 1.0], [0.4, 1.0]] + [None] * 7,
+    [None, [1.5, 2.4], [1.5, 2.4]] + [None] * 7
+]
+EXTRA_SHAPE_INTERVALS = [
+    [None, [1.5, 3.], [1.5, 3]] + [None] * 7
+]
+INTRA_STYLE_INTERVALS = [
+    [None, [-0.6, -0.52], None, None],
+    [None, [-0.3, -0.22], None, None],
+    [None, [0.22, 0.3], None, None],
+    [None, [0.52, 0.6], None, None]
+]
+EXTRA_STYLE_INTERVALS = [
+    [None, [0.3, 0.6], None, None]
+]
+
+SHAPE_MIN = -3.0
+SHAPE_MAX = 3.0
+STYLE_MIN = -0.75
+STYLE_MAX = 0.75
 
 # Constant strings
 TRAIN = 'train'

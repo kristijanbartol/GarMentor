@@ -70,20 +70,24 @@ _C.VISUALIZATION.DEFAULT_MESH_COLORS = False
 # Train - Synthetic Data - Sampling
 _C.TRAIN.SYNTH_DATA.SAMPLING = CfgNode()
 
-_C.TRAIN.SYNTH_DATA.SAMPLING.STRATEGY.POSE = 'all'           # ['zero', 'simple', 'all']
-_C.TRAIN.SYNTH_DATA.SAMPLING.STRATEGY.GLOBAL_ORIENT = 'all'   # ['fixed', 'frontal', 'diverse', 'all']
-_C.TRAIN.SYNTH_DATA.SAMPLING.STRATEGY.SHAPE = 'normal'   # ['normal', 'uniform']
-_C.TRAIN.SYNTH_DATA.SAMPLING.STRATEGY.STYLE = 'normal'   # ['normal', 'uniform']
+#_C.TRAIN.SYNTH_DATA.SAMPLING.STRATEGY = {
+#    'pose': 'simple',
+#    'global_orient': 'frontal',
+#    'shape': 'normal',
+#    'style': 'style'
+#}
 
-_C.TRAIN.SYNTH_DATA.SAMPLING.POLATION.POSE = 'extra'     # ['intra', 'extra']
-_C.TRAIN.SYNTH_DATA.SAMPLING.POLATION.ORIENT = 'extra'
-_C.TRAIN.SYNTH_DATA.SAMPLING.POLATION.SHAPE = 'extra'
-_C.TRAIN.SYNTH_DATA.SAMPLING.POLATION.STYLE = 'extra'
+#_C.TRAIN.SYNTH_DATA.SAMPLING.POLATION = {
+#    'pose': 'extra',
+#    'global_orient': 'extra',
+#    'shape': 'extra',
+#    'style': 'extra'
+#}
 
-_C.TRAIN.SYNTH_DATA.SAMPLING.CLIP_MIN.SHAPE = None
-_C.TRAIN.SYNTH_DATA.SAMPLING.CLIP_MAX.STYLE = None
-_C.TRAIN.SYNTH_DATA.SAMPLING.CLIP_MIN.SHAPE = None
-_C.TRAIN.SYNTH_DATA.SAMPLING.CLIP_MAX.STYLE = None
+#_C.TRAIN.SYNTH_DATA.SAMPLING.CLIPPING = {
+#    'shape': [None, None],
+#    'style': [None, None]
+#}
 
 # Train - Synthetic Data - Augmentation
 _C.TRAIN.SYNTH_DATA.AUGMENT = CfgNode()
