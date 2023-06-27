@@ -11,6 +11,7 @@ sys.path.append('/garmentor')
 
 from configs.const import SURREAL_DATASET_NAME
 import configs.paths as paths
+from data.cat.parameters import Parameters
 from models.pose2D_hrnet import get_pretrained_detector
 from predict.predict_hrnet import predict_hrnet
 from utils.garment_classes import GarmentClasses
@@ -179,6 +180,8 @@ class DataGenerator():
 
     def generate_sample(
             self, 
+            parameters: Parameters,
+            data_split: str,
             idx: int,
             gender: str,
             clothed_visualizer: ClothedVisualizer
@@ -186,17 +189,14 @@ class DataGenerator():
         """
         Generate a single training sample.
         """
-        pose, shape, style_vector = self.generate_random_params(idx)
-
-        print(f'Sample #{idx} ({gender}):')
-        print(f'\tPose: {pose}')
-        print(f'\tShape: {shape}')
-        print(f'\tStyle: {style_vector}')
-
+        params_dict = parameters.get(
+            data_split=data_split, 
+            idx=idx
+        )
         rgb_img, seg_maps, joints_3d = clothed_visualizer.vis_from_params(
-            pose=pose,
-            shape=shape,
-            style_vector=style_vector
+            pose=params_dict['pose'],
+            shape=params_dict['shape'],
+            style_vector=params_dict['style']
         )
         joints_2d, joints_conf, bbox = self._predict_joints(
             rgb_tensor=torch.swapaxes(rgb_img, 0, 2),
@@ -204,9 +204,9 @@ class DataGenerator():
         rgb_img = rgb_img.cpu().numpy()
         
         sample_values = PreparedSampleValues(
-            pose=pose,
-            shape=shape,
-            style_vector=style_vector,
+            pose=params_dict['pose'],
+            shape=params_dict['shape'],
+            style_vector=params_dict['style'],
             garment_labels=clothed_visualizer.garment_classes.labels_vector,
             joints_3d=joints_3d,
             joints_conf=joints_conf,
@@ -283,7 +283,7 @@ class DataGenerator():
             rgb_img: np.ndarray, 
             seg_maps: np.ndarray, 
             sample_values: PreparedSampleValues,
-            samples_values: PreparedValuesArray,
+            values_array: PreparedValuesArray,
             clothed_visualizer: ClothedVisualizer
         ) -> None:
         """
@@ -318,10 +318,10 @@ class DataGenerator():
             save_path=seg_path
         )
 
-        samples_values.append(sample_values)
+        values_array.append(sample_values)
         if sample_idx % self.CHECKPOINT_COUNT == 0 and sample_idx != 0:
             self._save_values(
-                samples_values=samples_values, 
+                values_array=values_array, 
                 dataset_dir=dataset_dir,
                 sample_idx=sample_idx
             )
@@ -335,9 +335,9 @@ class DataGenerator():
             )
 
     @staticmethod
-    def _create_values_array(
-            dataset_dir: str
-        ) -> Tuple[PreparedValuesArray, int]:
+    def _create_values_splits(
+            dataset_dirs: Dict[str, str]
+        ) -> Tuple[Dict[str, PreparedValuesArray], Dict[str, int]]:
         """
         Create an array of prepared values, which consists of:
           - pose parameters
@@ -353,21 +353,23 @@ class DataGenerator():
         Instead, the PreparedValuesArray starts with the values that
         are already saved into a dataset file.
         """
-        values_fpath = os.path.join(dataset_dir, paths.VALUES_FNAME)
-        if os.path.exists(values_fpath):
-            samples_dict = np.load(values_fpath, allow_pickle=True).item()
-            num_generated = samples_dict['poses'].shape[0]
-            samples_values = PreparedValuesArray(
-                samples_dict=samples_dict
-            )
-        else:
-            samples_values = PreparedValuesArray()
-            num_generated = 0
-        return samples_values, num_generated
+        values_arrays = {}
+        nums_generated = {}
+        for data_split in dataset_dirs:
+            values_fpath = os.path.join(dataset_dirs[data_split], paths.VALUES_FNAME)
+            if os.path.exists(values_fpath):
+                samples_dict = np.load(values_fpath, allow_pickle=True).item()
+                num_generated = samples_dict['poses'].shape[0]
+                values_arrays[data_split] = PreparedValuesArray(samples_dict=samples_dict)
+                nums_generated[data_split] = num_generated
+            else:
+                values_arrays[data_split] = PreparedValuesArray()
+                nums_generated[data_split] = 0
+        return values_arrays, nums_generated
     
     @staticmethod
     def _save_values(
-            samples_values: PreparedValuesArray, 
+            values_array: PreparedValuesArray, 
             dataset_dir: str,
             sample_idx: int
         ) -> None:
@@ -376,28 +378,40 @@ class DataGenerator():
         """
         print(f'Saving values on checkpoint #{sample_idx}')
         values_path = os.path.join(dataset_dir, paths.VALUES_FNAME)
-        np.save(values_path, samples_values.get())
+        np.save(values_path, values_array.get())
         print(f'Saved samples values to {values_path}!')
-    
-    def _log_class(self, 
-                   gender: str, 
-                   upper_class: str, 
-                   lower_class: str, 
-                   num_samples_per_class: int,
-                   num_generated: int):
-        total_num_samples = self.num_poses \
-            if num_samples_per_class is None else num_samples_per_class
-        subset_str = f'{gender}-{upper_class}-{lower_class}'
-        num_samples_to_generate = total_num_samples - num_generated
-        print(f'Generating {total_num_samples}-{num_generated}='
-              f'{num_samples_to_generate} samples for {subset_str}...')
-        return total_num_samples
 
-    def generate(self, 
-                 gender: str,
-                 upper_class: str,
-                 lower_class: str,
-                 num_samples_per_class: int) -> None:
+    def make_dataset_dirs(
+            self,
+            param_cfg: Dict,
+            upper_class: str,
+            lower_class: str,
+            gender: str
+        ) -> Dict[str, str]:
+        return {data_split: os.path.join(
+            paths.DATA_ROOT_DIR,
+            paths.DATASETS_DIR,
+            f"{param_cfg['pose']['strategy']}-pose",
+            param_cfg['pose']['interval'],
+            f"{param_cfg['global_orient']['strategy']}-global_orient",
+            param_cfg['global_orient']['interval'],
+            f"shape-{param_cfg['shape']['strategy']}",
+            param_cfg['shape']['interval'],
+            f"style-{param_cfg['shape']['strategy']}",
+            param_cfg['style']['interval'],
+            data_split,
+            gender,
+            f'{upper_class}+{lower_class}'
+        ) for data_split in ['train', 'valid'] }
+
+    def generate(
+            self, 
+            param_cfg: Dict,
+            upper_class: str,
+            lower_class: str,
+            gender: str,
+            num_samples_to_reach: int
+        ) -> None:
         """
         (Pre-)generate the dataset for particular upper+lower garment class.
 
@@ -411,45 +425,44 @@ class DataGenerator():
         arrays are frequently updated on the disk in case the failure
         happens along the way.
         """
-
+        parameters = Parameters(param_cfg=param_cfg)
         garment_classes = GarmentClasses(upper_class, lower_class)
         clothed_visualizer = ClothedVisualizer(
             device=self.device,
             gender=gender,
             garment_classes=garment_classes
         )
-        dataset_dir = self.dataset_path_template.format(
-            dataset_name=self.DATASET_NAME,
-            gender=gender,
-            upper_garment_class=upper_class,
-            lower_garment_class=lower_class
-        )  
-        samples_values, num_generated = self._create_values_array(
-            dataset_dir=dataset_dir
-        )
-        total_num_samples = self._log_class(
-            gender=gender, 
-            upper_class=upper_class, 
+        dataset_dirs = self.make_dataset_dirs(
+            param_cfg=param_cfg,
+            upper_class=upper_class,
             lower_class=lower_class,
-            num_samples_per_class=num_samples_per_class,
-            num_generated=num_generated
+            gender=gender
         )
-
-        for pose_idx in range(num_generated, total_num_samples):
-            rgb_img, seg_maps, sample_values = self.generate_sample(
-                idx=pose_idx, 
-                gender=gender, 
-                clothed_visualizer=clothed_visualizer
-            )
-            self._save_sample(
-                dataset_dir=dataset_dir, 
-                sample_idx=pose_idx, 
-                rgb_img=rgb_img, 
-                seg_maps=seg_maps, 
-                sample_values=sample_values,
-                samples_values=samples_values,
-                clothed_visualizer=clothed_visualizer
-            )
+        values_splits, nums_generated = self._create_values_splits(
+            dataset_dirs=dataset_dirs
+        )
+        total_nums_samples = {
+            'train': num_samples_to_reach, 
+            'valid': num_samples_to_reach // 5
+        }
+        for data_split in ['train', 'valid']:
+            for pose_idx in range(nums_generated[data_split], total_nums_samples[data_split]):
+                rgb_img, seg_maps, sample_values = self.generate_sample(
+                    parameters=parameters,
+                    data_split=data_split,
+                    idx=pose_idx, 
+                    gender=gender, 
+                    clothed_visualizer=clothed_visualizer
+                )
+                self._save_sample(
+                    dataset_dir=dataset_dirs[data_split], 
+                    sample_idx=pose_idx, 
+                    rgb_img=rgb_img, 
+                    seg_maps=seg_maps, 
+                    sample_values=sample_values,
+                    values_array=values_splits[data_split],
+                    clothed_visualizer=clothed_visualizer
+                )
         torch.cuda.empty_cache()
 
 
@@ -467,17 +480,31 @@ if __name__ == '__main__':
                         help='Whether to pre-extract 2D joint using HRNet pose detector.')
     args = parser.parse_args()
     
-    surreal_generator = DataGenerator(
+    data_generator = DataGenerator(
         preextract_kpt=args.preextract
     )
-    #1 - sample set(s) of params
-
-    #2 - generate dataset(s)
-    '''
-    surreal_generator.generate(
+    param_cfg = {
+        'pose': {
+            'strategy': 'zero',
+            'interval': 'intra'
+        },
+        'global_orient': {
+            'strategy': 'zero',
+            'interval': 'intra'
+        },
+        'shape': {
+            'strategy': 'normal',
+            'interval': 'intra'
+        },
+        'style': {
+            'strategy': 'normal',
+            'interval': 'intra'
+        }
+    }
+    data_generator.generate(
+        param_cfg=param_cfg,
         gender=args.gender,
         upper_class=args.upper_class,
         lower_class=args.lower_class,
-        num_samples_per_class=args.num_samples
+        num_samples_to_reach=args.num_samples
     )
-    '''

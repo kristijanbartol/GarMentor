@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Tuple, Dict, Optional
 import os
 import numpy as np
 import sys
@@ -17,15 +17,42 @@ class Parameters(object):
     The class for representing and managing (sampling) parameters.
     """
 
-    def __init__(self):
+    ALL_PARAMS_KEYS = ['pose', 'global_orient', 'shape', 'style']
+
+    def __init__(
+            self,
+            param_cfg: Optional[Dict[str, Dict[str, str]]] = None
+        ) -> None:
         self.params_dir = os.path.join(
             paths.DATA_ROOT_DIR,
             paths.PARAMS_DIR
         )
         self.cfg = get_cfg_defaults()
         self.sampling_cfg = self.cfg.TRAIN.SYNTH_DATA.SAMPLING
+        if param_cfg is not None:
+            self.params_dict, self.params_sizes = self.load_params(param_cfg)
 
-    def get_save_path(
+    def load_params(
+            self,
+            param_cfg: Dict[str, Dict[str, str]]
+        ) -> Tuple[Dict[str, Dict[str, np.ndarray]], Dict[str, Dict[str, int]]]:
+        params_dict = {x: {'train': np.empty(0), 'valid': np.empty(0)} for x in self.ALL_PARAMS_KEYS}
+        params_sizes = {x: {'train': 0, 'valid': 0} for x in self.ALL_PARAMS_KEYS}
+        for param_type in self.ALL_PARAMS_KEYS:
+            sampling_strategy = param_cfg[param_type]['strategy']
+            interval_type = param_cfg[param_type]['interval']
+            train_params, valid_params = self.init_params(
+                param_type=param_type,
+                sampling_strategy=sampling_strategy,
+                interval_type=interval_type
+            )
+            params_dict[param_type]['train'] = train_params
+            params_dict[param_type]['valid'] = valid_params
+            params_sizes[param_type]['train'] = params_dict[param_type]['train'].shape[0]
+            params_sizes[param_type]['valid'] = params_dict[param_type]['valid'].shape[0]
+        return params_dict, params_sizes
+
+    def get_path(
             self,
             param_type: str,
             sampling_strategy: str,
@@ -38,7 +65,7 @@ class Parameters(object):
             interval_type
         )
     
-    def save_params(
+    def _save_params(
             self,
             save_dir: str,
             params: Tuple[np.ndarray, np.ndarray],
@@ -51,39 +78,73 @@ class Parameters(object):
             )
             np.save(save_path, params[split_idx])
 
-    def sample_params(
+    def init_params(
             self,
             param_type: str,
             sampling_strategy: str,
             interval_type: str
         ) -> Tuple[np.ndarray, np.ndarray]:
-        return getattr(
-            utils.sampling_utils, 
-            f'sample_{sampling_strategy}_{param_type}'
-        )(interval_type)
+        params_path = self.get_path(
+            param_type=param_type,
+            sampling_strategy=sampling_strategy,
+            interval_type=interval_type
+        )
+        cfg_str = f'({param_type}-{sampling_strategy}-{interval_type})'
+        if not os.path.exists(params_path):
+            print(f'Sampling {cfg_str}...')
+            params = getattr(
+                utils.sampling_utils, 
+                f'sample_{sampling_strategy}_{param_type}'
+            )(interval_type)
+            self._save_params(params_path, params)
+            return params
+        else:
+            print(f'Loading {cfg_str}...')
+            return tuple([np.load(os.path.join(
+                    params_path, f'{data_split}.npy')
+                ) for data_split in ['train', 'valid']])
 
-    def sample_all_params(self) -> None:
+    def init_all_params(self) -> None:
         """
         Sample random pose, global orient, shape, and style parameters.
         """
-        for param_type in ['pose', 'global_orient', 'shape', 'style']:
+        for param_type in self.ALL_PARAMS_KEYS:
             for sampling_strategy in SAMPLING_STRATEGIES[param_type]:
                 for interval_type in ['intra', 'extra']:
-                    print(f'Sampling ({param_type}, {sampling_strategy}, {interval_type})...')
-                    save_path = self.get_save_path(
+                    self.init_params(
                         param_type=param_type,
                         sampling_strategy=sampling_strategy,
                         interval_type=interval_type
                     )
-                    if not os.path.exists(save_path):
-                        params = self.sample_params(
-                            param_type=param_type,
-                            sampling_strategy=sampling_strategy,
-                            interval_type=interval_type
-                        )
-                        self.save_params(save_path, params)
+
+    def get_param_type(
+            self,
+            data_split: str,
+            param_type: str,
+            idx: int
+        ) -> np.ndarray:
+        param_size = self.params_sizes[param_type][data_split]
+        return self.params_dict[param_type][data_split][idx % param_size]
+    
+    @staticmethod
+    def _post_prepare(params_sample: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+        params_sample['pose'] = np.concatenate(
+            (params_sample['global_orient'], params_sample['pose']), axis=0)
+        return params_sample
+
+    def get(self,
+            data_split: str,
+            idx: int
+        ) -> Dict[str, np.ndarray]:
+        return self._post_prepare(
+            {x: self.get_param_type(
+                data_split=data_split,
+                param_type=x,
+                idx=idx
+            ) for x in self.ALL_PARAMS_KEYS})
 
 
 if __name__ == '__main__':
     parameters = Parameters()
-    parameters.sample_all_params()
+    parameters.init_all_params()
+    style = parameters.get_param_type('train', 'style', 0)

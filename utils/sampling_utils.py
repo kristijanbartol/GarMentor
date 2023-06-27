@@ -11,6 +11,8 @@ from configs.const import (
     STYLE_MEANS,
     STYLE_STDS,
     NUM_SAMPLES,
+    NUM_GARMENT_CLASSES,
+    NUM_STYLE_PARAMS,
     SHAPE_MIN,
     SHAPE_MAX,
     STYLE_MIN,
@@ -254,16 +256,21 @@ def sample_normal_style(intervals_type: str) -> Tuple[np.ndarray, np.ndarray]:
     """
     (Truncated) normal sampling of style parameter deviations from the mean, for each garment.
     """
-    return _sample_normal_pc(
+    normal_style_samples = _sample_normal_pc(
         pc_type='style',
         mean_params=STYLE_MEANS,
         std_vector=STYLE_STDS,
-        num_train=NUM_SAMPLES['normal_style']['train'],
-        num_valid=NUM_SAMPLES['normal_style']['valid'],
+        num_train=NUM_SAMPLES['normal_style']['train'] * NUM_GARMENT_CLASSES,
+        num_valid=NUM_SAMPLES['normal_style']['valid'] * NUM_GARMENT_CLASSES,
         intervals_type=intervals_type,
         clip_min=STYLE_MIN,
         clip_max=STYLE_MAX
     )
+    normal_style_vectors = [
+        normal_style_samples[x].reshape(-1, NUM_GARMENT_CLASSES, NUM_STYLE_PARAMS)
+        for x in range(2)
+    ]
+    return tuple(normal_style_vectors)
 
 
 def sample_uniform_style(

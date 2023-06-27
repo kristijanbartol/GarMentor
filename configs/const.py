@@ -28,6 +28,7 @@ NUM_SHAPE_PARAMS = 10
 SHAPE_MEANS = np.zeros(NUM_SHAPE_PARAMS, dtype=np.float32)
 SHAPE_STDS = np.ones(NUM_SHAPE_PARAMS, dtype=np.float32) * 1.25
 NUM_STYLE_PARAMS = 4
+NUM_GARMENT_CLASSES = 4
 STYLE_MEANS = np.zeros(NUM_STYLE_PARAMS, dtype=np.float32)
 STYLE_STDS = np.ones(NUM_STYLE_PARAMS, dtype=np.float32) * 0.25
 

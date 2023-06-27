@@ -7,7 +7,7 @@ if [[ "$USER" == "kristijan" ]]; then
 	SSP3D_DIR=${BASE_DATA_DIR}/SSP-3D/
 	TAILORNET_DATA_DIR=${BASE_DATA_DIR}/tailornet
 	HIERPROB3D_DATA_DIR=${BASE_DATA_DIR}/hierprob3d
-	GARMENTOR_DATA_DIR=${BASE_DATA_DIR}/garmentor
+	CAT_DATA_DIR=${BASE_DATA_DIR}/cat
 	MGN_DATA_DIR=${BASE_DATA_DIR}/mgn
 	AGORA_DATA_DIR=${BASE_DATA_DIR}/agora
 	FRANKMOCAP_DATA_DIR=${BASE_DATA_DIR}/frankmocap
@@ -18,7 +18,7 @@ elif [[ "$USER" == "dbojanic" ]]; then
 	SSP3D_DIR=${BASE_DATA_DIR}/SSP-3D/
 	TAILORNET_DATA_DIR=${BASE_DATA_DIR}/tailornet/
 	HIERPROB3D_DATA_DIR=${BASE_DATA_DIR}/hierprob3d/
-	GARMENTOR_DATA_DIR=${BASE_DATA_DIR}/garmentor/
+	CAT_DATA_DIR=${BASE_DATA_DIR}/cat/
 	MGN_DATA_DIR=${BASE_DATA_DIR}/mgn
 	AGORA_DATA_DIR=${BASE_DATA_DIR}/agora
 	FRANKMOCAP_DATA_DIR=${BASE_DATA_DIR}/frankmocap
@@ -29,7 +29,7 @@ elif [[ "$USER" == "julien" ]]; then
 	SSP3D_DIR=/home/julien/data/SSP-3D
 	TAILORNET_DATA_DIR=/home/julien/data/TailorNet
 	HIERPROB3D_DATA_DIR=/home/julien/data/HierProb3D
-	GARMENTOR_DATA_DIR=/home/julien/data/garmentor
+	CAT_DATA_DIR=/home/julien/data/cat
 	MGN_DATA_DIR=/home/julien/data/mgn
 	AGORA_DATA_DIR=/home/julien/data/agora
 	FRANKMOCAP_DATA_DIR=${BASE_DATA_DIR}/frankmocap
@@ -39,7 +39,7 @@ else
 	SSP3D_DIR=/path/to/SSP-3D/dataset
 	TAILORNET_DATA_DIR=/path/to/tailornet/data
 	HIERPROB3D_DATA_DIR=/path/to/hierprob3d/data
-	GARMENTOR_DATA_DIR=/path/to/garmentor/folder
+	CAT_DATA_DIR=/path/to/cat/folder
 	MGN_DATA_DIR=/path/to/mgn/folder
 	AGORA_DATA_DIR=/path/to/agora/folder
 	FRANKMOCAP_DATA_DIR=${BASE_DATA_DIR}/frankmocap
@@ -56,7 +56,7 @@ docker run -it \
 	-v ${SSP3D_DIR}:/data/SSP-3D/ \
 	-v ${TAILORNET_DATA_DIR}:/data/tailornet/ \
 	-v ${HIERPROB3D_DATA_DIR}:/data/hierprob3d/ \
-	-v ${GARMENTOR_DATA_DIR}:/data/garmentor/ \
+	-v ${CAT_DATA_DIR}:/data/cat/ \
 	-v ${MGN_DATA_DIR}:/data/mgn/ \
 	-v ${AGORA_DATA_DIR}:/data/agora/ \
 	-v ${FRANKMOCAP_DATA_DIR}:/data/frankmocap/ \
