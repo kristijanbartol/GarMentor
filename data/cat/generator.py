@@ -12,7 +12,7 @@ sys.path.append('/garmentor')
 from configs.const import SURREAL_DATASET_NAME
 import configs.paths as paths
 from data.cat.parameters import Parameters
-from data.cat.utils import get_dataset_dirs
+from data.cat.common import get_dataset_dirs
 from models.pose2D_hrnet import get_pretrained_detector
 from predict.predict_hrnet import predict_hrnet
 from utils.garment_classes import GarmentClasses
@@ -468,15 +468,15 @@ if __name__ == '__main__':
         },
         'global_orient': {
             'strategy': 'zero',
-            'interval': 'intra'
+            'interval': 'extra'
         },
         'shape': {
             'strategy': 'normal',
-            'interval': 'intra'
+            'interval': 'extra'
         },
         'style': {
             'strategy': 'normal',
-            'interval': 'intra'
+            'interval': 'extra'
         }
     }
     data_generator.generate(

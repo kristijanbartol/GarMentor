@@ -15,7 +15,7 @@ from configs.const import (
 )
 from configs.param_configs import get_param_cfg_from_label
 from data.cat.generator import DataGenerator
-from data.cat.utils import get_dataset_dirs
+from data.cat.common import get_dataset_dirs
 from data.datasets.common import (
     get_background_paths,
     load_background,

@@ -45,7 +45,7 @@
         },
 
         {
-            "name": "Pregenerate (TailorNet)",
+            "name": "Data generator",
             "type": "python",
             "request": "launch",
             "program": "${file}",
