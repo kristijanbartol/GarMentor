@@ -123,7 +123,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     assert(target_style_vector.shape[1] == 2)
                     garment_labels = sample_batch['garment_labels'].to(device)      # (bs, num_garment_classes=4)
 
-                    target_cam_t = sample_batch['cam_t'].to(device)    # (bs, 3)
+                    #target_cam_t = sample_batch['cam_t'].to(device)    # (bs, 3)
                     
                     target_smpl_output = smpl_model(body_pose=target_pose_rotmats,
                                                     global_orient=target_glob_rotmats.unsqueeze(1),
@@ -142,7 +142,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     # ------------ INPUT PROXY REPRESENTATION GENERATION + 2D TARGET JOINTS ------------
                     target_joints2d = perspective_project_torch(target_joints,
                                                                 None,
-                                                                target_cam_t,
+                                                                mean_cam_t,
                                                                 focal_length=pose_shape_cfg.TRAIN.SYNTH_DATA.FOCAL_LENGTH,
                                                                 img_wh=pose_shape_cfg.DATA.PROXY_REP_SIZE)
 
@@ -223,7 +223,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                             )
                         pred_pose_rotmats_mode = target_pose_rotmats
                         pred_glob_rotmats = target_glob_rotmats
-                        pred_cam_wp = target_cam_t
+                        pred_cam_wp = mean_cam_t
                         pred_joints2d_mode = normalize_keypoints(target_joints2d, pose_shape_cfg.DATA.PROXY_REP_SIZE)
                         
                     # Pose F, U, V and rotmats_mode are (bs, 23, 3, 3) and Pose S is (bs, 23, 3)

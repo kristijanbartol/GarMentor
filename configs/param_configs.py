@@ -102,15 +102,6 @@ STYLE_CONFIGS = {
 }
 
 
-def create_param_cfg_dict(cfg_labels: List[int]) -> Dict:
-    return {
-        'pose': POSE_CONFIGS[cfg_labels[0]],
-        'global_orient': GLOBAL_ORIENT_CONFIGS[cfg_labels[1]],
-        'shape': SHAPE_CONFIGS[cfg_labels[2]],
-        'style': STYLE_CONFIGS[cfg_labels[3]]
-    }
-
-
 TRAIN_TEMPLATE = {
     0: {
         'epochs': [0],      # NOTE: For now, all templates will be fixed throughout the training, therefore, 'epochs': [0]
@@ -125,3 +116,16 @@ TRAIN_TEMPLATE = {
         ]
     }
 }
+
+
+def create_param_cfg_dict(cfg_labels: List[int]) -> Dict:
+    return {
+        'pose': POSE_CONFIGS[cfg_labels[0]],
+        'global_orient': GLOBAL_ORIENT_CONFIGS[cfg_labels[1]],
+        'shape': SHAPE_CONFIGS[cfg_labels[2]],
+        'style': STYLE_CONFIGS[cfg_labels[3]]
+    }
+
+
+def get_param_cfg_from_label(template_label: int) -> Dict:
+    return create_param_cfg_dict(TRAIN_TEMPLATE[template_label]['cfgs'][0])

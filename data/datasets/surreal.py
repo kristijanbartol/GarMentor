@@ -13,7 +13,7 @@ from configs.const import (
     TRAIN,
     VALID
 )
-from configs.param_configs import create_param_cfg_dict
+from configs.param_configs import get_param_cfg_from_label
 from data.cat.generator import DataGenerator
 from data.cat.utils import get_dataset_dirs
 from data.datasets.common import (
@@ -40,13 +40,14 @@ class SurrealDataset(Dataset):
         Initialize paths, load samples's values, and segmentation maps.
         """
         super().__init__()
-        cfg = get_cfg_defaults()
+        train_cfg = get_cfg_defaults().TRAIN
         print(f'Loading {data_split} data...')
 
         dataset_dirpaths = self._get_dataset_dirs(
             gender=gender,
-            garment_pairs=cfg.TRAIN.GARMENT_PAIRS,
-            param_cfg=create_param_cfg_dict(cfg.PARAM_CFG_TEMPLATE['cfgs'])
+            data_split=data_split,
+            garment_pairs=train_cfg.GARMENT_PAIRS,
+            param_cfg=get_param_cfg_from_label(train_cfg.PARAM_CFG_LABEL)
         )
         data_split_slices_list = self._get_slices(
             garment_dirpaths=dataset_dirpaths,
@@ -77,6 +78,7 @@ class SurrealDataset(Dataset):
     @staticmethod
     def _get_dataset_dirs(
             gender: str,
+            data_split: str,
             garment_pairs: List[str],
             param_cfg: Dict
         ) -> List[str]:
@@ -94,7 +96,7 @@ class SurrealDataset(Dataset):
                 upper_class=garment_pair.split('+')[0],
                 lower_class=garment_pair.split('+')[1],
                 gender=gender
-            ))
+            )[data_split])
         return dataset_dirs
     
     @staticmethod
@@ -235,7 +237,7 @@ class SurrealDataset(Dataset):
             'garment_labels': self._to_tensor(self.values.garment_labelss[idx]),
             'joints_3d': self._to_tensor(self.values.joints_3ds[idx]),
             'joints_2d': self._to_tensor(self.values.joints_2ds[idx]),
-            'cam_t': self._to_tensor(self.values.cam_ts[idx]),
+            #'cam_t': self._to_tensor(self.values.cam_ts[idx]),
             'bbox': self._to_tensor(self.values.bboxs[idx]),
             'rgb_img': self._to_tensor(rgb_img, type=np.float32),
             'seg_maps': self._to_tensor(seg_maps, type=bool),
