@@ -114,6 +114,12 @@ TRAIN_TEMPLATE = {
         'cfgs': [
             [0, 1, 1, 1]    # "all" extra
         ]
+    },
+    2: {
+        'epochs': [0],
+        'cfgs': [
+            [0, 2, 0, 0]    # all intra, frontal orients
+        ]
     }
 }
 

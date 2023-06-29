@@ -16,7 +16,7 @@ from configs.const import (
 from data.datasets.common import Values
     
 
-class AgoraDataset(Dataset):
+class CAT3DDataset(Dataset):
 
     """
     An instance of train dataset specific to SURREAL dataset.

@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List
 import numpy as np
 from tqdm import tqdm
 import os
@@ -14,17 +14,15 @@ from configs.const import (
     VALID
 )
 from configs.param_configs import get_param_cfg_from_label
-from data.cat.generator import DataGenerator
 from data.cat.common import get_dataset_dirs
 from data.datasets.common import (
     get_background_paths,
     load_background,
     Values
 )
-from utils.garment_classes import GarmentClasses
     
 
-class SurrealDataset(Dataset):
+class CATDataset(Dataset):
 
     """
     An instance of train dataset specific to SURREAL dataset.
