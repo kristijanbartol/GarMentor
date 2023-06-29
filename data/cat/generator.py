@@ -12,6 +12,7 @@ sys.path.append('/garmentor')
 from configs.const import SURREAL_DATASET_NAME
 import configs.paths as paths
 from data.cat.parameters import Parameters
+from data.cat.utils import get_dataset_dirs
 from models.pose2D_hrnet import get_pretrained_detector
 from predict.predict_hrnet import predict_hrnet
 from utils.garment_classes import GarmentClasses
@@ -381,29 +382,6 @@ class DataGenerator():
         np.save(values_path, values_array.get())
         print(f'Saved samples values to {values_path}!')
 
-    def make_dataset_dirs(
-            self,
-            param_cfg: Dict,
-            upper_class: str,
-            lower_class: str,
-            gender: str
-        ) -> Dict[str, str]:
-        return {data_split: os.path.join(
-            paths.DATA_ROOT_DIR,
-            paths.DATASETS_DIR,
-            f"{param_cfg['pose']['strategy']}-pose",
-            param_cfg['pose']['interval'],
-            f"{param_cfg['global_orient']['strategy']}-global_orient",
-            param_cfg['global_orient']['interval'],
-            f"shape-{param_cfg['shape']['strategy']}",
-            param_cfg['shape']['interval'],
-            f"style-{param_cfg['shape']['strategy']}",
-            param_cfg['style']['interval'],
-            data_split,
-            gender,
-            f'{upper_class}+{lower_class}'
-        ) for data_split in ['train', 'valid'] }
-
     def generate(
             self, 
             param_cfg: Dict,
@@ -432,7 +410,7 @@ class DataGenerator():
             gender=gender,
             garment_classes=garment_classes
         )
-        dataset_dirs = self.make_dataset_dirs(
+        dataset_dirs = get_dataset_dirs(
             param_cfg=param_cfg,
             upper_class=upper_class,
             lower_class=lower_class,

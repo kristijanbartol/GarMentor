@@ -53,9 +53,9 @@
             "justMyCode": false,
             "args": [
                 "-G", "male", 
-                "-U", "shirt", 
-                "-L", "short-pant", 
-                "-N", "10000",
+                "-U", "t-shirt", 
+                "-L", "pant", 
+                "-N", "5000",
                 "--preextract"
             ]
         },
