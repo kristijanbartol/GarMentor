@@ -45,7 +45,7 @@
         },
 
         {
-            "name": "Pregenerate (TailorNet)",
+            "name": "Data generator",
             "type": "python",
             "request": "launch",
             "program": "${file}",
@@ -53,8 +53,8 @@
             "justMyCode": false,
             "args": [
                 "-G", "male", 
-                "-U", "shirt", 
-                "-L", "short-pant", 
+                "-U", "t-shirt", 
+                "-L", "pant", 
                 "-N", "10000",
                 "--preextract"
             ]

@@ -29,17 +29,17 @@ from pytorch3d.renderer import (
 class Renderer(nn.Module):
 
     default_cam_R, default_cam_t = look_at_view_transform(
-        #dist=CAM_DIST,
-        dist=-2.7,
+        dist=CAM_DIST,
+        #dist=-2.7,
         elev=0,
         azim=0,
         degrees=True
     )
     default_cam_t[:, 1] += MEAN_CAM_Y_OFFSET
 
-    #assert(default_cam_t[:, 0] == MEAN_CAM_T[0])
-    #assert(default_cam_t[:, 1] == MEAN_CAM_T[1])
-    #assert(default_cam_t[:, 2] == MEAN_CAM_T[2])
+    assert(default_cam_t[:, 0] == MEAN_CAM_T[0])
+    assert(default_cam_t[:, 1] == MEAN_CAM_T[1])
+    assert(default_cam_t[:, 2] == MEAN_CAM_T[2])
 
     def __init__(
             self,
@@ -56,13 +56,13 @@ class Renderer(nn.Module):
             perspective_correct: bool = False,
             cull_backfaces: bool = False,
             clip_barycentric_coords: bool = None,
-            #light_t: Tuple[float] = LIGHT_T,
-            light_t: Tuple[float] = ((0.0, 0.0, -2.0),),
+            light_t: Tuple[float] = LIGHT_T,
+            #light_t: Tuple[float] = ((0.0, 0.0, -2.0),),
             light_ambient_color: Tuple[float] = LIGHT_AMBIENT_COLOR,
             light_diffuse_color: Tuple[float] = LIGHT_DIFFUSE_COLOR,
             light_specular_color: Tuple[float] = LIGHT_SPECULAR_COLOR,
-            #background_color: Tuple[float] = BACKGROUND_COLOR
-            background_color: Tuple[float] = (1.0, 1.0, 1.0)
+            background_color: Tuple[float] = BACKGROUND_COLOR
+            #background_color: Tuple[float] = (1.0, 1.0, 1.0)
         ) -> None:
         ''' The body renderer constructor.
 

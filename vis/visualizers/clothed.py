@@ -68,7 +68,10 @@ class ClothedVisualizer(Visualizer2D):
         )
         assert(device != 'cpu')
         self.device = device
-        self.renderer = ClothedRenderer(device=self.device)
+        self.renderer = ClothedRenderer(
+            device=self.device,
+            img_wh=img_wh    
+        )
         self.img_wh = img_wh
 
     def vis(self,
@@ -144,7 +147,8 @@ class ClothedVisualizer(Visualizer2D):
         Save RGB clothed image.
         """
         rgb_img = (rgb_img * 255).astype(np.uint8)
-        pil_img = ImageOps.flip(Image.fromarray(rgb_img))
+        #pil_img = ImageOps.flip(Image.fromarray(rgb_img))
+        pil_img = Image.fromarray(rgb_img)
         pil_img.save(save_path)
         print(f'Saved clothed image: {save_path}...')
 
@@ -172,5 +176,6 @@ class ClothedVisualizer(Visualizer2D):
         """
         for seg_idx in range(5):
             mask_img = (seg_masks[seg_idx] * 255).astype(np.uint8)
-            pil_img = ImageOps.flip(Image.fromarray(mask_img))
+            #pil_img = ImageOps.flip(Image.fromarray(mask_img))
+            pil_img = Image.fromarray(mask_img)
             pil_img.save(save_paths[seg_idx])

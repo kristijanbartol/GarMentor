@@ -1,10 +1,307 @@
+from typing import Optional, Tuple, List
 import torch
 import numpy as np
 
+from configs import paths
+import configs.const
+from configs.const import (
+    SIMPLE_POSE_RANGES,
+    SHAPE_MEANS,
+    SHAPE_STDS,
+    STYLE_MEANS,
+    STYLE_STDS,
+    NUM_SAMPLES,
+    NUM_GARMENT_CLASSES,
+    NUM_STYLE_PARAMS,
+    SHAPE_MIN,
+    SHAPE_MAX,
+    STYLE_MIN,
+    STYLE_MAX
+)
 from utils.rigid_transform_utils import quat_to_rotmat, aa_rotate_translate_points_pytorch3d
 from utils.cam_utils import orthographic_project_torch
 from utils.joints2d_utils import undo_keypoint_normalisation
 from utils.label_conversions import convert_heatmaps_to_2Djoints_coordinates_torch, ALL_JOINTS_TO_COCO_MAP
+
+
+# NOTE: Might create a Parameters class.
+
+def _ranges_to_sizes_and_offsets(
+        ranges: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
+    sizes = ranges[:, 1] - ranges[:, 0] # type: ignore
+    offsets = ranges[:, 0]
+    return sizes, offsets
+
+
+def _ranges_to_scaled_rand_array(
+        ranges: np.ndarray,
+        num_samples: int
+    ) -> np.ndarray:
+    sizes, offsets = _ranges_to_sizes_and_offsets(ranges)
+    rand_values = np.random.rand(num_samples, 3)
+    scaled_values = rand_values * sizes + offsets
+    return scaled_values
+
+
+def _load_poses(train_poses_path: str) -> np.ndarray:
+    data = np.load(train_poses_path)
+    fnames = data['fnames']
+    poses = data['poses']
+    indices = [i for i, x in enumerate(fnames)
+                if (x.startswith('h36m') or x.startswith('up3d') or x.startswith('3dpw'))]
+    poses_array = np.stack([poses[i] for i in indices], axis=0)
+    return poses_array
+
+
+def _sample_mocap_pose_common() -> Tuple[np.ndarray, np.ndarray]:
+    poses_array = _load_poses(paths.TRAIN_POSES_PATH)
+    num_poses_loaded = poses_array.shape[0]
+    num_train_loaded = int(num_poses_loaded * 0.85)
+    train_idxs = np.random.choice(
+        np.arange(poses_array.shape[0]), 
+        size=num_train_loaded
+    )
+    return poses_array[train_idxs], poses_array[~train_idxs]
+
+    
+
+def _split_new_samples(
+        new_samples: np.ndarray, 
+        train_samples: List[np.ndarray], 
+        valid_samples: List[np.ndarray], 
+        num_train: int, 
+        num_valid: int, 
+        intervals: List[np.ndarray]
+    ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+    for sample in new_samples:
+        for interval in intervals:
+            within_valid_interval = True
+            for cidx, component_interval in enumerate(interval):
+                if component_interval is not None:
+                    if not component_interval[0] <= sample[cidx] < component_interval[1]:
+                        within_valid_interval = False
+            if within_valid_interval:
+                if len(valid_samples) < num_valid:
+                    valid_samples.append(sample)
+            else:
+                if len(train_samples) < num_train:
+                    train_samples.append(sample)
+    return train_samples, valid_samples
+
+
+def _sample_global_orient(
+        num_train: int,
+        num_valid: int,
+        intervals_type: str,     # ['intra', 'extra']
+        range_type: str         # ['frontal', 'diverse']
+    ) -> Tuple[np.ndarray, np.ndarray]:
+    train_samples, valid_samples = [], []
+    ranges = getattr(
+        configs.const, 
+        f'{range_type.upper()}_ORIENT_RANGES'
+    )
+    intervals = getattr(
+        configs.const, 
+        f'{intervals_type.upper()}_ORIENT_INTERVALS'
+    )
+    while len(train_samples) < num_train or len(valid_samples) < num_valid:
+        new_samples = _ranges_to_scaled_rand_array(
+            ranges=ranges, 
+            num_samples=num_train+num_valid
+        )
+        train_samples, valid_samples = _split_new_samples(
+            new_samples=new_samples,
+            train_samples=train_samples,
+            valid_samples=valid_samples,
+            num_train=num_train,
+            num_valid=num_valid,
+            intervals=intervals[range_type]
+        )
+    return np.stack(train_samples, axis=0), np.stack(valid_samples, axis=0)
+
+
+def _clip_samples(
+        samples: np.ndarray,
+        clip_min: Optional[float] = None,
+        clip_max: Optional[float] = None
+    ) -> np.ndarray:
+    clip_min = clip_min if clip_min is not None else np.min(samples)
+    clip_max = clip_max if clip_max is not None else np.max(samples)
+    return np.clip(samples, a_min=clip_min, a_max=clip_max)
+
+
+def _sample_normal_pc(
+        pc_type: str,           # ['shape', 'style']
+        mean_params: np.ndarray,      # (10,) OR (4,4)
+        std_vector: np.ndarray,       # (10,) OR (4,4)
+        num_train: int,
+        num_valid: int,
+        intervals_type: str,    # ['intra', 'extra']
+        clip_min: Optional[float] = None,
+        clip_max: Optional[float] = None
+    ) -> Tuple[np.ndarray, np.ndarray]:             # (10,)
+    """
+    (Truncated) normal sampling of shape parameter deviations from the mean.
+    """
+    train_samples, valid_samples = [], []
+    intervals = getattr(
+        configs.const, 
+        f'{intervals_type.upper()}_{pc_type.upper()}_INTERVALS'
+    )
+    while len(train_samples) < num_train or len(valid_samples) < num_valid:
+        new_samples_shape = [num_train + num_valid] + list(mean_params.shape)
+        new_samples = mean_params + np.random.randn(*new_samples_shape) * std_vector
+        new_samples = _clip_samples(
+            samples=new_samples,
+            clip_min=clip_min,
+            clip_max=clip_max
+        )
+        train_samples, valid_samples = _split_new_samples(
+            new_samples=new_samples,
+            train_samples=train_samples,
+            valid_samples=valid_samples,
+            num_train=num_train,
+            num_valid=num_valid,
+            intervals=intervals
+        )
+    return np.stack(train_samples, axis=0), np.stack(valid_samples, axis=0)
+
+
+def sample_zero_pose(_) -> Tuple[np.ndarray, np.ndarray]:
+    return (
+        np.zeros((NUM_SAMPLES['zero_pose']['train'], 69)), 
+        np.zeros((NUM_SAMPLES['zero_pose']['valid'], 69))
+    )
+
+
+def sample_simple_pose(_) -> Tuple[np.ndarray, np.ndarray]:
+    pose_samples = []
+    num_train = NUM_SAMPLES['simple_pose']['train']
+    num_valid = NUM_SAMPLES['simple_pose']['valid']
+    pose_samples = np.zeros((num_train + num_valid, 69))
+    for joint_idx in SIMPLE_POSE_RANGES:
+        rand_values = _ranges_to_scaled_rand_array(
+            ranges=SIMPLE_POSE_RANGES[joint_idx],
+            num_samples=num_train+num_valid
+        )
+        pose_samples[:, joint_idx*3:(joint_idx+1)*3] = rand_values
+    return pose_samples[:num_train], pose_samples[:num_valid]
+
+
+def sample_mocap_pose(_) -> Tuple[np.ndarray, np.ndarray]:
+    train_poses, valid_poses = _sample_mocap_pose_common()
+    return train_poses[:, 3:], valid_poses[:, 3:]
+
+
+def sample_zero_global_orient(interval_type: str) -> Tuple[np.ndarray, np.ndarray]:
+    return (
+        np.zeros((NUM_SAMPLES['zero_global_orient']['train'], 3)), 
+        np.zeros((NUM_SAMPLES['zero_global_orient']['valid'], 3))
+    )
+
+
+def sample_frontal_global_orient(intervals_type: str) -> Tuple[np.ndarray, np.ndarray]:
+    return _sample_global_orient(
+        num_train=NUM_SAMPLES['frontal_global_orient']['train'],
+        num_valid=NUM_SAMPLES['frontal_global_orient']['valid'],
+        intervals_type=intervals_type,
+        range_type='frontal'
+    )
+
+
+def sample_diverse_global_orient(intervals_type: str) -> Tuple[np.ndarray, np.ndarray]:
+    return _sample_global_orient(
+        num_train=NUM_SAMPLES['diverse_global_orient']['train'],
+        num_valid=NUM_SAMPLES['diverse_global_orient']['valid'],
+        intervals_type=intervals_type,
+        range_type='diverse'
+    )
+
+
+def sample_mocap_global_orient(_) -> Tuple[np.ndarray, np.ndarray]:
+    train_orients, valid_orients = _sample_mocap_pose_common()
+    return train_orients[:, :3], valid_orients[:, :3]
+
+
+def sample_normal_shape(intervals_type: str) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    (Truncated) normal sampling of shape parameter deviations from the mean.
+    """
+    return _sample_normal_pc(
+        pc_type='shape',
+        mean_params=SHAPE_MEANS,
+        std_vector=SHAPE_STDS,
+        num_train=NUM_SAMPLES['normal_shape']['train'],
+        num_valid=NUM_SAMPLES['normal_shape']['valid'],
+        intervals_type=intervals_type,
+        clip_min=SHAPE_MIN,
+        clip_max=SHAPE_MAX
+    )
+
+
+def sample_uniform_shape(
+        min_value: float,
+        max_value: float       
+    ) -> Tuple[np.ndarray, np.ndarray]:             # (10,)
+    """
+    Uniform sampling of shape parameters.
+    """
+    raise NotImplementedError('Need to finish the implementation...')
+    #shape = (max_value - min_value) * np.random.randn(10,) + min_value
+    #return shape
+
+
+def sample_normal_style(intervals_type: str) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    (Truncated) normal sampling of style parameter deviations from the mean, for each garment.
+    """
+    normal_style_samples = _sample_normal_pc(
+        pc_type='style',
+        mean_params=STYLE_MEANS,
+        std_vector=STYLE_STDS,
+        num_train=NUM_SAMPLES['normal_style']['train'] * NUM_GARMENT_CLASSES,
+        num_valid=NUM_SAMPLES['normal_style']['valid'] * NUM_GARMENT_CLASSES,
+        intervals_type=intervals_type,
+        clip_min=STYLE_MIN,
+        clip_max=STYLE_MAX
+    )
+    normal_style_vectors = [
+        normal_style_samples[x].reshape(-1, NUM_GARMENT_CLASSES, NUM_STYLE_PARAMS)
+        for x in range(2)
+    ]
+    return tuple(normal_style_vectors)
+
+
+def sample_uniform_style(
+        num_garment_classes: int,
+        min_value: float,
+        max_value: float
+    ) -> Tuple[np.ndarray, np.ndarray]:                  # (num_garment_classes, 4)
+    """
+    Uniform sampling of style parameters, for each garment.
+    """
+    raise NotImplementedError('Need to finish the implementation...')
+    #style = (max_value - min_value) * np.random.randn(num_garment_classes, 4) + min_value
+    #return style
+
+
+def uniform_random_unit_vector(num_vectors):
+    """
+    Uniform sampling random 3D unit-vectors, i.e. points on unit sphere.
+    """
+    e = torch.randn(num_vectors, 3)
+    e = torch.div(e, torch.norm(e, dim=-1, keepdim=True))
+    return e  # (num_vectors, 3)
+
+
+@DeprecationWarning
+def normal_sample_params_deprecated(batch_size, mean_params, std_vector):
+    """
+    Gaussian sampling of shape parameter deviations from the mean.
+    """
+    shape = mean_params + torch.randn(batch_size, mean_params.shape[0], device=mean_params.device)*std_vector
+    return shape  # (bs, num_smpl_betas)
 
 
 def bingham_sampling_for_matrix_fisher_torch(A,

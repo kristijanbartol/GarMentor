@@ -1,15 +1,12 @@
 import os
-from data.datasets.surreal import SurrealDataset
-from rendering.body import BodyRenderer
+from data.datasets.cat import CATDataset
 import torch
 import torch.cuda
 import torch.optim as optim
 import argparse
-import _thread as thread
 import visdom as vis
 
 from models.poseMF_shapeGaussian_net import PoseMFShapeGaussianNet
-from models.fully_parametric_net import FullyParametricNet
 from models.smpl_official import SMPL
 from models.canny_edge_detector import CannyEdgeDetector
 
@@ -58,14 +55,13 @@ def run_train(device,
 
     print('\n', pose_shape_cfg)
     # ------------------------- Datasets -------------------------
-    train_dataset = SurrealDataset(
+    train_dataset = CATDataset(
         gender=gender,
         data_split='train',
-        garment_dirnames=pose_shape_cfg.GARMENT_DIRNAMES,
         train_val_ratio=0.8,
         backgrounds_dir_path=paths.TRAIN_BACKGROUNDS_PATH
     )
-    val_dataset = SurrealDataset(
+    val_dataset = CATDataset(
         gender=gender,
         data_split='valid',
         train_val_ratio=0.8,

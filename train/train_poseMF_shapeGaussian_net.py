@@ -18,7 +18,7 @@ from utils.joints2d_utils import check_joints2d_visibility_torch, check_joints2d
 from utils.image_utils import batch_add_rgb_background, batch_crop_pytorch_affine
 from utils.sampling_utils import pose_matrix_fisher_sampling_torch
 
-from utils.augmentation.smpl_augmentation import normal_sample_params
+from utils.sampling_utils import normal_sample_params_deprecated
 from utils.augmentation.cam_augmentation import augment_cam_t
 from utils.augmentation.proxy_rep_augmentation import augment_proxy_representation, random_extreme_crop
 from utils.augmentation.rgb_augmentation import augment_rgb
@@ -147,12 +147,12 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                                                          axes=x_axis,
                                                                          rot_mult_order='post')
                     # Random sample body shape
-                    target_shape = normal_sample_params(batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
+                    target_shape = normal_sample_params_deprecated(batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
                                                         mean_params=mean_shape,
                                                         std_vector=delta_betas_std_vector)
 
                     # Random sample garment parameters
-                    target_style = normal_sample_params(batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
+                    target_style = normal_sample_params_deprecated(batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
                                                         mean_params=mean_style,
                                                         std_vector=delta_style_std_vector)
 

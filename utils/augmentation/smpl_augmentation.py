@@ -49,4 +49,3 @@ def uniform_random_unit_vector(num_vectors):
     e = torch.randn(num_vectors, 3)
     e = torch.div(e, torch.norm(e, dim=-1, keepdim=True))
     return e  # (num_vectors, 3)
-

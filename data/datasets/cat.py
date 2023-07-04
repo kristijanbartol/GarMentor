@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List
 import numpy as np
 from tqdm import tqdm
 import os
@@ -7,32 +7,30 @@ from torch.utils.data import Dataset
 from math import floor, ceil
 import imageio
 
+from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
 import configs.paths as paths
 from configs.const import (
     TRAIN,
     VALID
 )
-from data.prepare.surreal.tn import SurrealDataGenerator
+from configs.param_configs import get_param_cfg_from_label
+from data.cat.common import get_dataset_dirs
 from data.datasets.common import (
     get_background_paths,
     load_background,
     Values
 )
-from utils.garment_classes import GarmentClasses
     
 
-class SurrealDataset(Dataset):
+class CATDataset(Dataset):
 
     """
     An instance of train dataset specific to SURREAL dataset.
     """
 
-    DATASET_NAME = SurrealDataGenerator.DATASET_NAME
-
     def __init__(self,
                  gender: str,
                  data_split: str,
-                 garment_dirnames: List[str],
                  train_val_ratio: float,
                  backgrounds_dir_path: str,
                  img_wh: int = 256):
@@ -40,40 +38,32 @@ class SurrealDataset(Dataset):
         Initialize paths, load samples's values, and segmentation maps.
         """
         super().__init__()
+        train_cfg = get_cfg_defaults().TRAIN
         print(f'Loading {data_split} data...')
-        
-        if gender == 'neutral':
-            dataset_gender_dirs = [os.path.join(
-                paths.DATA_ROOT_DIR,
-                self.DATASET_NAME,
-                x) for x in ['male', 'female']]
-        else:
-            dataset_gender_dirs = [os.path.join(
-                paths.DATA_ROOT_DIR,
-                self.DATASET_NAME,
-                gender)]
 
-        garment_dirpaths = self._get_all_garment_pairs(
-            dataset_gender_dirs=dataset_gender_dirs,
-            query_dirnames=garment_dirnames
+        dataset_dirpaths = self._get_dataset_dirs(
+            gender=gender,
+            data_split=data_split,
+            garment_pairs=train_cfg.GARMENT_PAIRS,
+            param_cfg=get_param_cfg_from_label(train_cfg.PARAM_CFG_LABEL)
         )
         data_split_slices_list = self._get_slices(
-            garment_dirpaths=garment_dirpaths,
+            garment_dirpaths=dataset_dirpaths,
             values_fname=paths.VALUES_FNAME,
             data_split=data_split,
             train_val_ratio=train_val_ratio
         )
         self.values = self._load_values(
-            garment_dirpaths,
+            dataset_dirpaths,
             slice_list=data_split_slices_list
         )
         self.seg_maps_paths = self._get_seg_maps_paths(
-            garment_dirpaths=garment_dirpaths, 
+            garment_dirpaths=dataset_dirpaths, 
             seg_maps_dirname=paths.SEG_MAPS_DIR,
             slice_list=data_split_slices_list
         )
         self.rgb_img_paths = self._get_rgb_img_paths(
-            garment_dirpaths=garment_dirpaths,
+            garment_dirpaths=dataset_dirpaths,
             rgb_imgs_dirname=paths.RGB_DIR,
             slice_list=data_split_slices_list
         )
@@ -84,9 +74,11 @@ class SurrealDataset(Dataset):
         self.img_wh = img_wh
         
     @staticmethod
-    def _get_all_garment_pairs(
-            dataset_gender_dirs: List[str],
-            query_dirnames: List[str]
+    def _get_dataset_dirs(
+            gender: str,
+            data_split: str,
+            garment_pairs: List[str],
+            param_cfg: Dict
         ) -> List[str]:
         """
         Collects all the garment class pairs based on directory names.
@@ -95,15 +87,15 @@ class SurrealDataset(Dataset):
         combination is generated separately and it is simpler to determine
         the combination this way.
         """
-        garment_dirpaths = []
-        for dataset_gender_dir in dataset_gender_dirs:
-            for query_dirname in query_dirnames:
-                query_dirpath = os.path.join(dataset_gender_dir, query_dirname)
-                if not os.path.exists(query_dirpath):
-                    raise FileNotFoundError(f'Not found generated data dir: {query_dirpath}')
-                print(f'Found directory: {query_dirpath}')
-                garment_dirpaths.append(query_dirpath)
-        return garment_dirpaths
+        dataset_dirs = []
+        for garment_pair in garment_pairs:
+            dataset_dirs.append(get_dataset_dirs(
+                param_cfg=param_cfg,
+                upper_class=garment_pair.split('+')[0],
+                lower_class=garment_pair.split('+')[1],
+                gender=gender
+            )[data_split])
+        return dataset_dirs
     
     @staticmethod
     def _get_slices(
@@ -243,7 +235,7 @@ class SurrealDataset(Dataset):
             'garment_labels': self._to_tensor(self.values.garment_labelss[idx]),
             'joints_3d': self._to_tensor(self.values.joints_3ds[idx]),
             'joints_2d': self._to_tensor(self.values.joints_2ds[idx]),
-            'cam_t': self._to_tensor(self.values.cam_ts[idx]),
+            #'cam_t': self._to_tensor(self.values.cam_ts[idx]),
             'bbox': self._to_tensor(self.values.bboxs[idx]),
             'rgb_img': self._to_tensor(rgb_img, type=np.float32),
             'seg_maps': self._to_tensor(seg_maps, type=bool),
