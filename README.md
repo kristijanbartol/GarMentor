@@ -1,4 +1,4 @@
-# Garmentor: Parametric Pose, Shape, and Clothes In-The-Wild
+# GarMentor: Synthetic Training for Clothed Avatars
 
 <img src="https://github.com/kristijanbartol/garmentor/blob/main/assets/Garmentor_Pipeline_Overview.png" width="400">
 
