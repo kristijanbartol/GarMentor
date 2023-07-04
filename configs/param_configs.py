@@ -120,6 +120,24 @@ TRAIN_TEMPLATE = {
         'cfgs': [
             [0, 2, 0, 0]    # all intra, frontal orients
         ]
+    },
+    3: {
+        'epochs': [0],
+        'cfgs': [
+            [0, 3, 1, 1]    # "all" extra, frontal orients
+        ]
+    },
+    4: {
+        'epochs': [0],
+        'cfgs': [
+            [2, 3, 1, 1]    # "all" extra, simple poses, frontal orients
+        ]
+    },
+    5: {
+        'epochs': [0],
+        'cfgs': [
+            [2, 5, 1, 1]    # "all" extra, simple poses, diverse orients
+        ]
     }
 }
 

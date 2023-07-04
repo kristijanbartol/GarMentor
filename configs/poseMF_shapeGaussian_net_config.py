@@ -16,13 +16,8 @@ _C = CfgNode()
 
 # Model
 _C.MODEL = CfgNode()
-#_C.MODEL.NUM_IN_CHANNELS = 18
-#_C.MODEL.NUM_IN_CHANNELS = 17 + 5
-#_C.MODEL.NUM_IN_CHANNELS = 20
 _C.MODEL.NUM_IN_CHANNELS = 23
-#_C.MODEL.NUM_RESNET_LAYERS = 18
 _C.MODEL.NUM_RESNET_LAYERS = 50
-#_C.MODEL.NUM_RESNET_LAYERS = 101
 _C.MODEL.EMBED_DIM = 256
 _C.MODEL.DELTA_I = True
 _C.MODEL.DELTA_I_WEIGHT = 1.0
@@ -49,16 +44,14 @@ _C.DATA.EDGE_GAUSSIAN_SIZE = 5
 
 # Train
 _C.TRAIN = CfgNode()
-_C.TRAIN.NUM_EPOCHS = 300
-#_C.TRAIN.BATCH_SIZE = 2
+_C.TRAIN.NUM_EPOCHS = 50
 _C.TRAIN.BATCH_SIZE = 32
-#_C.TRAIN.BATCH_SIZE = 4
 _C.TRAIN.LR = 0.0001
 _C.TRAIN.EPOCHS_PER_SAVE = 5
 _C.TRAIN.PIN_MEMORY = True
 _C.TRAIN.NUM_WORKERS = 2
 _C.TRAIN.GARMENT_PAIRS = ['t-shirt+pant']
-_C.TRAIN.PARAM_CFG_LABEL = 1
+_C.TRAIN.PARAM_CFG_LABEL = 4
 
 # Train - Synthetic Data
 _C.TRAIN.SYNTH_DATA = CfgNode()
@@ -72,25 +65,6 @@ _C.VISUALIZATION.DEFAULT_MESH_COLORS = False
 
 # Train - Synthetic Data - Sampling
 _C.TRAIN.SYNTH_DATA.SAMPLING = CfgNode()
-
-#_C.TRAIN.SYNTH_DATA.SAMPLING.STRATEGY = {
-#    'pose': 'simple',
-#    'global_orient': 'frontal',
-#    'shape': 'normal',
-#    'style': 'style'
-#}
-
-#_C.TRAIN.SYNTH_DATA.SAMPLING.POLATION = {
-#    'pose': 'extra',
-#    'global_orient': 'extra',
-#    'shape': 'extra',
-#    'style': 'extra'
-#}
-
-#_C.TRAIN.SYNTH_DATA.SAMPLING.CLIPPING = {
-#    'shape': [None, None],
-#    'style': [None, None]
-#}
 
 # Train - Synthetic Data - Augmentation
 _C.TRAIN.SYNTH_DATA.AUGMENT = CfgNode()
