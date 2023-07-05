@@ -45,7 +45,8 @@ class CATDataset(Dataset):
             gender=gender,
             data_split=data_split,
             garment_pairs=train_cfg.GARMENT_PAIRS,
-            param_cfg=get_param_cfg_from_label(train_cfg.PARAM_CFG_LABEL)
+            param_cfg=get_param_cfg_from_label(train_cfg.PARAM_CFG_LABEL),
+            img_wh=train_cfg.SYNTH_DATA.IMG_WH
         )
         data_split_slices_list = self._get_slices(
             garment_dirpaths=dataset_dirpaths,
@@ -78,6 +79,7 @@ class CATDataset(Dataset):
             gender: str,
             data_split: str,
             garment_pairs: List[str],
+            img_wh: int,
             param_cfg: Dict
         ) -> List[str]:
         """
@@ -93,7 +95,8 @@ class CATDataset(Dataset):
                 param_cfg=param_cfg,
                 upper_class=garment_pair.split('+')[0],
                 lower_class=garment_pair.split('+')[1],
-                gender=gender
+                gender=gender,
+                img_wh=img_wh
             )[data_split])
         return dataset_dirs
     
