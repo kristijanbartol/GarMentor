@@ -5,6 +5,15 @@ import torch
 import torch.nn.functional as F
 
 
+def upscale_retaining_center(img, factor):
+    center_coords = img.shape[-2:] / 2
+    new_center_coords = center_coords * factor
+    center_offset = new_center_coords - center_coords
+    h, w = img.shape[:-2] * factor
+    resized_img = img.Resize(size=(h, w))
+    
+
+
 def convert_bbox_corners_to_centre_hw(bbox_corners):
     """
     Convert bbox coordinates from [top left:(x1, y1), bot right: (x2, y2)]  to centre, height, width.

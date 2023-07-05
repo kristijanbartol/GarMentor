@@ -1,7 +1,8 @@
 import os
 
 # ------------------- SMPL Files -------------------
-SMPL = '/data/hierprob3d/smpl'
+SMPL_DIR = '/data/hierprob3d/smpl'
+SMPL_PATH_TEMPLATE = os.path.join(SMPL_DIR, 'SMPL_{gender}.pkl')
 J_REGRESSOR_EXTRA = '/data/hierprob3d/J_regressor_extra.npy'
 COCOPLUS_REGRESSOR= '/data/hierprob3d/cocoplus_regressor.npy'
 H36M_REGRESSOR = '/data/hierprob3d/J_regressor_h36m.npy'

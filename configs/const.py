@@ -2,9 +2,7 @@ import numpy as np
 
 # Rendering constants
 CAM_DIST = 2.7
-MEAN_CAM_Y_OFFSET = 0.2
-# NOTE (cam_t): cam_t is currently relevant only for the augmentation purposes,
-#               and not as a parameter for learning.
+MEAN_CAM_Y_OFFSET = 0.3
 MEAN_CAM_T = [0.0, MEAN_CAM_Y_OFFSET, CAM_DIST]
 FOCAL_LENGTH = 300.0
 IMG_WH = 256
@@ -22,6 +20,13 @@ BACKGROUND_COLOR = (0.0, 0.0, 0.0)
 BBOX_SCALE_FACTOR = 1.2
 OBJECT_DETECT_THRESHOLD = 0.95
 HEATMAP_GAUSSIAN_STD = 4.0
+
+# Height constants (for the volume extraction)
+GENDER_HEIGHT = {
+    'male': 1.82,
+    'female': 1.68,
+    'neutral': 1.75
+}
 
 # Sampling settings
 NUM_SHAPE_PARAMS = 10

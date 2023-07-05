@@ -1,23 +1,19 @@
-import os
+from typing import Optional
 from math import nan
 import numpy as np
 import trimesh
 import sys
 
+from smplx.body_models import SMPL
+
 sys.path.append('/garmentor/utils/measurements/')
 
-from _model import create_model, set_shape
+from utils.measurements.model import set_shape
 from _utils import get_dist, get_segment_length, get_height
 
 
 HORIZ_NORMAL = np.array([0, 1, 0], dtype=np.float32)
 VERT_NORMAL = np.array([1, 0, 0], dtype=np.float32)
-
-GENDER_HEIGHT = {
-    0: 1.82,    # male
-    1: 1.68,    # female
-    2: 1.75     # neutral
-}
 
 
 class MeshMeasurements:
@@ -101,43 +97,33 @@ class MeshMeasurements:
            nan, 6.0, nan, nan, 8.0, 15.0, 6.0, nan, 12.0, nan, 5.0]) * 0.001
 
     @staticmethod
-    def __init_from_params__(gender, shape, mesh_size=None, keep_mesh=False, pose=None):
-        if pose is None:
-            model = create_model(gender)
-        else:
-            model = create_model(gender, pose)
-            
-        model_output = set_shape(model, shape)
+    def __init_from_betas__(
+            smpl_model: SMPL, 
+            betas: np.ndarray, 
+            mesh_size: Optional[float] = None
+        ):
+        model_output = set_shape(smpl_model, betas)
         verts = model_output.vertices.detach().cpu().numpy().squeeze()
-        faces = model.faces.squeeze()
+        faces = smpl_model.faces.squeeze()
+        return MeshMeasurements(
+            verts=verts, 
+            faces=faces, 
+            mesh_size=mesh_size
+        )
 
-        return MeshMeasurements(verts, faces, mesh_size, keep_mesh)
-
-    def __init__(self, verts, faces, mesh_size=None, keep_mesh=False):
+    def __init__(
+            self, 
+            verts: np.ndarray, 
+            faces: np.ndarray, 
+            mesh_size: Optional[float] = None
+        ):
         self.verts = verts
         self.faces = faces
-
         self.mesh = trimesh.Trimesh(vertices=self.verts, faces=self.faces)
-
-        self.weight = self.mesh.volume
-
+        self.volume = self.mesh.volume
         self.overall_height = self._get_overall_height()
-
         if mesh_size is not None:
             self._scale_mesh(mesh_size)
-
-        self.allmeasurements = self._get_all_measurements()
-        #self.apmeasurements = self._get_ap_measurements()
-
-        if not keep_mesh:
-            self.verts = None
-            self.faces = None
-            self.mesh = None
-
-    def flush(self):
-        self.verts = None
-        self.faces = None
-        self.mesh = None
 
     def _scale_mesh(self, mesh_size):
         self.verts *= (mesh_size / self.overall_height)
@@ -429,4 +415,16 @@ class MeshMeasurements:
 
 
 def get_measurements(verts, faces):
-    return MeshMeasurements(verts, faces, keep_mesh=True).apmeasurements
+    return MeshMeasurements(verts, faces).apmeasurements
+
+
+def get_canonical_volume(
+        smpl_model: SMPL,
+        betas: np.ndarray, 
+        fixed_height: float
+    ) -> float:
+    return MeshMeasurements.__init_from_betas__(
+        smpl_model=smpl_model,
+        betas=betas,
+        mesh_size=fixed_height
+    ).volume

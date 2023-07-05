@@ -15,6 +15,7 @@ from configs.const import (
     BACKGROUND_COLOR,
     ORTHOGRAPHIC_SCALE
 )
+from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
 from pytorch3d.renderer import (
     look_at_view_transform,
     FoVOrthographicCameras,
@@ -44,9 +45,9 @@ class Renderer(nn.Module):
     def __init__(
             self,
             device: str,
-            img_wh: int = IMG_WH,
             cam_t: Optional[torch.Tensor] = None,
             cam_R: Optional[torch.Tensor] = None,
+            img_wh: int = 256,
             projection_type: str = 'perspective',
             orthographic_scale: float = ORTHOGRAPHIC_SCALE,
             blur_radius: float = 0.0,
@@ -57,12 +58,10 @@ class Renderer(nn.Module):
             cull_backfaces: bool = False,
             clip_barycentric_coords: bool = None,
             light_t: Tuple[float] = LIGHT_T,
-            #light_t: Tuple[float] = ((0.0, 0.0, -2.0),),
             light_ambient_color: Tuple[float] = LIGHT_AMBIENT_COLOR,
             light_diffuse_color: Tuple[float] = LIGHT_DIFFUSE_COLOR,
             light_specular_color: Tuple[float] = LIGHT_SPECULAR_COLOR,
             background_color: Tuple[float] = BACKGROUND_COLOR
-            #background_color: Tuple[float] = (1.0, 1.0, 1.0)
         ) -> None:
         ''' The body renderer constructor.
 
@@ -112,7 +111,8 @@ class Renderer(nn.Module):
                 resulting in negative barycentric coordinates.
         '''
         super().__init__()
-        self.img_wh = img_wh
+        self.cfg = get_cfg_defaults()
+        self.img_wh = self.cfg.TRAIN.SYNTH_DATA.IMG_WH
         self.device = device
 
         # Cameras - pre-defined here but can be specified in forward 
@@ -134,7 +134,7 @@ class Renderer(nn.Module):
             scale_xyz=((
                 orthographic_scale,
                 orthographic_scale,
-                1.0),)
+                1.5),)
         )
 
         # Lights for textured RGB render - pre-defined here but can be specified in 
