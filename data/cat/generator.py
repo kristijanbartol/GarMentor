@@ -196,8 +196,8 @@ class DataGenerator():
             idx=idx
         )
         params_dict['shape'][0] = 0.        # set the beta PC0 = 0
-        params_dict['style'][:, 2] = 0.     # set the gamma PC2 = 0
-        params_dict['style'][:, 3] = 0.     # set the gamma PC3 = 0
+        #params_dict['style'][:, 2] = 0.     # set the gamma PC2 = 0
+        #params_dict['style'][:, 3] = 0.     # set the gamma PC3 = 0
         rgb_img, seg_maps, joints_3d = clothed_visualizer.vis_from_params(
             pose=params_dict['pose'],
             shape=params_dict['shape'],
@@ -476,7 +476,7 @@ if __name__ == '__main__':
             'interval': 'intra'
         },
         'global_orient': {
-            'strategy': 'zero',
+            'strategy': 'frontal',
             'interval': 'extra'
         },
         'shape': {

@@ -2,7 +2,7 @@ import numpy as np
 
 # Rendering constants
 CAM_DIST = 2.7
-MEAN_CAM_Y_OFFSET = 0.2
+MEAN_CAM_Y_OFFSET = 0.3
 MEAN_CAM_T = [0.0, MEAN_CAM_Y_OFFSET, CAM_DIST]
 FOCAL_LENGTH = 300.0
 IMG_WH = 256

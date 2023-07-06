@@ -168,6 +168,42 @@ def _sample_normal_pc(
     return np.stack(train_samples, axis=0), np.stack(valid_samples, axis=0)
 
 
+'''
+def _sample_uniform_pc(
+        pc_type: str,           # ['shape', 'style']
+        num_train: int,
+        num_valid: int,
+        intervals_type: str    # ['intra', 'extra']
+    ) -> Tuple[np.ndarray, np.ndarray]:             # (10,)
+    """
+    (Truncated) normal sampling of shape parameter deviations from the mean.
+    """
+    train_samples, valid_samples = [], []
+    intervals = getattr(
+        configs.const, 
+        f'{intervals_type.upper()}_{pc_type.upper()}_INTERVALS'
+    )
+    max_value = max(np.max)
+    while len(train_samples) < num_train or len(valid_samples) < num_valid:
+        new_samples_shape = [num_train + num_valid] + SAMPLES_SHAPE['pc_type']
+        new_samples = (max_value - min_value) * np.random.randn(num_garment_classes, 4) + min_value
+        new_samples = _clip_samples(
+            samples=new_samples,
+            clip_min=clip_min,
+            clip_max=clip_max
+        )
+        train_samples, valid_samples = _split_new_samples(
+            new_samples=new_samples,
+            train_samples=train_samples,
+            valid_samples=valid_samples,
+            num_train=num_train,
+            num_valid=num_valid,
+            intervals=intervals
+        )
+    return np.stack(train_samples, axis=0), np.stack(valid_samples, axis=0)
+'''
+
+
 def sample_zero_pose(_) -> Tuple[np.ndarray, np.ndarray]:
     return (
         np.zeros((NUM_SAMPLES['zero_pose']['train'], 69)), 
