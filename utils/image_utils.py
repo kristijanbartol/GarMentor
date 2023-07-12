@@ -3,15 +3,72 @@ import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
+from torchgeometry.core import warp_affine
+from kornia.geometry.transform import resize, translate
 
 
-def upscale_retaining_center(img, factor):
-    center_coords = img.shape[-2:] / 2
-    new_center_coords = center_coords * factor
-    center_offset = new_center_coords - center_coords
-    h, w = img.shape[:-2] * factor
-    resized_img = img.Resize(size=(h, w))
-    
+# TODO: Mimic the actual bbox detector for determining the hyperparameters.
+# NOTE: By default, the random component should be zero here.
+def _determine_scaling_factor(img_dims, bbox):
+    max_value, max_idx = torch.max(bbox[:, 1] - bbox[:, 0], dim=1)
+    img_size = img_dims[max_idx]
+    random_fraction = (torch.rand(bbox.shape[0]) * 0.1) + 0.85
+    subject_size = img_size * random_fraction
+    scaling_factor = subject_size / max_value
+    return scaling_factor
+
+
+def scale_retaining_center(img, bbox):
+    center_coords = torch.tensor([img.shape[1] / 2, img.shape[2] / 2])
+    scaling_factor = _determine_scaling_factor(
+        img_dims=img.shape[1:2], 
+        bbox=bbox
+    )
+    center_offset = center_coords * (scaling_factor - 1)
+    new_wh = int(img.shape[1] * scaling_factor)
+    resized_img = resize(img.swapaxes(1, 3).float(), size=new_wh, interpolation='nearest')
+    trans_img = translate(
+        tensor=resized_img, 
+        translation=torch.tensor([-center_offset[0], -center_offset[1]]).view(resized_img.shape[0], 2)
+    )
+    cropped_img = trans_img[:, :, :img.shape[1], :img.shape[2]].swapaxes(1, 3)
+    return cropped_img, trans_img, resized_img, img
+
+
+def _numpy_determine_scaling_factor(img_dims, bbox):
+    max_value, max_idx = np.max(bbox[1] - bbox[0], axis=0)
+    img_size = img_dims[max_idx]
+    random_fraction = (np.rand(bbox.shape[0]) * 0.1) + 0.85
+    subject_size = img_size * random_fraction
+    scaling_factor = subject_size / max_value
+    return scaling_factor
+
+
+def numpy_scale_retaining_center(img, bbox):
+    orig_wh = img.shape[:2]
+    center_coords = np.array([img.shape[1] / 2, img.shape[2] / 2])
+    scaling_factor = _numpy_determine_scaling_factor(
+        img_dims=img.shape[:1],
+        bbox=bbox
+    )
+    coff = center_coords * (scaling_factor - 1)
+    new_wh = int(img.shape[0] * scaling_factor)
+    resized_img = cv2.resize(
+        src=img.swapaxes(1, 3).float(), 
+        dsize=(new_wh, new_wh), 
+        interpolation='nearest'
+    )
+    trans_img = cv2.warpAffine(
+        src=resized_img,
+        M=np.array([[1, 0, -coff[0]], [0, 1, -coff[1]]], dtype=np.float32),
+        dsize=(new_wh, new_wh)
+    )
+    cropped_img = trans_img[:orig_wh, :orig_wh]
+    return cropped_img
+
+
+def random_translate(img):
+    pass
 
 
 def convert_bbox_corners_to_centre_hw(bbox_corners):
@@ -431,3 +488,41 @@ def batch_crop_pytorch_affine(input_wh,
 
     return cropped_dict
 
+
+
+
+if __name__ == '__main__':
+    from PIL import Image
+    import os
+    IMG_DIR = '/data/cat/tn/datasets/zero-pose/intra/zero-global_orient/extra/shape-normal/extra/style-normal/extra/256/train/male/t-shirt+pant/rgb/'
+    img = np.array(Image.open(os.path.join(IMG_DIR, '00000.png')))
+
+    x1 = 0
+    y1 = 0
+    x2 = img.shape[0] - 1
+    y2 = img.shape[1] - 1
+
+    for x in range(img.shape[0]):
+        if np.any(img[x]):
+            x1 = x
+            break
+            
+    for y in range(img.shape[1]):
+        if np.any(img[:, y]):
+            y1 = y
+            break
+
+    for x in range(img.shape[0] - 1, 0, -1):
+        if np.any(img[x]):
+            x2 = x
+            break
+
+    for y in range(img.shape[1] -1, 0, -1):
+        if np.any(img[:, y]):
+            y2 = y
+            break
+
+    img_tensor = torch.from_numpy(img).unsqueeze(0)
+    bbox = torch.tensor([[[x1, y1], [x2, y2]]])
+
+    scale_retaining_center(img=img_tensor, bbox=bbox)
