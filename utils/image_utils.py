@@ -38,16 +38,47 @@ def scale_retaining_center(img, bbox):
     return cropped_img, trans_img, resized_img, img
 
 
+def np_determine_bbox(img):
+    x1 = 0
+    y1 = 0
+    x2 = img.shape[0] - 1
+    y2 = img.shape[1] - 1
+    for x in range(img.shape[0]):
+        if np.any(img[x]):
+            x1 = x
+            break
+            
+    for y in range(img.shape[1]):
+        if np.any(img[:, y]):
+            y1 = y
+            break
+
+    for x in range(img.shape[0] - 1, 0, -1):
+        if np.any(img[x]):
+            x2 = x
+            break
+
+    for y in range(img.shape[1] -1, 0, -1):
+        if np.any(img[:, y]):
+            y2 = y
+            break
+    bbox = np.array([[x1, y1], [x2, y2]])
+    return bbox
+
+
 def _np_get_scaling_factor(
-        img_dims: np.ndarray, 
+        img_wh: int, 
         bbox: np.ndarray, 
         var: float = 0.0, 
-        fraction: float = 0.95
+        fraction: float = 0.92
     ) -> float:
-    max_value = np.max(bbox[1] - bbox[0], axis=0)
+    # TODO: Later, either take the max between the height/weight of the bbox OR
+    # TODO: rotate the image so that height is always a bigger dimention.
+    bbox_height = bbox[1, 0] - bbox[0, 0]
+    print(bbox_height)
     random_fraction = (np.random.rand(1,) * var) + fraction
-    subject_size = img_dims[0] * random_fraction
-    return subject_size / max_value
+    subject_size = img_wh * random_fraction
+    return subject_size / bbox_height
 
 
 def _np_get_new_wh(
@@ -98,11 +129,11 @@ def np_scale_joints_retaining_center(
 def normalize_features(
         rgb_img: np.ndarray,
         seg_maps: np.ndarray,
-        joints_2d: np.ndarray,
-        bbox: np.ndarray
+        joints_2d: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    bbox = np_determine_bbox(img=rgb_img)
     scaling_factor = _np_get_scaling_factor(
-        img_dims=np.array(rgb_img.shape[:1]),
+        img_wh=rgb_img.shape[0],
         bbox=bbox
     )
     new_wh = _np_get_new_wh(
@@ -110,7 +141,7 @@ def normalize_features(
         scaling_factor=scaling_factor
     )
     center_offset = _np_get_center_offset(
-        img_dims=np.array(rgb_img.shape[:1]),
+        img_dims=np.array(rgb_img.shape[:2]),
         scaling_factor=scaling_factor
     )
     rgb_img = np_rescale_retaining_center(

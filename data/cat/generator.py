@@ -208,8 +208,7 @@ class DataGenerator():
         rgb_img, seg_maps, joints_2d = normalize_features(
             rgb_img,
             seg_maps,
-            joints_2d,
-            bbox
+            joints_2d
         )
         sample_values = PreparedSampleValues(
             pose=params_dict['pose'],
@@ -219,7 +218,7 @@ class DataGenerator():
             joints_3d=joints_3d,
             joints_conf=joints_conf,
             joints_2d=joints_2d,
-            bbox=bbox
+            bbox=bbox       # TODO: Remove as it is unrealiable at this stage.
         )
         return (
             rgb_img,
@@ -479,7 +478,7 @@ if __name__ == '__main__':
             'interval': 'intra'
         },
         'global_orient': {
-            'strategy': 'frontal',
+            'strategy': 'zero',
             'interval': 'extra'
         },
         'shape': {
