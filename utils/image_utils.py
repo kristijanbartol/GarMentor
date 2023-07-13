@@ -1,9 +1,8 @@
-from typing import Union
+from typing import Union, Tuple
 import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torchgeometry.core import warp_affine
 from kornia.geometry.transform import resize, translate
 
 
@@ -39,23 +38,37 @@ def scale_retaining_center(img, bbox):
     return cropped_img, trans_img, resized_img, img
 
 
-def _numpy_determine_scaling_factor(img_dims, bbox):
-    max_value, max_idx = np.max(bbox[1] - bbox[0], axis=0), np.argmax(bbox[1] - bbox[0], axis=0)
-    img_size = img_dims[max_idx]
-    random_fraction = (np.random.rand(1,) * 0.1) + 0.85
-    subject_size = img_size * random_fraction
-    scaling_factor = subject_size / max_value
-    return scaling_factor
+def _np_get_scaling_factor(
+        img_dims: np.ndarray, 
+        bbox: np.ndarray, 
+        var: float = 0.0, 
+        fraction: float = 0.95
+    ) -> float:
+    max_value = np.max(bbox[1] - bbox[0], axis=0)
+    random_fraction = (np.random.rand(1,) * var) + fraction
+    subject_size = img_dims[0] * random_fraction
+    return subject_size / max_value
 
 
-def numpy_scale_retaining_center(img, bbox):
-    center_coords = np.array([img.shape[1] / 2, img.shape[2] / 2])
-    scaling_factor = _numpy_determine_scaling_factor(
-        img_dims=img.shape[:1],
-        bbox=bbox
-    )
-    coff = center_coords * (scaling_factor - 1)
-    new_wh = int(img.shape[0] * scaling_factor)
+def _np_get_new_wh(
+        img_wh,
+        scaling_factor: float
+    ) -> int:
+    return int(img_wh * scaling_factor)
+
+
+def _np_get_center_offset(
+        img_dims: np.ndarray,
+        scaling_factor: float
+    ) -> np.ndarray:
+    return (img_dims / 2) * (scaling_factor - 1)
+
+
+def np_rescale_retaining_center(
+        img: np.ndarray, 
+        new_wh: int,
+        center_offset: np.ndarray
+    ) -> np.ndarray:
     resized_img = cv2.resize(
         src=img, 
         dsize=(new_wh, new_wh), 
@@ -63,11 +76,59 @@ def numpy_scale_retaining_center(img, bbox):
     )
     trans_img = cv2.warpAffine(
         src=resized_img,
-        M=np.array([[1, 0, -coff[0]], [0, 1, -coff[1]]], dtype=np.float32),
+        M=np.array([
+            [1, 0, -center_offset[0]], 
+            [0, 1, -center_offset[1]]
+        ], dtype=np.float32),
         dsize=(new_wh, new_wh)
     )
     cropped_img = trans_img[:img.shape[0], :img.shape[1]]
     return cropped_img
+
+
+def np_scale_joints_retaining_center(
+        joints_2d: np.ndarray, 
+        scaling_factor: float,
+        center_offset: np.ndarray,
+    ) -> np.ndarray:
+    resized_joints_2d = joints_2d * scaling_factor
+    return resized_joints_2d - center_offset
+
+
+def normalize_features(
+        rgb_img: np.ndarray,
+        seg_maps: np.ndarray,
+        joints_2d: np.ndarray,
+        bbox: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    scaling_factor = _np_get_scaling_factor(
+        img_dims=np.array(rgb_img.shape[:1]),
+        bbox=bbox
+    )
+    new_wh = _np_get_new_wh(
+        img_wh=rgb_img.shape[0],
+        scaling_factor=scaling_factor
+    )
+    center_offset = _np_get_center_offset(
+        img_dims=np.array(rgb_img.shape[:1]),
+        scaling_factor=scaling_factor
+    )
+    rgb_img = np_rescale_retaining_center(
+        img=rgb_img,
+        new_wh=new_wh,
+        center_offset=center_offset
+    )
+    seg_maps = np_rescale_retaining_center(
+        img=seg_maps[-1],
+        new_wh=new_wh,
+        center_offset=center_offset
+    )
+    joint_2d = np_scale_joints_retaining_center(
+        joints_2d=joints_2d,
+        scaling_factor=scaling_factor,
+        center_offset=center_offset
+    )
+    return rgb_img, seg_maps, joints_2d
 
 
 def random_translate(img):

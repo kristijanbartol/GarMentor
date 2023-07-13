@@ -17,6 +17,7 @@ from data.cat.common import get_dataset_dirs
 from models.pose2D_hrnet import get_pretrained_detector
 from predict.predict_hrnet import predict_hrnet
 from utils.garment_classes import GarmentClasses
+from utils.image_utils import normalize_features
 from vis.visualizers.clothed import ClothedVisualizer
 from vis.visualizers.keypoints import KeypointsVisualizer
 
@@ -195,9 +196,6 @@ class DataGenerator():
             data_split=data_split, 
             idx=idx
         )
-        params_dict['shape'][0] = 0.        # set the beta PC0 = 0
-        #params_dict['style'][:, 2] = 0.     # set the gamma PC2 = 0
-        #params_dict['style'][:, 3] = 0.     # set the gamma PC3 = 0
         rgb_img, seg_maps, joints_3d = clothed_visualizer.vis_from_params(
             pose=params_dict['pose'],
             shape=params_dict['shape'],
@@ -207,7 +205,12 @@ class DataGenerator():
             rgb_tensor=torch.swapaxes(rgb_img, 0, 2),
         )
         rgb_img = rgb_img.cpu().numpy()
-        
+        rgb_img, seg_maps, joints_2d = normalize_features(
+            rgb_img,
+            seg_maps,
+            joints_2d,
+            bbox
+        )
         sample_values = PreparedSampleValues(
             pose=params_dict['pose'],
             shape=params_dict['shape'],
