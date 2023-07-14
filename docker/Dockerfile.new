@@ -5,21 +5,24 @@ FROM pytorch/pytorch:1.11.0-cuda11.3-cudnn8-devel
 RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys A4B469963BF863CC
 
 RUN apt update && apt install -y git \
-    ninja-build \
-    libglib2.0-0 \
-    libsm6 \
-    libxrender-dev \
-    libxext6 \
-    libgl1-mesa-glx \
-    vim \
-    curl \
-	libboost-dev \
+    	ninja-build \
+    	libglib2.0-0 \
+    	libsm6 \
+    	libxrender-dev \
+    	libxext6 \
+    	libgl1-mesa-glx \
+    	vim \
+    	curl \
+  	libboost-dev \
+	tar \
 	tmux \
 	freeglut3-dev \
-    unzip \
+    	unzip \
 	wget
 
 ENV BOOST_INCLUDE_DIRS=/usr/include/boost
+
+RUN pip install -U pip setuptools
 
 # install python dependencies
 RUN pip install --ignore-installed PyYAML \
@@ -28,7 +31,6 @@ RUN pip install --ignore-installed PyYAML \
 	matplotlib \
 	seaborn \
 	dataclasses \
-	#pyyaml \
 	yacs \
 	fvcore==0.1.2.post20201213 \
 	scikit-image==0.17.2 \
@@ -43,13 +45,20 @@ RUN pip install --ignore-installed PyYAML \
 	lmdb \
 	visdom \
 	notebook \
-    chumpy \
+    	chumpy \
 	open3d \
+	fvcore \
+	einops \
+	hesiod \
 	loguru \
 	omegaconf \
 	pickle5 \
 	pandas==1.0.3 \
-	mxnet-mkl==1.6.0
+	mxnet-mkl==1.6.0 \
+	kornia \
+	psutil==5.8.0 \
+	cython \
+	networkx
 
 RUN conda install pytorch=1.13.0 torchvision pytorch-cuda=11.6 -c pytorch -c nvidia
 
@@ -57,7 +66,12 @@ RUN conda install -c fvcore -c iopath -c conda-forge fvcore iopath
 
 RUN conda install -c bottler nvidiacub
 
-RUN conda install pytorch3d -c pytorch3d
+RUN mkdir -p /tmp/ && cd /tmp/ \
+	&& curl -LO https://github.com/NVIDIA/cub/archive/1.10.0.tar.gz \
+	&& tar xzf 1.10.0.tar.gz \
+	&& export CUB_HOME=$PWD/cub-1.10.0 \
+	&& conda install pytorch3d -c pytorch3d \
+	&& rm 1.10.0.tar.gz
 
 # psbody.mesh installation
 RUN mkdir /git && cd /git && git clone https://github.com/MPI-IS/mesh && cd mesh && make all
