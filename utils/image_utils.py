@@ -95,7 +95,19 @@ def _np_get_center_offset(
     return (img_dims / 2) * (scaling_factor - 1)
 
 
-def np_rescale_retaining_center(
+def _np_crop_or_pad(
+        trans_img: np.ndarray, 
+        orig_img: np.ndarray
+    ) -> np.ndarray:
+    if orig_img.shape[0] < trans_img.shape[0]:  # crop
+        return trans_img[:orig_img.shape[0], :orig_img.shape[1]]
+    else:   # pad
+        padded_img = np.zeros(orig_img.shape)
+        padded_img[:trans_img.shape[0], :trans_img.shape[1]] = trans_img
+        return padded_img
+
+
+def _np_rescale_retaining_center(
         img: np.ndarray, 
         new_wh: int,
         center_offset: np.ndarray
@@ -113,17 +125,26 @@ def np_rescale_retaining_center(
         ], dtype=np.float32),
         dsize=(new_wh, new_wh)
     )
-    cropped_img = trans_img[:img.shape[0], :img.shape[1]]
-    return cropped_img
+    final_img = _np_crop_or_pad(
+        trans_img=trans_img,
+        orig_img=img
+    )
+    return final_img
 
 
-def np_scale_joints_retaining_center(
-        joints_2d: np.ndarray, 
-        scaling_factor: float,
-        center_offset: np.ndarray,
+def _np_rescale_segmaps(
+        seg_maps: np.ndarray,
+        new_wh: int,
+        center_offset: np.ndarray
     ) -> np.ndarray:
-    resized_joints_2d = joints_2d * scaling_factor
-    return resized_joints_2d - center_offset
+    for map_idx, seg_map in enumerate(seg_maps):
+        rescaled_map = _np_rescale_retaining_center(
+            img=np.repeat((seg_maps[map_idx][:, :, None] * 255), 3, axis=2).astype(np.float32),
+            new_wh=new_wh,
+            center_offset=center_offset
+        )
+        seg_maps[map_idx] = ~np.all(np.isclose(rescaled_map, np.zeros(rescaled_map.shape), atol=1e-3), axis=-1)
+    return seg_maps
 
 
 def normalize_features(
@@ -144,21 +165,17 @@ def normalize_features(
         img_dims=np.array(rgb_img.shape[:2]),
         scaling_factor=scaling_factor
     )
-    rgb_img = np_rescale_retaining_center(
+    rgb_img = _np_rescale_retaining_center(
         img=rgb_img,
         new_wh=new_wh,
         center_offset=center_offset
     )
-    seg_maps = np_rescale_retaining_center(
-        img=seg_maps[-1],
+    seg_maps = _np_rescale_segmaps(
+        seg_maps=seg_maps,
         new_wh=new_wh,
         center_offset=center_offset
     )
-    joint_2d = np_scale_joints_retaining_center(
-        joints_2d=joints_2d,
-        scaling_factor=scaling_factor,
-        center_offset=center_offset
-    )
+    joints_2d = joints_2d * scaling_factor - center_offset
     return rgb_img, seg_maps, joints_2d
 
 

@@ -37,7 +37,6 @@ class NoColors(Colors):
 
 class GarmentColors(Colors):
     
-    BLACK  = (0., 0., 0.)
     GRAY   = (169., 169., 169.)
     GREEN  = (127., 255., 0.)
     BLUE   = (30., 144., 255)
