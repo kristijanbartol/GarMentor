@@ -97,7 +97,7 @@ class TrainingLossesAndMetricsTracker:
             elif 'shape_method' in metric_type:
                 self.loss_metric_sums[metric_type] = np.zeros(11,)
             elif 'style_method' in metric_type:
-                self.loss_metric_sums[metric_type] = np.zeros(5,)
+                self.loss_metric_sums[metric_type] = np.zeros(11,)
             else:
                 self.loss_metric_sums[metric_type] = 0.
 
@@ -174,11 +174,14 @@ class TrainingLossesAndMetricsTracker:
             self.loss_metric_sums[split + '_shape_baseline'] += np.sum(shape_params_baseline_batch)
 
         if 'style_method' in self.metrics_to_track:
-            style_params_method_batch = np.mean(np.mean(np.abs(pred_dict['style_params'] - target_dict['style_params']), axis=-1), axis=-1)
-            style_params_method_components = np.mean(np.abs(pred_dict['style_params'] - target_dict['style_params']), axis=1)
-            style_params_method_sum = np.hstack((np.sum(style_params_method_batch), np.sum(style_params_method_components, axis=0)))
+            abs_diff = np.abs(pred_dict['style_params'] - target_dict['style_params'])
+            method_sums = np.hstack((
+                np.sum(np.mean(np.mean(abs_diff, -1), -1)),     # sum of (B, N, M) -> (1,)
+                np.sum(np.mean(abs_diff, -1), 0),               # sum of (B, M) -> (N,) -> (2,)
+                np.ravel(np.sum(abs_diff, 0))                   # sum B -> (N, M), i.e., (2, 4) -> 8
+            ))
             style_params_baseline_batch = np.mean(np.mean(np.abs(np.zeros_like(pred_dict['style_params']) - target_dict['style_params']), axis=-1), axis=-1)
-            self.loss_metric_sums[split + '_style_method'] += style_params_method_sum
+            self.loss_metric_sums[split + '_style_method'] += method_sums
             self.loss_metric_sums[split + '_style_baseline'] += np.sum(style_params_baseline_batch)
 
         if 'MPJPE' in self.metrics_to_track:
