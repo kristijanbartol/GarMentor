@@ -8,7 +8,7 @@ from tqdm import tqdm
 sys.path.append('/garmentor/')
 
 from data.mesh_managers.textured_garments import TexturedGarmentsMeshManager
-from models.parametric_model import ParametricModel
+from models.parametric.tn import ParametricModel
 from models.smpl_conversions import smplx2smpl
 from utils.augmentation.smpl_augmentation import normal_sample_style_numpy
 from utils.garment_classes import GarmentClasses

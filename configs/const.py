@@ -50,6 +50,7 @@ SAMPLING_STRATEGIES = {
     ],
     'style': [
         'normal',
+        'predefined'    # for DrapeNet, in particular
         #'uniform'
     ]
 }
