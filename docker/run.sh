@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [[ "$USER" == "kristijan" ]]; then
-	REPO_DIR=/media/kristijan/garmentor/
+	REPO_DIR=/media/kristijan/GarMentor/
 	BASE_DATA_DIR=/media/kristijan/data/
 	DRAPENET_REPO=/media/kristijan/DrapeNet/
 	DRAPENET_DATA=/media/kristijan/data/drapenet/
@@ -14,7 +14,7 @@ if [[ "$USER" == "kristijan" ]]; then
 	AGORA_DATA_DIR=${BASE_DATA_DIR}/agora
 	FRANKMOCAP_DATA_DIR=${BASE_DATA_DIR}/frankmocap
 elif [[ "$USER" == "dbojanic" ]]; then
-	REPO_DIR=/home/dbojanic/garmentor/
+	REPO_DIR=/home/dbojanic/GarMentor/
 	BASE_DATA_DIR=/home/dbojanic/data/
 	DRAPENET_REPO=/media/kristijan/DrapeNet/
 	DRAPENET_DATA=/home/dbojanic/data/drapenet/
@@ -28,7 +28,7 @@ elif [[ "$USER" == "dbojanic" ]]; then
 	FRANKMOCAP_DATA_DIR=${BASE_DATA_DIR}/frankmocap
 	USER="kbartol"
 elif [[ "$USER" == "julien" ]]; then
-	REPO_DIR=/home/julien/git/garmentor
+	REPO_DIR=/home/julien/git/GarMentor
 	BASE_DATA_DIR=/home/julien/data/
 	DRAPENET_REPO=/home/julien/DrapeNet/
 	DRAPENET_DATA=/home/julien/data/drapenet/
@@ -41,7 +41,7 @@ elif [[ "$USER" == "julien" ]]; then
 	AGORA_DATA_DIR=/home/julien/data/agora
 	FRANKMOCAP_DATA_DIR=${BASE_DATA_DIR}/frankmocap
 else
-	REPO_DIR=/path/to/garmentor/repository
+	REPO_DIR=/path/to/GarMentor/repository
 	BASE_DATA_DIR=/path/to/data/dir/
 	DRAPENET_REPO=/path/to/drapenet/repo/
 	DRAPENET_DATA=/path/to/drapenet/data/dir/
@@ -61,8 +61,8 @@ docker run -it \
 	--gpus all \
 	--shm-size=8gb \
 	--name $USER-garmentor \
-	-v ${REPO_DIR}:/garmentor \
-	-v ${DRAPENET_REPO}:/garmentor/DrapeNet/ \
+	-v ${REPO_DIR}:/GarMentor \
+	-v ${DRAPENET_REPO}:/GarMentor/DrapeNet/ \
 	-v ${DRAPENET_DATA}:/data/drapenet/ \
 	-v ${PW3D_DIR}:/data/3DPW/ \
 	-v ${SSP3D_DIR}:/data/SSP-3D/ \

@@ -7,13 +7,13 @@ from smplx import SMPL
 import configs.paths as paths
 from utils.drapenet_structure import DrapeNetStructure
 
-from DrapeNet.utils_drape import (
+from drapenet_for_garmentor.utils_drape import (
     draping,
     load_lbs,
     load_udf,
     reconstruct
 )
-from DrapeNet.smpl_pytorch.body_models import SMPL
+from drapenet_for_garmentor.smpl_pytorch.body_models import SMPL
 
 
 class ParametricModel(object):

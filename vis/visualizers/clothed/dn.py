@@ -15,7 +15,7 @@ from rendering.clothed.dn import ClothedRenderer
 from utils.garment_classes import GarmentClasses
 from vis.visualizers.common import Visualizer2D
 
-from DrapeNet.draping.drape import main
+from drapenet_for_garmentor.draping.drape import main
 
 
 class ClothedVisualizer(Visualizer2D):

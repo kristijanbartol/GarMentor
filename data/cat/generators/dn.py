@@ -7,7 +7,7 @@ import os
 import sys
 import argparse
 
-sys.path.append('/garmentor')
+sys.path.append('/GarMentor')
 
 from configs.const import SURREAL_DATASET_NAME
 import configs.paths as paths

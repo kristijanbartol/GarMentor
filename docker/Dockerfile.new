@@ -88,6 +88,6 @@ RUN pip install -U pip setuptools
 # NOTE: Also pay attention to pandas==1.0.3
 RUN pip install numpy==1.23.1 cython einops
 
-RUN mkdir -p /garmentor
+RUN mkdir -p /GarMentor
 
-WORKDIR /garmentor
+WORKDIR /GarMentor

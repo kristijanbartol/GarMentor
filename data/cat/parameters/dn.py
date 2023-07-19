@@ -3,7 +3,7 @@ import os
 import numpy as np
 import sys
 
-sys.path.append('/garmentor/')
+sys.path.append('/GarMentor/')
 
 from configs import paths
 from configs.const import SAMPLING_STRATEGIES
