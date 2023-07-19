@@ -437,21 +437,24 @@ class DataGenerator():
         }
         for data_split in ['train', 'valid']:
             for pose_idx in range(nums_generated[data_split], total_nums_samples[data_split]):
-                rgb_img, seg_maps, sample_values = self.generate_sample(
-                    parameters=parameters,
-                    data_split=data_split,
-                    idx=pose_idx, 
-                    clothed_visualizer=clothed_visualizer
-                )
-                self._save_sample(
-                    dataset_dir=dataset_dirs[data_split], 
-                    sample_idx=pose_idx, 
-                    rgb_img=rgb_img, 
-                    seg_maps=seg_maps, 
-                    sample_values=sample_values,
-                    values_array=values_splits[data_split],
-                    clothed_visualizer=clothed_visualizer
-                )
+                try:
+                    rgb_img, seg_maps, sample_values = self.generate_sample(
+                        parameters=parameters,
+                        data_split=data_split,
+                        idx=pose_idx, 
+                        clothed_visualizer=clothed_visualizer
+                    )
+                    self._save_sample(
+                        dataset_dir=dataset_dirs[data_split], 
+                        sample_idx=pose_idx, 
+                        rgb_img=rgb_img, 
+                        seg_maps=seg_maps, 
+                        sample_values=sample_values,
+                        values_array=values_splits[data_split],
+                        clothed_visualizer=clothed_visualizer
+                    )
+                except RuntimeError:
+                    print('Got runtime error! Probably CUDA out of memory for the sample.')
                 torch.cuda.empty_cache()
 
 
