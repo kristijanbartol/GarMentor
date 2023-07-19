@@ -16,6 +16,3 @@
 [submodule "frankmocap"]
 	path = frankmocap
 	url = https://github.com/kristijanbartol/frankmocap.git
-[submodule "drapenet_for_garmentor"]
-	path = drapenet_for_garmentor
-	url = https://github.com/kristijanbartol/drapenet_for_garmentor.git
