@@ -3,6 +3,7 @@
 if [[ "$USER" == "kristijan" ]]; then
 	REPO_DIR=/media/kristijan/garmentor/
 	BASE_DATA_DIR=/media/kristijan/data/
+	DRAPENET_DIR=/media/kristijan/DrapeNet/
 	PW3D_DIR=${BASE_DATA_DIR}/3dpw/
 	SSP3D_DIR=${BASE_DATA_DIR}/SSP-3D/
 	TAILORNET_DATA_DIR=${BASE_DATA_DIR}/tailornet
@@ -14,6 +15,7 @@ if [[ "$USER" == "kristijan" ]]; then
 elif [[ "$USER" == "dbojanic" ]]; then
 	REPO_DIR=/home/dbojanic/garmentor/
 	BASE_DATA_DIR=/home/dbojanic/data/
+	DRAPENET_DIR=/media/kristijan/DrapeNet/
 	PW3D_DIR=${BASE_DATA_DIR}/3dpw/
 	SSP3D_DIR=${BASE_DATA_DIR}/SSP-3D/
 	TAILORNET_DATA_DIR=${BASE_DATA_DIR}/tailornet/
@@ -25,6 +27,8 @@ elif [[ "$USER" == "dbojanic" ]]; then
 	USER="kbartol"
 elif [[ "$USER" == "julien" ]]; then
 	REPO_DIR=/home/julien/git/garmentor
+	BASE_DATA_DIR=/home/julien/data/
+	DRAPENET_DIR=/home/julien/DrapeNet/
 	PW3D_DIR=/home/julien/data/3DPW
 	SSP3D_DIR=/home/julien/data/SSP-3D
 	TAILORNET_DATA_DIR=/home/julien/data/TailorNet
@@ -35,6 +39,8 @@ elif [[ "$USER" == "julien" ]]; then
 	FRANKMOCAP_DATA_DIR=${BASE_DATA_DIR}/frankmocap
 else
 	REPO_DIR=/path/to/garmentor/repository
+	BASE_DATA_DIR=/path/to/data/dir/
+	DRAPENET_DIR=/path/to/drapenet/dir/
 	PW3D_DIR=/path/to/3DPW/dataset
 	SSP3D_DIR=/path/to/SSP-3D/dataset
 	TAILORNET_DATA_DIR=/path/to/tailornet/data
@@ -52,6 +58,7 @@ docker run -it \
 	--shm-size=8gb \
 	--name $USER-garmentor \
 	-v ${REPO_DIR}:/garmentor \
+	-v ${DRAPENET_DIR}:/garmentor/DrapeNet/ \
 	-v ${PW3D_DIR}:/data/3DPW/ \
 	-v ${SSP3D_DIR}:/data/SSP-3D/ \
 	-v ${TAILORNET_DATA_DIR}:/data/tailornet/ \
