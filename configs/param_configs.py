@@ -138,6 +138,24 @@ TRAIN_TEMPLATE = {
         'cfgs': [
             [2, 5, 1, 1]    # "all" extra, simple poses, diverse orients
         ]
+    },
+    6: {
+        'epochs': [0],
+        'cfgs': [
+            [4, 3, 1, 1]    # "all" extra, mocap poses, frontal orients
+        ]
+    },
+    7: {
+        'epochs': [0],
+        'cfgs': [
+            [4, 5, 1, 1]    # "all" extra, mocap poses, frontal orients
+        ]
+    },
+    8: {
+        'epochs': [0],
+        'cfgs': [
+            [4, 7, 1, 1]    # "all" extra, mocap poses, mocap orients
+        ]
     }
 }
 

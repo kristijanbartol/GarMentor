@@ -358,7 +358,7 @@ if __name__ == '__main__':
     body_bbox_detector = BodyPoseEstimator()
     body_mocap = BodyMocap(
         regressor_checkpoint=MOCAP_CHECKPOINT_PATH, 
-        smpl_dir=paths.SMPL, 
+        smpl_dir=paths.SMPL_DIR, 
         device=device, 
         use_smplx=args.use_smplx
     )

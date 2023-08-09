@@ -17,7 +17,7 @@ from models.poseMF_shapeGaussian_net import PoseMFShapeGaussianNet
 from models.canny_edge_detector import CannyEdgeDetector
 from models.parametric_model import ParametricModel
 #from evaluate.evaluate_poseMF_shapeGaussian_net import evaluate_pose_MF_shapeGaussian_net
-from evaluate.original_evaluate import evaluate_pose_MF_shapeGaussian_net
+from evaluate.evaluate_poseMF_shapeGaussian_net import evaluate_pose_MF_shapeGaussian_net
 from rendering.body import BodyRenderer
 from utils.garment_classes import GarmentClasses
 from vis.logger import VisLogger
@@ -48,14 +48,14 @@ def run_evaluate(device,
                                           threshold=pose_shape_cfg.DATA.EDGE_THRESHOLD).to(device)
 
     # SMPL neutral/male/female models
-    smpl_model = SMPL(paths.SMPL,
+    smpl_model = SMPL(paths.SMPL_DIR,
                       batch_size=1,
                       num_betas=pose_shape_cfg.MODEL.NUM_SMPL_BETAS).to(device)
     smpl_immediate_parents = smpl_model.parents.tolist()
-    smpl_model_male = SMPL(paths.SMPL,
+    smpl_model_male = SMPL(paths.SMPL_DIR,
                            batch_size=1,
                            gender='male').to(device)
-    smpl_model_female = SMPL(paths.SMPL,
+    smpl_model_female = SMPL(paths.SMPL_DIR,
                              batch_size=1,
                              gender='female').to(device)
     

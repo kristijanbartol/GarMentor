@@ -474,11 +474,11 @@ if __name__ == '__main__':
     )
     param_cfg = {
         'pose': {
-            'strategy': 'zero',
+            'strategy': 'mocap',
             'interval': 'intra'
         },
         'global_orient': {
-            'strategy': 'zero',
+            'strategy': 'mocap',
             'interval': 'extra'
         },
         'shape': {
