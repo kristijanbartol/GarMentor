@@ -7,6 +7,9 @@ from smplx.lbs import batch_rodrigues
 from pytorch3d.transforms import matrix_to_axis_angle
 import time
 from trimesh import Trimesh
+import sys
+
+sys.path.append('/garmentor/')
 
 from metrics.eval_metrics_tracker import EvalMetricsTracker
 from rendering.body import BodyRenderer
@@ -383,7 +386,7 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
                     smpl_reposed_output_dict['lower'].garment_faces
                 ]
             )
-            
+            '''
             Trimesh(
                 vertices=smpl_output_dict['upper'].body_verts, 
                 faces=smpl_output_dict['upper'].body_faces
@@ -412,6 +415,7 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
             ).export(f'output/pred_reposed/{batch_num:05d}_lower.obj')
             Trimesh(vertices=pred_reposed_vertices_merged_trimesh, faces=pred_reposed_faces_merged_trimesh).export(
                 f'output/pred_reposed/{batch_num:05d}.obj')
+            '''
             #Trimesh(vertices=pred_reposed_vertices_merged_trimesh * 1000., faces=pred_reposed_faces_merged_trimesh).export(
             #    f'output/pred_reposed/{batch_num:05d}.obj')
             #Trimesh(vertices=target_vertices_clothed[0].cpu().numpy(), faces=smpl_faces).export(

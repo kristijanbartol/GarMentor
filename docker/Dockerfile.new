@@ -55,10 +55,7 @@ RUN pip install --ignore-installed PyYAML \
 	pickle5 \
 	pandas==1.0.3 \
 	mxnet-mkl==1.6.0 \
-	kornia \
-	psutil==5.8.0 \
-	cython \
-	networkx
+	kornia
 
 RUN conda install pytorch=1.13.0 torchvision pytorch-cuda=11.6 -c pytorch -c nvidia
 

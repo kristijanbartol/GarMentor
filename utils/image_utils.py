@@ -1,8 +1,186 @@
-from typing import Union
+from typing import Union, Tuple
 import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
+from kornia.geometry.transform import resize, translate
+
+
+# TODO: Mimic the actual bbox detector for determining the hyperparameters.
+# NOTE: By default, the random component should be zero here.
+def _determine_scaling_factor(img_dims, bbox):
+    max_value, max_idx = torch.max(bbox[:, 1] - bbox[:, 0], dim=1)
+    img_size = img_dims[max_idx]
+    random_fraction = (torch.rand(bbox.shape[0]) * 0.1) + 0.85
+    subject_size = img_size * random_fraction
+    scaling_factor = subject_size / max_value
+    return scaling_factor
+
+
+def scale_retaining_center(img, bbox):
+    center_coords = torch.tensor([img.shape[1] / 2, img.shape[2] / 2])
+    scaling_factor = _determine_scaling_factor(
+        img_dims=img.shape[1:2], 
+        bbox=bbox
+    )
+    center_offset = center_coords * (scaling_factor - 1)
+    new_wh = int(img.shape[1] * scaling_factor)
+    resized_img = resize(
+        img.swapaxes(1, 3).float(), 
+        size=new_wh, 
+        interpolation='nearest'
+    )
+    trans_img = translate(
+        tensor=resized_img, 
+        translation=torch.tensor([-center_offset[0], -center_offset[1]]).view(resized_img.shape[0], 2)
+    )
+    cropped_img = trans_img[:, :, :img.shape[1], :img.shape[2]].swapaxes(1, 3)
+    return cropped_img, trans_img, resized_img, img
+
+
+def np_determine_bbox(img):
+    x1 = 0
+    y1 = 0
+    x2 = img.shape[0] - 1
+    y2 = img.shape[1] - 1
+    for x in range(img.shape[0]):
+        if np.any(img[x]):
+            x1 = x
+            break
+            
+    for y in range(img.shape[1]):
+        if np.any(img[:, y]):
+            y1 = y
+            break
+
+    for x in range(img.shape[0] - 1, 0, -1):
+        if np.any(img[x]):
+            x2 = x
+            break
+
+    for y in range(img.shape[1] -1, 0, -1):
+        if np.any(img[:, y]):
+            y2 = y
+            break
+    bbox = np.array([[x1, y1], [x2, y2]])
+    return bbox
+
+
+def _np_get_scaling_factor(
+        img_wh: int, 
+        bbox: np.ndarray, 
+        var: float = 0.0, 
+        fraction: float = 0.92
+    ) -> float:
+    # TODO: Later, either take the max between the height/weight of the bbox OR
+    # TODO: rotate the image so that height is always a bigger dimention.
+    bbox_height = bbox[1, 0] - bbox[0, 0]
+    print(bbox_height)
+    random_fraction = (np.random.rand(1,) * var) + fraction
+    subject_size = img_wh * random_fraction
+    return subject_size / bbox_height
+
+
+def _np_get_new_wh(
+        img_wh,
+        scaling_factor: float
+    ) -> int:
+    return int(img_wh * scaling_factor)
+
+
+def _np_get_center_offset(
+        img_dims: np.ndarray,
+        scaling_factor: float
+    ) -> np.ndarray:
+    return (img_dims / 2) * (scaling_factor - 1)
+
+
+def _np_crop_or_pad(
+        trans_img: np.ndarray, 
+        orig_img: np.ndarray
+    ) -> np.ndarray:
+    if orig_img.shape[0] < trans_img.shape[0]:  # crop
+        return trans_img[:orig_img.shape[0], :orig_img.shape[1]]
+    else:   # pad
+        padded_img = np.zeros(orig_img.shape)
+        padded_img[:trans_img.shape[0], :trans_img.shape[1]] = trans_img
+        return padded_img
+
+
+def _np_rescale_retaining_center(
+        img: np.ndarray, 
+        new_wh: int,
+        center_offset: np.ndarray
+    ) -> np.ndarray:
+    resized_img = cv2.resize(
+        src=img, 
+        dsize=(new_wh, new_wh), 
+        interpolation=cv2.INTER_NEAREST
+    )
+    trans_img = cv2.warpAffine(
+        src=resized_img,
+        M=np.array([
+            [1, 0, -center_offset[0]], 
+            [0, 1, -center_offset[1]]
+        ], dtype=np.float32),
+        dsize=(new_wh, new_wh)
+    )
+    final_img = _np_crop_or_pad(
+        trans_img=trans_img,
+        orig_img=img
+    )
+    return final_img
+
+
+def _np_rescale_segmaps(
+        seg_maps: np.ndarray,
+        new_wh: int,
+        center_offset: np.ndarray
+    ) -> np.ndarray:
+    for map_idx, seg_map in enumerate(seg_maps):
+        rescaled_map = _np_rescale_retaining_center(
+            img=np.repeat((seg_maps[map_idx][:, :, None] * 255), 3, axis=2).astype(np.float32),
+            new_wh=new_wh,
+            center_offset=center_offset
+        )
+        seg_maps[map_idx] = ~np.all(np.isclose(rescaled_map, np.zeros(rescaled_map.shape), atol=1e-3), axis=-1)
+    return seg_maps
+
+
+def normalize_features(
+        rgb_img: np.ndarray,
+        seg_maps: np.ndarray,
+        joints_2d: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    bbox = np_determine_bbox(img=rgb_img)
+    scaling_factor = _np_get_scaling_factor(
+        img_wh=rgb_img.shape[0],
+        bbox=bbox
+    )
+    new_wh = _np_get_new_wh(
+        img_wh=rgb_img.shape[0],
+        scaling_factor=scaling_factor
+    )
+    center_offset = _np_get_center_offset(
+        img_dims=np.array(rgb_img.shape[:2]),
+        scaling_factor=scaling_factor
+    )
+    rgb_img = _np_rescale_retaining_center(
+        img=rgb_img,
+        new_wh=new_wh,
+        center_offset=center_offset
+    )
+    seg_maps = _np_rescale_segmaps(
+        seg_maps=seg_maps,
+        new_wh=new_wh,
+        center_offset=center_offset
+    )
+    joints_2d = joints_2d * scaling_factor - center_offset
+    return rgb_img, seg_maps, joints_2d
+
+
+def random_translate(img):
+    pass
 
 
 def convert_bbox_corners_to_centre_hw(bbox_corners):
@@ -421,4 +599,3 @@ def batch_crop_pytorch_affine(input_wh,
                                             align_corners=False)
 
     return cropped_dict
-

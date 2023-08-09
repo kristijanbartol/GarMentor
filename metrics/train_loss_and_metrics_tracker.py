@@ -94,6 +94,10 @@ class TrainingLossesAndMetricsTracker:
             elif metric_type == 'val_joints2Dsamples-L2E':
                 self.loss_metric_sums['val_num_visib_joints2Dsamples'] = 0.
                 self.loss_metric_sums[metric_type] = 0.
+            elif 'shape_method' in metric_type:
+                self.loss_metric_sums[metric_type] = np.zeros(11,)
+            elif 'style_method' in metric_type:
+                self.loss_metric_sums[metric_type] = np.zeros(11,)
             else:
                 self.loss_metric_sums[metric_type] = 0.
 
@@ -163,14 +167,21 @@ class TrainingLossesAndMetricsTracker:
 
         if 'shape_method' in self.metrics_to_track:
             shape_params_method_batch = np.mean(np.abs(pred_dict['shape_params'] - target_dict['shape_params']), axis=-1)
+            shape_params_method_components = np.abs(pred_dict['shape_params'] - target_dict['shape_params'])
+            shape_params_method_sum = np.hstack((np.sum(shape_params_method_batch), np.sum(shape_params_method_components, axis=0)))
             shape_params_baseline_batch = np.mean(np.abs(np.zeros_like(pred_dict['shape_params']) - target_dict['shape_params']), axis=-1)
-            self.loss_metric_sums[split + '_shape_method'] += np.sum(shape_params_method_batch)
+            self.loss_metric_sums[split + '_shape_method'] += shape_params_method_sum
             self.loss_metric_sums[split + '_shape_baseline'] += np.sum(shape_params_baseline_batch)
 
         if 'style_method' in self.metrics_to_track:
-            style_params_method_batch = np.mean(np.mean(np.abs(pred_dict['style_params'] - target_dict['style_params']), axis=-1), axis=-1)
+            abs_diff = np.abs(pred_dict['style_params'] - target_dict['style_params'])
+            method_sums = np.hstack((
+                np.sum(np.mean(np.mean(abs_diff, -1), -1)),     # sum of (B, N, M) -> (1,)
+                np.sum(np.mean(abs_diff, -1), 0),               # sum of (B, M) -> (N,) -> (2,)
+                np.ravel(np.sum(abs_diff, 0))                   # sum B -> (N, M), i.e., (2, 4) -> 8
+            ))
             style_params_baseline_batch = np.mean(np.mean(np.abs(np.zeros_like(pred_dict['style_params']) - target_dict['style_params']), axis=-1), axis=-1)
-            self.loss_metric_sums[split + '_style_method'] += np.sum(style_params_method_batch)
+            self.loss_metric_sums[split + '_style_method'] += method_sums
             self.loss_metric_sums[split + '_style_baseline'] += np.sum(style_params_baseline_batch)
 
         if 'MPJPE' in self.metrics_to_track:
@@ -251,10 +262,14 @@ class TrainingLossesAndMetricsTracker:
         print('Train Loss: {:.5f}, Val Loss: {:.5f}'.format(self.epochs_history['train_losses'][-1],
                                                             self.epochs_history['val_losses'][-1]))
         for metric in self.metrics_to_track:
-            print('Train {}: {:.5f}, Val {}: {:.5f}'.format(metric,
-                                                            self.epochs_history['train_' + metric][-1],
-                                                            metric,
-                                                            self.epochs_history['val_' + metric][-1]))
+            if 'shape' not in metric and 'style' not in metric:
+                print('Train {}: {:.5f}, Val {}: {:.5f}'.format(metric,
+                                                                self.epochs_history['train_' + metric][-1],
+                                                                metric,
+                                                                self.epochs_history['val_' + metric][-1]))
+            else:
+                print(f'Train {metric}: {self.epochs_history["train_" + metric][-1]}')
+                print(f'Valid {metric}: {self.epochs_history["val_" + metric][-1]}')
 
         # Dump history to log file
         if self.log_save_path is not None:

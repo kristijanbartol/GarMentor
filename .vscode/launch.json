@@ -55,7 +55,7 @@
                 "-G", "male", 
                 "-U", "t-shirt", 
                 "-L", "pant", 
-                "-N", "10000",
+                "-N", "50000",
                 "--preextract"
             ]
         },
@@ -111,8 +111,8 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--pose_shape_weights", "/data/hierprob3d/poseMF_shapeGaussian_net_weights.tar",
-                "--dataset", "3dpw"
+                "--pose_shape_weights", "experiments/4-5-1-1-noseg-50k-e50/saved_models/epoch_050.tar",
+                //"--dataset", "3dpw"
             ]
         },
 

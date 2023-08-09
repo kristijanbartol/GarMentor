@@ -143,6 +143,7 @@ output/
 tests/functional/out/
 tests/functional/data/
 tests/functional/*.png
+3dpw_eval/
 
 # Dependencies
 torch-trust-ncg/

@@ -11,11 +11,13 @@ sys.path.append('/garmentor')
 
 from configs.const import SURREAL_DATASET_NAME
 import configs.paths as paths
+from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
 from data.cat.parameters import Parameters
 from data.cat.common import get_dataset_dirs
 from models.pose2D_hrnet import get_pretrained_detector
 from predict.predict_hrnet import predict_hrnet
 from utils.garment_classes import GarmentClasses
+from utils.image_utils import normalize_features
 from vis.visualizers.clothed import ClothedVisualizer
 from vis.visualizers.keypoints import KeypointsVisualizer
 
@@ -203,7 +205,11 @@ class DataGenerator():
             rgb_tensor=torch.swapaxes(rgb_img, 0, 2),
         )
         rgb_img = rgb_img.cpu().numpy()
-        
+        rgb_img, seg_maps, joints_2d = normalize_features(
+            rgb_img,
+            seg_maps,
+            joints_2d
+        )
         sample_values = PreparedSampleValues(
             pose=params_dict['pose'],
             shape=params_dict['shape'],
@@ -212,7 +218,7 @@ class DataGenerator():
             joints_3d=joints_3d,
             joints_conf=joints_conf,
             joints_2d=joints_2d,
-            bbox=bbox
+            bbox=bbox       # TODO: Remove as it is unrealiable at this stage.
         )
         return (
             rgb_img,
@@ -388,6 +394,7 @@ class DataGenerator():
             upper_class: str,
             lower_class: str,
             gender: str,
+            img_wh: int,
             num_samples_to_reach: int
         ) -> None:
         """
@@ -408,13 +415,15 @@ class DataGenerator():
         clothed_visualizer = ClothedVisualizer(
             device=self.device,
             gender=gender,
-            garment_classes=garment_classes
+            garment_classes=garment_classes,
+            img_wh=img_wh
         )
         dataset_dirs = get_dataset_dirs(
             param_cfg=param_cfg,
             upper_class=upper_class,
             lower_class=lower_class,
-            gender=gender
+            gender=gender,
+            img_wh=img_wh
         )
         values_splits, nums_generated = self._create_values_splits(
             dataset_dirs=dataset_dirs
@@ -456,6 +465,8 @@ if __name__ == '__main__':
                         help='Number of samples to have for the class after the generation is done.')
     parser.add_argument('--preextract', dest='preextract', action='store_true', 
                         help='Whether to pre-extract 2D joint using HRNet pose detector.')
+    parser.add_argument('--img_wh', '-I', type=int, choices=[256, 512, 1024, 2048], default=256,
+                        help='The size of weight, i.e., height of the images.')
     args = parser.parse_args()
     
     data_generator = DataGenerator(
@@ -463,11 +474,11 @@ if __name__ == '__main__':
     )
     param_cfg = {
         'pose': {
-            'strategy': 'simple',
+            'strategy': 'mocap',
             'interval': 'intra'
         },
         'global_orient': {
-            'strategy': 'diverse',
+            'strategy': 'mocap',
             'interval': 'extra'
         },
         'shape': {
@@ -484,5 +495,6 @@ if __name__ == '__main__':
         gender=args.gender,
         upper_class=args.upper_class,
         lower_class=args.lower_class,
+        img_wh=args.img_wh,
         num_samples_to_reach=args.num_samples
     )

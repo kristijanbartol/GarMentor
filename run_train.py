@@ -79,7 +79,7 @@ def run_train(device,
                                           gaussian_filter_size=pose_shape_cfg.DATA.EDGE_GAUSSIAN_SIZE,
                                           threshold=pose_shape_cfg.DATA.EDGE_THRESHOLD).to(device)
     # SMPL model
-    smpl_model = SMPL(paths.SMPL,
+    smpl_model = SMPL(paths.SMPL_PATH_TEMPLATE.format(gender=args.gender.upper()),
                       num_betas=pose_shape_cfg.MODEL.NUM_SMPL_BETAS,
                       gender=gender).to(device)
 
