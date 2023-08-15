@@ -478,7 +478,7 @@ if __name__ == '__main__':
             'interval': 'intra'
         },
         'global_orient': {
-            'strategy': 'mocap',
+            'strategy': 'diverse',
             'interval': 'extra'
         },
         'shape': {

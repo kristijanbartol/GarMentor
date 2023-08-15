@@ -249,6 +249,9 @@ class PoseMFShapeGaussianLoss(nn.Module):
         self.glob_rotmats_loss = nn.MSELoss(reduction=loss_config.REDUCTION)
         self.joints3D_loss = nn.MSELoss(reduction=loss_config.REDUCTION)
 
+        self.determ_shape_loss = nn.MSELoss(reduction=loss_config.REDUCTION)
+        self.determ_style_loss = nn.MSELoss(reduction=loss_config.REDUCTION)
+
     def forward(self, target_dict, pred_dict):
 
         if self.model_config.OUTPUT_SET == 'all':
@@ -264,25 +267,31 @@ class PoseMFShapeGaussianLoss(nn.Module):
             elif self.loss_config.REDUCTION == 'sum':
                 pose_nll = torch.sum(pose_nll)
 
-            # Shape NLL
-            shape_nll = -(pred_dict['shape_params'].log_prob(target_dict['shape_params']).sum(dim=1))  # (batch_size,)
-            if self.loss_config.REDUCTION == 'mean':
-                shape_nll = torch.mean(shape_nll)
-            elif self.loss_config.REDUCTION == 'sum':
-                shape_nll = torch.sum(shape_nll)
-                
-            # Style NLL
-            if pred_dict['style_params'] is not None:
-                #style_nll_per_class = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=4)
-                style_nll = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=4)
-                # NOTE: Only 2/4 (if num_classes=4) NLL losses are non-zero, others are masked.
-                #style_nll = target_dict['garment_labels'] * style_nll_per_class                                    # (batch_size, num_classes=4)
-                if self.loss_config.REDUCTION == 'mean':
-                    style_nll = torch.mean(style_nll)
-                elif self.loss_config.REDUCTION == 'sum':
-                    style_nll = torch.sum(style_nll)
+            # Shape loss
+            if self.model_config.DETERMINISTIC:
+                shape_loss = self.determ_shape_loss(pred_dict['shape_params'], target_dict['shape_params'])
             else:
-                style_nll = 0.
+                shape_loss = -(pred_dict['shape_params'].log_prob(target_dict['shape_params']).sum(dim=1))  # (batch_size,)
+                if self.loss_config.REDUCTION == 'mean':
+                    shape_loss = torch.mean(shape_loss)
+                elif self.loss_config.REDUCTION == 'sum':
+                    shape_loss = torch.sum(shape_loss)
+                
+            # Style loss
+            if pred_dict['style_params'] is not None:
+                if self.model_config.DETERMINISTIC:
+                    style_loss = self.determ_style_loss(pred_dict['style_params'], target_dict['style_params'])
+                else:
+                    #style_loss_per_class = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=4)
+                    style_loss = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=4)
+                    # NOTE: Only 2/4 (if num_classes=4) NLL losses are non-zero, others are masked.
+                    #style_loss = target_dict['garment_labels'] * style_loss_per_class                                    # (batch_size, num_classes=4)
+                    if self.loss_config.REDUCTION == 'mean':
+                        style_loss = torch.mean(style_loss)
+                    elif self.loss_config.REDUCTION == 'sum':
+                        style_loss = torch.sum(style_loss)
+            else:
+                style_loss = 0.
 
             # Joints2D MSE
             target_joints2D = target_dict['joints2D']
@@ -304,44 +313,54 @@ class PoseMFShapeGaussianLoss(nn.Module):
             joints3D_loss = self.joints3D_loss(pred_dict['joints3D'], target_dict['joints3D'])
 
             total_loss = pose_nll * self.loss_config.WEIGHTS.POSE \
-                        + shape_nll * self.loss_config.WEIGHTS.SHAPE \
-                        + style_nll * self.loss_config.WEIGHTS.STYLE \
+                        + shape_loss * self.loss_config.WEIGHTS.SHAPE \
+                        + style_loss * self.loss_config.WEIGHTS.STYLE \
                         + joints2D_loss * self.loss_config.WEIGHTS.JOINTS2D \
                         + glob_rotmats_loss * self.loss_config.WEIGHTS.GLOB_ROTMATS \
                         + joints3D_loss * self.loss_config.WEIGHTS.JOINTS3D
             
         elif self.model_config.OUTPUT_SET == 'style':
-            style_nll = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=4)
-            if self.loss_config.REDUCTION == 'mean':
-                style_nll = torch.mean(style_nll)
-            elif self.loss_config.REDUCTION == 'sum':
-                style_nll = torch.sum(style_nll)
+            if self.model_config.DETERMINISTIC:
+                total_loss = self.determ_style_loss(pred_dict['style_params'], target_dict['style_params'])
+            else:
+                style_loss = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=4)
+                if self.loss_config.REDUCTION == 'mean':
+                    style_loss = torch.mean(style_loss)
+                elif self.loss_config.REDUCTION == 'sum':
+                    style_loss = torch.sum(style_loss)
 
-            total_loss = style_nll
+                total_loss = style_loss
         
         elif self.model_config.OUTPUT_SET == 'shape':
-            shape_nll = -(pred_dict['shape_params'].log_prob(target_dict['shape_params']).sum(dim=1))  # (batch_size,)
-            if self.loss_config.REDUCTION == 'mean':
-                shape_nll = torch.mean(shape_nll)
-            elif self.loss_config.REDUCTION == 'sum':
-                shape_nll = torch.sum(shape_nll)
+            if self.model_config.DETERMINISTIC:
+                total_loss = self.determ_shape_loss(pred_dict['shape_params'], target_dict['shape_params'])
+            else:
+                shape_loss = -(pred_dict['shape_params'].log_prob(target_dict['shape_params']).sum(dim=1))  # (batch_size,)
+                if self.loss_config.REDUCTION == 'mean':
+                    shape_loss = torch.mean(shape_loss)
+                elif self.loss_config.REDUCTION == 'sum':
+                    shape_loss = torch.sum(shape_loss)
 
-            total_loss = shape_nll
+                total_loss = shape_loss
 
         else:
-            style_nll = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=4)
-            if self.loss_config.REDUCTION == 'mean':
-                style_nll = torch.mean(style_nll)
-            elif self.loss_config.REDUCTION == 'sum':
-                style_nll = torch.sum(style_nll)
+            if self.model_config.DETERMINISTIC:
+                shape_loss = self.determ_shape_loss(pred_dict['shape_params'], target_dict['shape_params'])
+                style_loss = self.determ_style_loss(pred_dict['style_params'], target_dict['style_params'])
+            else:
+                style_loss = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=4)
+                if self.loss_config.REDUCTION == 'mean':
+                    style_loss = torch.mean(style_loss)
+                elif self.loss_config.REDUCTION == 'sum':
+                    style_loss = torch.sum(style_loss)
 
-            shape_nll = -(pred_dict['shape_params'].log_prob(target_dict['shape_params']).sum(dim=1))  # (batch_size,)
-            if self.loss_config.REDUCTION == 'mean':
-                shape_nll = torch.mean(shape_nll)
-            elif self.loss_config.REDUCTION == 'sum':
-                shape_nll = torch.sum(shape_nll)
+                shape_loss = -(pred_dict['shape_params'].log_prob(target_dict['shape_params']).sum(dim=1))  # (batch_size,)
+                if self.loss_config.REDUCTION == 'mean':
+                    shape_loss = torch.mean(shape_loss)
+                elif self.loss_config.REDUCTION == 'sum':
+                    shape_loss = torch.sum(shape_loss)
 
-            total_loss = style_nll * 2 + shape_nll
+            total_loss = style_loss * 2 + shape_loss
 
         return total_loss
 

@@ -46,7 +46,7 @@ class CATDataset(Dataset):
             data_split=data_split,
             garment_pairs=train_cfg.GARMENT_PAIRS,
             param_cfg=get_param_cfg_from_label(train_cfg.PARAM_CFG_LABEL),
-            img_wh=train_cfg.SYNTH_DATA.IMG_WH
+            img_wh=get_cfg_defaults().DATA.PROXY_REP_SIZE
         )
         data_split_slices_list = self._get_slices(
             garment_dirpaths=dataset_dirpaths,

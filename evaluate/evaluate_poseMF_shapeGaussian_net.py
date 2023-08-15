@@ -140,7 +140,8 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
                                                      global_orient=target_pose[:, :3],
                                                      betas=target_shape_clothed)
 
-                target_reposed_smpl_output_unclothed = smpl_model_male(betas=torch.zeros_like(target_shape).to(device))
+                #target_reposed_smpl_output_unclothed = smpl_model_male(betas=torch.zeros_like(target_shape).to(device))
+                target_reposed_smpl_output_unclothed = smpl_model_male(betas=target_shape.to(device))
                 target_reposed_smpl_output_clothed = smpl_model_male(betas=target_shape_clothed)
             elif target_gender == 'f':
                 continue
