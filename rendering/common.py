@@ -112,7 +112,7 @@ class Renderer(nn.Module):
         '''
         super().__init__()
         self.cfg = get_cfg_defaults()
-        self.img_wh = self.cfg.TRAIN.SYNTH_DATA.IMG_WH
+        self.img_wh = self.cfg.DATA.PROXY_REP_SIZE
         self.device = device
 
         # Cameras - pre-defined here but can be specified in forward 

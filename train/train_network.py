@@ -177,10 +177,17 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                         )
 
                     # Compute 2D joint heatmaps
-                    heatmaps = convert_2Djoints_to_gaussian_heatmaps_torch(target_joints2d_input, #type:ignore
-                                                                           pose_shape_cfg.DATA.PROXY_REP_SIZE,
-                                                                           std=pose_shape_cfg.DATA.HEATMAP_GAUSSIAN_STD)
-                    heatmaps = heatmaps * target_joints2d_visib[:, :, None, None]
+                    if pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.USE_PREEXTRACTED:
+                        heatmaps = convert_2Djoints_to_gaussian_heatmaps_torch(
+                            sample_batch['joints_2d'].to(device),
+                            pose_shape_cfg.DATA.PROXY_REP_SIZE,
+                            std=pose_shape_cfg.DATA.HEATMAP_GAUSSIAN_STD
+                        )
+                    else:
+                        heatmaps = convert_2Djoints_to_gaussian_heatmaps_torch(target_joints2d_input, #type:ignore
+                                                                            pose_shape_cfg.DATA.PROXY_REP_SIZE,
+                                                                            std=pose_shape_cfg.DATA.HEATMAP_GAUSSIAN_STD)
+                        heatmaps = heatmaps * target_joints2d_visib[:, :, None, None]
 
                     # Concatenate edge-image and 2D joint heatmaps to create input proxy representation
                     if pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 23:
@@ -208,19 +215,25 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     # ---------------------- FORWARD PASS -----------------------
                     #############################################################
                     pred_pose_F, pred_pose_U, pred_pose_S, pred_pose_V, pred_pose_rotmats_mode, \
-                        pred_shape_dist, pred_style_dist, pred_glob, pred_cam_wp = pose_shape_model(proxy_rep_input)
+                        pred_shape_params, pred_style_params, pred_glob, pred_cam_wp = pose_shape_model(proxy_rep_input)
                     
                     if not pose_shape_cfg.MODEL.OUTPUT_SET == 'all':
                         if 'shape' not in pose_shape_cfg.MODEL.OUTPUT_SET:
-                            pred_shape_dist = Normal(
-                                loc=target_shape, 
-                                scale=torch.exp(torch.zeros_like(target_shape))
-                            )
+                            if pose_shape_cfg.MODEL.DETERMINISTIC:
+                                pred_shape_params = target_shape
+                            else:
+                                pred_shape_params = Normal(
+                                    loc=target_shape, 
+                                    scale=torch.exp(torch.zeros_like(target_shape))
+                                )
                         if 'style' not in pose_shape_cfg.MODEL.OUTPUT_SET:
-                            pred_style_dist = Normal(
-                                loc=torch.zeros(target_shape.shape[0], pose_shape_cfg.MODEL.NUM_GARMENT_CLASSES, pose_shape_cfg.MODEL.NUM_STYLE_PARAMS), 
-                                scale=torch.exp(torch.zeros(target_shape.shape[0], pose_shape_cfg.MODEL.NUM_GARMENT_CLASSES, pose_shape_cfg.MODEL.NUM_STYLE_PARAMS))
-                            )
+                            if pose_shape_cfg.MODEL.DETERMINISTIC:
+                                pred_style_params = target_style_vector
+                            else:
+                                pred_style_params = Normal(
+                                    loc=target_style_vector, 
+                                    scale=torch.exp(torch.zeros(target_style_vector.shape[0], pose_shape_cfg.MODEL.NUM_GARMENT_CLASSES, pose_shape_cfg.MODEL.NUM_STYLE_PARAMS))
+                                )
                         pred_pose_rotmats_mode = target_pose_rotmats
                         pred_glob_rotmats = target_glob_rotmats
                         pred_cam_wp = mean_cam_t
@@ -230,9 +243,12 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     if pred_glob is not None:
                         pred_glob_rotmats = rot6d_to_rotmat(pred_glob)  # (bs, 3, 3)
 
+                    pred_shape_mean = pred_shape_params if pose_shape_cfg.MODEL.DETERMINISTIC else pred_shape_params.loc
+                    pred_style_mean = pred_style_params if pose_shape_cfg.MODEL.DETERMINISTIC else pred_style_params.loc
+
                     pred_smpl_output_mode = smpl_model(body_pose=pred_pose_rotmats_mode,
                                                        global_orient=pred_glob_rotmats.unsqueeze(1),
-                                                       betas=pred_shape_dist.loc,
+                                                       betas=pred_shape_mean,
                                                        pose2rot=False)
 
                     pred_vertices_mode = pred_smpl_output_mode.vertices
@@ -247,7 +263,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     with torch.no_grad():
                         pred_reposed_smpl_output_mean = smpl_model(body_pose=torch.zeros_like(target_pose)[:, 3:], #type:ignore
                                                                    global_orient=torch.zeros_like(target_pose)[:, :3], #type:ignore
-                                                                   betas=pred_shape_dist.loc)
+                                                                   betas=pred_shape_mean)
                         pred_reposed_vertices_mean = pred_reposed_smpl_output_mean.vertices  # (bs, 6890, 3)
 
                     pred_joints2d_samples = pred_joints2d_mode[:, None, :, :]  # (batch_size, 1, 17, 2)
@@ -259,8 +275,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                           'pose_params_U': pred_pose_U,
                                           'pose_params_S': pred_pose_S,
                                           'pose_params_V': pred_pose_V,
-                                          'shape_params': pred_shape_dist,
-                                          'style_params': pred_style_dist,
+                                          'shape_params': pred_shape_params,
+                                          'style_params': pred_style_params,
                                           'verts': pred_vertices_mode,
                                           'joints3D': pred_joints_h36mlsp_mode,
                                           'joints2D': pred_joints2d_samples,
@@ -295,11 +311,13 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                 del pred_dict_for_loss['pose_params_S']
                 del pred_dict_for_loss['pose_params_V']
                 #del pred_dict_for_loss['shape_params']
-                pred_dict_for_loss['shape_params'] = pred_dict_for_loss['shape_params'].loc
+                #pred_dict_for_loss['shape_params'] = pred_dict_for_loss['shape_params'].loc
+                pred_dict_for_loss['shape_params'] = pred_shape_mean
                 #del pred_dict_for_loss['style_params']
                 # TODO (kbartol): Update this if branch and incorporate into MODEL.OUTPUT_SET logic.
                 if pred_dict_for_loss['style_params'] is not None:
-                    pred_dict_for_loss['style_params'] = pred_dict_for_loss['style_params'].loc
+                    #pred_dict_for_loss['style_params'] = pred_dict_for_loss['style_params'].loc
+                    pred_dict_for_loss['style_params'] = pred_style_mean
                 else:
                     del pred_dict_for_loss['style_params']
                 metrics_tracker.update_per_batch(split=split,

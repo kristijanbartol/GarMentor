@@ -50,6 +50,11 @@ class PoseMFShapeGaussianNet(nn.Module):
         self.num_glob_params = 6
         init_glob = rotmat_to_rot6d(torch.eye(3)[None, :].float())
 
+        # Total number of parameters (determinstic/probabilistic).
+        self.multiplicator = 1 if self.config.MODEL.DETERMINISTIC else 2
+        self.total_num_shape_params = self.num_shape_params * self.multiplicator
+        self.total_num_style_params = self.num_style_params * self.num_garment_classes * self.multiplicator
+
         self.register_buffer('init_glob', init_glob)
         self.num_cam_params = 3
         init_cam = torch.tensor(self.config.MODEL.WP_CAM).float()  # Initialise weak-perspective camera scale at 0.9
@@ -60,46 +65,46 @@ class PoseMFShapeGaussianNet(nn.Module):
         if self.config.MODEL.NUM_RESNET_LAYERS == 18:
             self.image_encoder = resnet18(in_channels=self.config.MODEL.NUM_IN_CHANNELS,
                                           pretrained=self.config.MODEL.PRETRAINED)
-            num_image_features = 512
-            fc1_dim = 512
+            num_image_features = self.config.MODEL.NUM_IMAGE_FEATURES
+            fc1_dim = self.config.MODEL.FC1_DIM
         elif self.config.MODEL.NUM_RESNET_LAYERS == 50:
             self.image_encoder = resnet50(in_channels=self.config.MODEL.NUM_IN_CHANNELS,
                                           pretrained=self.config.MODEL.PRETRAINED)
-            num_image_features = 2048
-            fc1_dim = 1024
+            num_image_features = self.config.MODEL.NUM_IMAGE_FEATURES
+            fc1_dim = self.config.MODEL.FC1_DIM
         elif self.config.MODEL.NUM_RESNET_LAYERS == 101:
             self.image_encoder = resnet101(in_channels=self.config.MODEL.NUM_IN_CHANNELS,
                                           pretrained=self.config.MODEL.PRETRAINED)
-            num_image_features = 2048
-            fc1_dim = 1024
+            num_image_features = self.config.MODEL.NUM_IMAGE_FEATURES
+            fc1_dim = self.config.MODEL.FC1_DIM
 
         # FC Shape/Glob/Cam networks
         self.activation = nn.ELU()
 
         self.fc1 = nn.Linear(num_image_features, fc1_dim)
 
-        self.fc_shape = nn.Linear(fc1_dim, self.num_shape_params * 2) # x2 because of (means, variances)
+        self.fc_shape = nn.Linear(fc1_dim, self.total_num_shape_params)
         self.fc_style = nn.Linear(
             fc1_dim, 
-            self.num_style_params * self.num_garment_classes * 2      # x2 for (means, variances)
-        )                                                             # xN for garment classes
+            self.total_num_style_params
+        )                                                             
         self.fc_glob = nn.Linear(fc1_dim, self.num_glob_params)
         self.fc_cam = nn.Linear(fc1_dim, self.num_cam_params)
 
         if self.using_style:
             self.fc_embed = nn.Linear(
-                num_image_features +                                   \
-                self.num_shape_params * 2 +                            \
-                self.num_style_params * self.num_garment_classes * 2 + \
-                self.num_glob_params +                                 \
+                num_image_features +            \
+                self.total_num_shape_params +   \
+                self.total_num_style_params +   \
+                self.num_glob_params +          \
                 self.num_cam_params,
                 self.config.MODEL.EMBED_DIM
             )
         else:
             self.fc_embed = nn.Linear(
-                num_image_features +                                   \
-                self.num_shape_params * 2 +                            \
-                self.num_glob_params +                                 \
+                num_image_features +            \
+                self.total_num_shape_params +   \
+                self.num_glob_params +          \
                 self.num_cam_params,
                 self.config.MODEL.EMBED_DIM
             )
@@ -129,18 +134,22 @@ class PoseMFShapeGaussianNet(nn.Module):
 
         if self.output_set == 'all':
             # Shape
-            shape_params = self.fc_shape(x)  # (bsize, num_shape_params * 2)
+            shape_params = self.fc_shape(x)  # (bsize, num_shape_params * multiplicator)
             shape_mean = shape_params[:, :self.num_shape_params]
-            shape_log_std = shape_params[:, self.num_shape_params:]
-            shape_dist = Normal(loc=shape_mean, scale=torch.exp(shape_log_std))
+            if not self.config.MODEL.DETERMINISTIC:
+                shape_log_std = shape_params[:, self.num_shape_params:]
+                shape_dist = Normal(loc=shape_mean, scale=torch.exp(shape_log_std))
             
             # Style
             if self.using_style:
-                style_params = self.fc_style(x)  # (bsize, num_style_params * num_garment_classes * 2)
-                style_params_reshaped = torch.reshape(style_params, (-1, self.num_garment_classes, self.num_style_params, 2))
-                style_mean, style_log_std = style_params_reshaped[:, :, :, 0], style_params_reshaped[:, :, :, 1]
-                style_dist = Normal(loc=style_mean, scale=torch.exp(style_log_std))
+                style_params = self.fc_style(x)  # (bsize, num_style_params * num_garment_classes * multiplicator)
+                style_params_reshaped = torch.reshape(style_params, (-1, self.num_garment_classes, self.num_style_params, self.multiplicator))
+                style_mean = style_params_reshaped[:, :, :, 0]
+                if not self.config.MODEL.DETERMINISTIC:
+                    style_log_std = style_params_reshaped[:, :, :, 0]
+                    style_dist = Normal(loc=style_mean, scale=torch.exp(style_log_std))
             else:
+                style_mean = None
                 style_dist = None
 
             # Glob rot and WP Cam
@@ -216,31 +225,48 @@ class PoseMFShapeGaussianNet(nn.Module):
                 pose_S_proper[:, joint, :] = joint_S_proper
                 pose_rotmats_mode[:, joint, :, :] = joint_rotmat_mode
 
-            return pose_F, pose_U, pose_S, pose_V, pose_rotmats_mode, shape_dist, style_dist, glob, cam
+            if self.config.MODEL.DETERMINISTIC:
+                return pose_F, pose_U, pose_S, pose_V, pose_rotmats_mode, shape_mean, style_mean, glob, cam
+            else:
+                return pose_F, pose_U, pose_S, pose_V, pose_rotmats_mode, shape_dist, style_dist, glob, cam
         elif self.output_set == 'style':
-            style_params = self.fc_style(x)  # (bsize, num_style_params * num_garment_classes * 2)
-            style_params_reshaped = torch.reshape(style_params, (-1, self.num_garment_classes, self.num_style_params, 2))
-            style_mean, style_log_std = style_params_reshaped[:, :, :, 0], style_params_reshaped[:, :, :, 1]
-            style_dist = Normal(loc=style_mean, scale=torch.exp(style_log_std))
+            style_params = self.fc_style(x)  # (bsize, num_style_params * num_garment_classes * multiplicator)
+            style_params_reshaped = torch.reshape(style_params, (-1, self.num_garment_classes, self.num_style_params, self.multiplicator))
+            style_mean = style_params_reshaped[:, :, :, 0]
+            if not self.config.MODEL.DETERMINISTIC:
+                style_log_std = style_params_reshaped[:, :, :, 1]
+                style_dist = Normal(loc=style_mean, scale=torch.exp(style_log_std))
 
-            return None, None, None, None, None, None, style_dist, None, None
+            if self.config.MODEL.DETERMINISTIC:
+                return None, None, None, None, None, None, style_mean, None, None
+            else:
+                return None, None, None, None, None, None, style_dist, None, None
         elif self.output_set == 'shape':
-            shape_params = self.fc_shape(x)  # (bsize, num_shape_params * 2)
+            shape_params = self.fc_shape(x)  # (bsize, num_shape_params * multiplicator)
             shape_mean = shape_params[:, :self.num_shape_params]
-            shape_log_std = shape_params[:, self.num_shape_params:]
-            shape_dist = Normal(loc=shape_mean, scale=torch.exp(shape_log_std))
+            if not self.config.MODEL.DETERMINISTIC:
+                shape_log_std = shape_params[:, self.num_shape_params:]
+                shape_dist = Normal(loc=shape_mean, scale=torch.exp(shape_log_std))
 
-            return None, None, None, None, None, shape_dist, None, None, None
+            if self.config.MODEL.DETERMINISTIC:
+                return None, None, None, None, None, shape_mean, None, None, None
+            else:
+                return None, None, None, None, None, shape_dist, None, None, None
         elif self.output_set == 'shape-style':
-            style_params = self.fc_style(x)  # (bsize, num_style_params * num_garment_classes * 2)
-            style_params_reshaped = torch.reshape(style_params, (-1, self.num_garment_classes, self.num_style_params, 2))
-            style_mean, style_log_std = style_params_reshaped[:, :, :, 0], style_params_reshaped[:, :, :, 1]
-            style_dist = Normal(loc=style_mean, scale=torch.exp(style_log_std))
+            style_params = self.fc_style(x)  # (bsize, num_style_params * num_garment_classes * multiplicator)
+            style_params_reshaped = torch.reshape(style_params, (-1, self.num_garment_classes, self.num_style_params, self.multiplicator))
+            style_mean = style_params_reshaped[:, :, :, 0]
+            if not self.config.MODEL.DETERMINISTIC:
+                style_log_std = style_params_reshaped[:, :, :, 1]
+                style_dist = Normal(loc=style_mean, scale=torch.exp(style_log_std))
         
-            shape_params = self.fc_shape(x)  # (bsize, num_shape_params * 2)
+            shape_params = self.fc_shape(x)  # (bsize, num_shape_params * multiplicator)
             shape_mean = shape_params[:, :self.num_shape_params]
-            shape_log_std = shape_params[:, self.num_shape_params:]
-            shape_dist = Normal(loc=shape_mean, scale=torch.exp(shape_log_std))
+            if not self.config.MODEL.DETERMINISTIC:
+                shape_log_std = shape_params[:, self.num_shape_params:]
+                shape_dist = Normal(loc=shape_mean, scale=torch.exp(shape_log_std))
 
-            return None, None, None, None, None, shape_dist, style_dist, None, None
-
+            if self.config.MODEL.DETERMINISTIC:
+                return None, None, None, None, None, shape_mean, style_mean, None, None
+            else:
+                return None, None, None, None, None, shape_dist, style_dist, None, None
