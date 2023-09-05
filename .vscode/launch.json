@@ -45,7 +45,7 @@
         },
 
         {
-            "name": "Data generator",
+            "name": "Data generator (TN)",
             "type": "python",
             "request": "launch",
             "program": "${file}",
@@ -58,6 +58,20 @@
                 "-N", "50000",
                 "--preextract",     // NOTE: should always preextract, anyways you can decide whether to use it later
                 "--img_wh", "256"
+            ]
+        },
+
+        {
+            "name": "Data generator (DN)",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "-G", "female", 
+                "-N", "100",
+                "--preextract"
             ]
         },
 

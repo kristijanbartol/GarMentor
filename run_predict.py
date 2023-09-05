@@ -8,7 +8,7 @@ from models.poseMF_shapeGaussian_net import PoseMFShapeGaussianNet
 from models.smpl_official import SMPL
 from models.pose2D_hrnet import PoseHighResolutionNet
 from models.canny_edge_detector import CannyEdgeDetector
-from models.parametric_model import ParametricModel
+from models.parametric.tn import ParametricModel
 
 from configs.poseMF_shapeGaussian_net_config import get_cfg_defaults
 from configs.pose2D_hrnet_config import get_pose2D_hrnet_cfg_defaults

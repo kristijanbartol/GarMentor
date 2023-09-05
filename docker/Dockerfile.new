@@ -22,8 +22,6 @@ RUN apt update && apt install -y git \
 
 ENV BOOST_INCLUDE_DIRS=/usr/include/boost
 
-RUN pip install -U pip setuptools
-
 # install python dependencies
 RUN pip install --ignore-installed PyYAML \
 	opencv-python \
@@ -81,10 +79,12 @@ RUN cd /git && git clone https://github.com/vchoutas/smplx && cd smplx && git re
 	sed -i "/body_data = / s/pickle.load(body_file)/pickle.load(body_file, encoding='latin1')/" clean_ch.py && \
 	sed -i "s/iteritems/items/g" clean_ch.py
 
+RUN pip install -U pip setuptools
+
 # Use this numpy version when you get error that bool can't be imported from numpy.
 # NOTE: Also pay attention to pandas==1.0.3
-RUN pip install numpy==1.23.1
+RUN pip install numpy==1.23.1 cython einops
 
-RUN mkdir -p /garmentor
+RUN mkdir -p /GarMentor
 
-WORKDIR /garmentor
+WORKDIR /GarMentor

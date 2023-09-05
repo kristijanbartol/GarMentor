@@ -41,8 +41,9 @@ Folder hierarchy of the stored data.
                 <SEG_MAP_1_1>
                 ...
 """
-#DATA_ROOT_DIR = '/data/garmentor/'
-DATA_ROOT_DIR = '/data/cat/tn/'
+DATA_ROOT_DIR = '/data/cat/'
+TN_DIR = 'tn/'
+DN_DIR = 'dn/'
 PARAMS_DIR = 'params/'
 DATASETS_DIR = 'datasets/'
 RGB_DIR = 'rgb/'
@@ -97,3 +98,14 @@ AGORA_FULL_IMG_DIR_TEMPLATE = os.path.join(
     SCENE_NAME_TEMPLATE,
     RESOLUTION_TEMPLATE
 )
+
+############ DRAPENET PATHS ###################
+DRAPENET_CHECKPOINTS = '/data/drapenet/checkpoints'
+DRAPENET_EXTRADIR = '/data/drapenet/extra-data'
+DRAPENET_SMPLDIR = '/data/drapenet/smpl_pytorch'
+
+TOP_CODES_FNAME = 'top_codes.pt'
+TOP_MODEL_FNAME = 'top_udf.pt'
+
+BOTTOM_CODES_FNAME = 'top_codes.pt'
+BOTTOM_MODEL_FNAME = 'top_udf.pt'

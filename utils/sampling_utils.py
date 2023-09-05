@@ -1,6 +1,8 @@
 from typing import Optional, Tuple, List
 import torch
 import numpy as np
+import os
+from sklearn.model_selection import train_test_split
 
 from configs import paths
 import configs.const
@@ -18,13 +20,12 @@ from configs.const import (
     STYLE_MIN,
     STYLE_MAX
 )
+import configs.paths as paths
 from utils.rigid_transform_utils import quat_to_rotmat, aa_rotate_translate_points_pytorch3d
 from utils.cam_utils import orthographic_project_torch
 from utils.joints2d_utils import undo_keypoint_normalisation
 from utils.label_conversions import convert_heatmaps_to_2Djoints_coordinates_torch, ALL_JOINTS_TO_COCO_MAP
 
-
-# NOTE: Might create a Parameters class.
 
 def _ranges_to_sizes_and_offsets(
         ranges: np.ndarray
@@ -320,6 +321,18 @@ def sample_uniform_style(
     raise NotImplementedError('Need to finish the implementation...')
     #style = (max_value - min_value) * np.random.randn(num_garment_classes, 4) + min_value
     #return style
+
+
+def sample_predefined_style(
+        _: str,
+        garment_part: str
+    ) -> Tuple[np.ndarray, np.ndarray]:
+    styles_array = torch.load(os.path.join(
+        paths.DRAPENET_CHECKPOINTS,
+        paths.TOP_CODES_FNAME if garment_part == 'upper' else paths.BOTTOM_CODES_FNAME)
+    ).cpu().detach().numpy()
+    train_styles, valid_styles = train_test_split(styles_array, test_size=0.2)
+    return train_styles, valid_styles
 
 
 def uniform_random_unit_vector(num_vectors):
