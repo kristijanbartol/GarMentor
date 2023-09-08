@@ -100,12 +100,13 @@ AGORA_FULL_IMG_DIR_TEMPLATE = os.path.join(
 )
 
 ############ DRAPENET PATHS ###################
-DRAPENET_CHECKPOINTS = '/data/drapenet/checkpoints'
-DRAPENET_EXTRADIR = '/data/drapenet/extra-data'
-DRAPENET_SMPLDIR = '/data/drapenet/smpl_pytorch'
+DRAPENET_DIR = '/GarMentor/drapenet_for_garmentor/'
+DRAPENET_CHECKPOINTS = os.path.join(DRAPENET_DIR, 'checkpoints/')
+DRAPENET_EXTRADIR = os.path.join(DRAPENET_DIR, 'extra-data/')
+DRAPENET_SMPLDIR = os.path.join(DRAPENET_DIR, 'smpl_pytorch/')
 
 TOP_CODES_FNAME = 'top_codes.pt'
 TOP_MODEL_FNAME = 'top_udf.pt'
 
-BOTTOM_CODES_FNAME = 'top_codes.pt'
-BOTTOM_MODEL_FNAME = 'top_udf.pt'
+BOTTOM_CODES_FNAME = 'bottom_codes.pt'
+BOTTOM_MODEL_FNAME = 'bottom_udf.pt'

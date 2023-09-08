@@ -83,7 +83,7 @@ class TrainingLossesAndMetricsTracker:
 
         return history
 
-    def initialise_loss_metric_sums(self):
+    def initialise_loss_metric_sums(self, train_cfg):
         self.loss_metric_sums = {'train_losses': 0., 'val_losses': 0.,
                                  'train_num_samples': 0, 'val_num_samples': 0}
 
@@ -95,9 +95,9 @@ class TrainingLossesAndMetricsTracker:
                 self.loss_metric_sums['val_num_visib_joints2Dsamples'] = 0.
                 self.loss_metric_sums[metric_type] = 0.
             elif 'shape_method' in metric_type:
-                self.loss_metric_sums[metric_type] = np.zeros(11,)
+                self.loss_metric_sums[metric_type] = np.zeros(1 + train_cfg.NUM_SMPL_BETAS,)
             elif 'style_method' in metric_type:
-                self.loss_metric_sums[metric_type] = np.zeros(11,)
+                self.loss_metric_sums[metric_type] = np.zeros(1 + 2 + train_cfg.NUM_STYLE_PARAMS * 2,)
             else:
                 self.loss_metric_sums[metric_type] = 0.
 

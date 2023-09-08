@@ -1,4 +1,5 @@
-from typing import Dict, List
+from abc import abstractmethod
+from typing import Dict, List, Optional
 import numpy as np
 from tqdm import tqdm
 import os
@@ -29,6 +30,7 @@ class CATDataset(Dataset):
     """
 
     def __init__(self,
+                 garment_model: str,
                  gender: str,
                  data_split: str,
                  train_val_ratio: float,
@@ -39,14 +41,15 @@ class CATDataset(Dataset):
         """
         super().__init__()
         train_cfg = get_cfg_defaults().TRAIN
-        print(f'Loading {data_split} data...')
+        print(f'Loading {data_split} data ({garment_model.upper()})...')
 
         dataset_dirpaths = self._get_dataset_dirs(
+            garment_model=garment_model,
             gender=gender,
             data_split=data_split,
-            garment_pairs=train_cfg.GARMENT_PAIRS,
+            img_wh=get_cfg_defaults().DATA.PROXY_REP_SIZE,
             param_cfg=get_param_cfg_from_label(train_cfg.PARAM_CFG_LABEL),
-            img_wh=get_cfg_defaults().DATA.PROXY_REP_SIZE
+            garment_pairs_list=train_cfg.GARMENT_PAIRS
         )
         data_split_slices_list = self._get_slices(
             garment_dirpaths=dataset_dirpaths,
@@ -75,30 +78,16 @@ class CATDataset(Dataset):
         self.img_wh = img_wh
         
     @staticmethod
+    @abstractmethod
     def _get_dataset_dirs(
+            garment_model: str,
             gender: str,
             data_split: str,
-            garment_pairs: List[str],
             img_wh: int,
-            param_cfg: Dict
+            param_cfg: Dict,
+            garment_pairs_list: Optional[List[str]] = None
         ) -> List[str]:
-        """
-        Collects all the garment class pairs based on directory names.
-
-        This is specific to SURREAL-like datasets because each garment
-        combination is generated separately and it is simpler to determine
-        the combination this way.
-        """
-        dataset_dirs = []
-        for garment_pair in garment_pairs:
-            dataset_dirs.append(get_dataset_dirs(
-                param_cfg=param_cfg,
-                upper_class=garment_pair.split('+')[0],
-                lower_class=garment_pair.split('+')[1],
-                gender=gender,
-                img_wh=img_wh
-            )[data_split])
-        return dataset_dirs
+        pass
     
     @staticmethod
     def _get_slices(
@@ -218,6 +207,13 @@ class CATDataset(Dataset):
         To torch Tensor from NumPy, given the type.
         """
         return torch.from_numpy(value.astype(type)) # type: ignore
+    
+    @abstractmethod
+    def getitem_style(
+            self,
+            idx: int
+        ) -> np.ndarray:
+        pass
 
     def __getitem__(
             self, 
@@ -229,7 +225,7 @@ class CATDataset(Dataset):
         seg_maps = np.load(self.seg_maps_paths[idx])['seg_maps']
         seg_maps = np.flip(seg_maps, axis=1)
         rgb_img = imageio.imread(self.rgb_img_paths[idx]).transpose(2, 0, 1)[::-1] / 255
-        style_vector = self.values.style_vectors[idx][self.values.garment_labelss[idx]]
+        style_vector = self.getitem_style(idx)
 
         return {
             'pose': self._to_tensor(self.values.poses[idx]),
@@ -244,3 +240,95 @@ class CATDataset(Dataset):
             'seg_maps': self._to_tensor(seg_maps, type=bool),
             'background': self._load_background()
         }
+
+
+class TNCATDataset(CATDataset):
+
+    def __init__(self,
+                 garment_model: str,
+                 gender: str,
+                 data_split: str,
+                 train_val_ratio: float,
+                 backgrounds_dir_path: str,
+                 img_wh: int = 256):
+        super().__init__(
+            garment_model=garment_model,
+            gender=gender,
+            data_split=data_split,
+            train_val_ratio=train_val_ratio,
+            backgrounds_dir_path=backgrounds_dir_path,
+            img_wh=img_wh)
+
+    @staticmethod
+    def _get_dataset_dirs(
+            garment_model: str,
+            gender: str,
+            data_split: str,
+            img_wh: int,
+            param_cfg: Dict,
+            garment_pairs_list: List[str]
+        ) -> List[str]:
+        """
+        Collects all the garment class pairs based on directory names.
+
+        This is specific to SURREAL-like datasets because each garment
+        combination is generated separately and it is simpler to determine
+        the combination this way.
+        """
+        dataset_dirs = []
+        for garment_pair in garment_pairs_list:
+            dataset_dirs.append(get_dataset_dirs(
+                param_cfg=param_cfg,
+                garment_model=garment_model,
+                gender=gender,
+                img_wh=img_wh,
+                upper_class=garment_pair.split('+')[0],
+                lower_class=garment_pair.split('+')[1]
+            )[data_split])
+        return dataset_dirs
+
+    def getitem_style(
+            self,
+            idx: int
+        ) -> np.ndarray:
+        return self.values.style_vectors[idx][self.values.garment_labelss[idx]]
+
+
+class DNCATDataset(CATDataset):
+
+    def __init__(self,
+                 garment_model: str,
+                 gender: str,
+                 data_split: str,
+                 train_val_ratio: float,
+                 backgrounds_dir_path: str,
+                 img_wh: int = 256):
+        super().__init__(
+            garment_model=garment_model,
+            gender=gender,
+            data_split=data_split,
+            train_val_ratio=train_val_ratio,
+            backgrounds_dir_path=backgrounds_dir_path,
+            img_wh=img_wh)
+
+    @staticmethod
+    def _get_dataset_dirs(
+            garment_model: str,
+            gender: str,
+            data_split: str,
+            img_wh: int,
+            param_cfg: Dict,
+            garment_pairs_list: Optional[List[str]]
+        ) -> List[str]:
+        return [get_dataset_dirs(
+            param_cfg=param_cfg,
+            garment_model=garment_model,
+            gender=gender,
+            img_wh=img_wh
+        )[data_split]]
+
+    def getitem_style(
+            self,
+            idx: int
+        ) -> np.ndarray:
+        return self.values.style_vectors[idx]

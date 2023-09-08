@@ -40,7 +40,7 @@
             "args": [
                 "-E", "experiments/tmp", 
                 "--gpu", "0",
-                "-G", "male"
+                "-G", "female"
             ]
         },
 
@@ -55,7 +55,7 @@
                 "-G", "male", 
                 "-U", "t-shirt", 
                 "-L", "pant", 
-                "-N", "50000",
+                "-N", "51000",
                 "--preextract",     // NOTE: should always preextract, anyways you can decide whether to use it later
                 "--img_wh", "256"
             ]
@@ -70,7 +70,7 @@
             "justMyCode": false,
             "args": [
                 "-G", "female", 
-                "-N", "100",
+                "-N", "5800",
                 "--preextract"
             ]
         },

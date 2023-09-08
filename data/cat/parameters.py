@@ -1,9 +1,9 @@
+from abc import abstractmethod
 from typing import Tuple, Dict, Optional
 import os
 import numpy as np
-import sys
 
-sys.path.append('/garmentor/')
+#sys.path.append('/GarMentor/')
 
 from configs import paths
 from configs.const import SAMPLING_STRATEGIES
@@ -21,10 +21,12 @@ class Parameters(object):
 
     def __init__(
             self,
+            garment_model: str,
             param_cfg: Optional[Dict[str, Dict[str, str]]] = None
         ) -> None:
         self.params_dir = os.path.join(
             paths.DATA_ROOT_DIR,
+            garment_model,
             paths.PARAMS_DIR
         )
         self.cfg = get_cfg_defaults()
@@ -78,31 +80,14 @@ class Parameters(object):
             )
             np.save(save_path, params[split_idx])
 
+    @abstractmethod
     def init_params(
             self,
             param_type: str,
             sampling_strategy: str,
             interval_type: str
         ) -> Tuple[np.ndarray, np.ndarray]:
-        params_path = self.get_path(
-            param_type=param_type,
-            sampling_strategy=sampling_strategy,
-            interval_type=interval_type
-        )
-        cfg_str = f'({param_type}-{sampling_strategy}-{interval_type})'
-        if not os.path.exists(params_path):
-            print(f'Sampling {cfg_str}...')
-            params = getattr(
-                utils.sampling_utils, 
-                f'sample_{sampling_strategy}_{param_type}'
-            )(interval_type)
-            self._save_params(params_path, params)
-            return params
-        else:
-            print(f'Loading {cfg_str}...')
-            return tuple([np.load(os.path.join(
-                    params_path, f'{data_split}.npy')
-                ) for data_split in ['train', 'valid']])
+        pass
 
     def init_all_params(self) -> None:
         """
@@ -142,9 +127,134 @@ class Parameters(object):
                 param_type=x,
                 idx=idx
             ) for x in self.ALL_PARAMS_KEYS})
+    
+
+class DNParameters(Parameters):
+
+    """
+    The class for representing and managing (sampling) parameters.
+    """
+
+    ALL_PARAMS_KEYS = ['pose', 'global_orient', 'shape', 'style']
+
+    def __init__(
+            self,
+            param_cfg: Optional[Dict[str, Dict[str, str]]] = None
+        ) -> None:
+        super().__init__(
+            garment_model='dn',
+            param_cfg=param_cfg
+        )
+
+    @staticmethod
+    def process_style() -> Tuple[np.ndarray, np.ndarray]:
+
+        def extend_arrays(upper_array, lower_array):
+            ext_arrays = []
+            for train_split_idx in range(2):
+                upper_len = upper_array[train_split_idx].shape[0]
+                lower_array_split = lower_array[train_split_idx]
+                lower_len = lower_array_split.shape[0]
+                num_repeats = upper_len // lower_len
+                lower_array_ext = np.tile(lower_array_split, (num_repeats, 1))
+                remaining_num = upper_len - lower_array_ext.shape[0]
+                if remaining_num > 0:
+                    lower_array_ext = np.vstack((
+                        lower_array_ext, 
+                        lower_array_split[:remaining_num])
+                    )
+                ext_arrays.append(lower_array_ext)
+            return ext_arrays      
+
+        upper_style = getattr(
+            utils.sampling_utils, 
+            f'sample_predefined_style'
+        )(None, 'upper')
+        lower_style = getattr(
+            utils.sampling_utils, 
+            f'sample_predefined_style'
+        )(None, 'lower')
+        lower_style = extend_arrays(upper_style, lower_style)
+        return (
+            np.concatenate((upper_style[0][:, None], lower_style[0][:, None]), axis=1),
+            np.concatenate((upper_style[1][:, None], lower_style[1][:, None]), axis=1)
+        )
+
+    def init_params(
+            self,
+            param_type: str,
+            sampling_strategy: str,
+            interval_type: str
+        ) -> Tuple[np.ndarray, np.ndarray]:
+        params_path = self.get_path(
+            param_type=param_type,
+            sampling_strategy=sampling_strategy,
+            interval_type=interval_type
+        )
+        cfg_str = f'({param_type}-{sampling_strategy}-{interval_type})'
+        if not os.path.exists(params_path):
+            print(f'Sampling {cfg_str}...')
+            if param_type == 'style':
+                params = self.process_style()
+            else:
+                params = getattr(
+                    utils.sampling_utils, 
+                    f'sample_{sampling_strategy}_{param_type}'
+                )(interval_type)
+            self._save_params(params_path, params)
+            return params
+        else:
+            print(f'Loading {cfg_str}...')
+            return tuple([np.load(os.path.join(
+                    params_path, f'{data_split}.npy')
+                ) for data_split in ['train', 'valid']])
+        
+
+class TNParameters(Parameters):
+
+    """
+    The class for representing and managing (sampling) parameters.
+    """
+
+    ALL_PARAMS_KEYS = ['pose', 'global_orient', 'shape', 'style']
+
+    def __init__(
+            self,
+            param_cfg: Optional[Dict[str, Dict[str, str]]] = None
+        ) -> None:
+        super().__init__(
+            garment_model='tn',
+            param_cfg=param_cfg
+        )
+
+    def init_params(
+            self,
+            param_type: str,
+            sampling_strategy: str,
+            interval_type: str
+        ) -> Tuple[np.ndarray, np.ndarray]:
+        params_path = self.get_path(
+            param_type=param_type,
+            sampling_strategy=sampling_strategy,
+            interval_type=interval_type
+        )
+        cfg_str = f'({param_type}-{sampling_strategy}-{interval_type})'
+        if not os.path.exists(params_path):
+            print(f'Sampling {cfg_str}...')
+            params = getattr(
+                utils.sampling_utils, 
+                f'sample_{sampling_strategy}_{param_type}'
+            )(interval_type)
+            self._save_params(params_path, params)
+            return params
+        else:
+            print(f'Loading {cfg_str}...')
+            return tuple([np.load(os.path.join(
+                    params_path, f'{data_split}.npy')
+                ) for data_split in ['train', 'valid']])
 
 
 if __name__ == '__main__':
-    parameters = Parameters()
+    parameters = TNParameters()
     parameters.init_all_params()
     style = parameters.get_param_type('train', 'style', 0)

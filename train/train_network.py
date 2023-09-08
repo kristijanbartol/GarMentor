@@ -92,7 +92,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
     for epoch in range(current_epoch, pose_shape_cfg.TRAIN.NUM_EPOCHS):
         print('\nEpoch {}/{}'.format(epoch, pose_shape_cfg.TRAIN.NUM_EPOCHS - 1))
         print('-' * 10)
-        metrics_tracker.initialise_loss_metric_sums()
+        metrics_tracker.initialise_loss_metric_sums(pose_shape_cfg.MODEL)
 
         for split in ['train', 'val']:
             if split == 'train':
@@ -190,7 +190,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                         heatmaps = heatmaps * target_joints2d_visib[:, :, None, None]
 
                     # Concatenate edge-image and 2D joint heatmaps to create input proxy representation
-                    if pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 23:
+                    seg_channels_diff = 2 if pose_shape_cfg.MODEL.GARMENT_MODEL == 'dn' else 0
+                    if pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 23 - seg_channels_diff:
                         #np.repeat((seg_maps[:, -1][None, 0] * 255).detach().cpu().numpy(), 3, axis=0)
                         proxy_rep_input = torch.cat([edge_in, seg_maps, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
                     elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 17:
@@ -199,15 +200,15 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                         proxy_rep_input = torch.cat([edge_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
                     elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 20:
                         proxy_rep_input = torch.cat([rgb_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
-                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 22:
+                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 22 - seg_channels_diff:
                         proxy_rep_input = torch.cat([seg_maps, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
                     elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 3:
                         proxy_rep_input = torch.cat([rgb_in], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
                     elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 1:
                         proxy_rep_input = torch.cat([edge_in], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
-                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 5:
+                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 5 - seg_channels_diff:
                         proxy_rep_input = torch.cat([seg_maps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
-                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 6:
+                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 6 - seg_channels_diff:
                         proxy_rep_input = torch.cat([edge_in, seg_maps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
 
                 with torch.set_grad_enabled(split == 'train'): #type:ignore
