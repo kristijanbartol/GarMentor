@@ -1,6 +1,6 @@
 
 from abc import abstractmethod
-from typing import Tuple, Union, Dict
+from typing import Tuple, Union, Dict, Optional
 import numpy as np
 import torch
 import torch.cuda
@@ -549,6 +549,7 @@ class DNDataGenerator(DataGenerator):
         if preextract_kpt:
             self.kpt_model, self.kpt_cfg = get_pretrained_detector()
         self.keypoints_visualizer = KeypointsVisualizer()
+        self.skip_counter = 0
 
     @staticmethod
     def prepare_sample_values(
@@ -568,6 +569,68 @@ class DNDataGenerator(DataGenerator):
             joints_2d=joints_2d,
             bbox=np.empty(0,)       # TODO: Remove as it is unrealiable at this stage.
         )
+    
+    @staticmethod
+    def _check_style_blacklist(style):
+        if not os.path.exists('invalid_styles.npy'):
+            invalid_styles = []
+        else:
+            invalid_styles = np.load('invalid_styles.npy')
+        is_invalid = False
+        for invalid_style in invalid_styles:
+            if np.array_equal(style[0], invalid_style[0]) and np.array_equal(style[1], invalid_style[1]):
+                print('WARNING: Loaded blacklisted style! Setting the baseline value.')
+                is_invalid = True
+                break
+        if is_invalid:
+            style[0] = np.load('top_baseline.npy')
+            style[1] = np.load('bottom_baseline.npy')
+        return style
+    
+    @staticmethod
+    def _verify_cuda(
+            rgb_img,
+            current_style
+        ) -> None:
+        if rgb_img is None:
+            if not os.path.exists('invalid_styles.npy'):
+                invalid_styles = []
+            else:
+                invalid_styles = list(np.load('invalid_styles.npy'))
+            invalid_styles.append(current_style)
+            np.save('invalid_styles.npy', np.array(invalid_styles))
+            print(f'Runtime error! Logged this sample to the invalid ones ({len(invalid_styles)}). Now exiting...')
+            exit()
+    
+    def _verify_appearance(
+            self,
+            rgb_img
+        ) -> bool:
+        print(torch.any(rgb_img, dim=-1).sum())
+        if torch.any(rgb_img, dim=-1).sum() > 0.125 * rgb_img.shape[0] * rgb_img.shape[1]:
+            return False
+        else:
+            return True
+
+    def produce_features(
+            self,
+            clothed_visualizer,
+            params_dict
+        ):
+        params_dict['style'] = self._check_style_blacklist(params_dict['style'])
+        rgb_img, seg_maps, joints_3d = clothed_visualizer.vis_from_params(
+            pose=params_dict['pose'],
+            shape=params_dict['shape'],
+            style_vector=params_dict['style']
+        )
+        self._verify_cuda(
+            rgb_img=rgb_img,
+            current_style=params_dict['style']
+        )
+        rgb_ok = self._verify_appearance(rgb_img)
+        if not rgb_ok:
+            self.skip_counter += 1
+        return rgb_img, seg_maps, joints_3d, rgb_ok
 
     def generate_sample(
             self, 
@@ -579,15 +642,16 @@ class DNDataGenerator(DataGenerator):
         """
         Generate a single training sample.
         """
-        params_dict = parameters.get(
-            data_split=data_split, 
-            idx=idx
-        )
-        rgb_img, seg_maps, joints_3d = clothed_visualizer.vis_from_params(
-            pose=params_dict['pose'],
-            shape=params_dict['shape'],
-            style_vector=params_dict['style']
-        )
+        rgb_ok = False
+        while not rgb_ok:
+            params_dict = parameters.get(
+                data_split=data_split, 
+                idx=idx + self.skip_counter
+            )
+            rgb_img, seg_maps, joints_3d, rgb_ok = self.produce_features(
+                clothed_visualizer=clothed_visualizer,
+                params_dict=params_dict
+            )
         joints_2d, joints_conf, _ = self._predict_joints(
             rgb_tensor=torch.swapaxes(rgb_img, 0, 2),
         )
@@ -671,6 +735,7 @@ class DNDataGenerator(DataGenerator):
         arrays are frequently updated on the disk in case the failure
         happens along the way.
         """
+        self.skip_counter = 0
         parameters = DNParameters(param_cfg=param_cfg)
         clothed_visualizer = DNClothedVisualizer(
             device=self.device,
@@ -691,24 +756,21 @@ class DNDataGenerator(DataGenerator):
         }
         for data_split in ['train', 'valid']:
             for pose_idx in range(nums_generated[data_split], total_nums_samples[data_split]):
-                try:
-                    rgb_img, seg_maps, sample_values = self.generate_sample(
-                        parameters=parameters,
-                        data_split=data_split,
-                        idx=pose_idx, 
-                        clothed_visualizer=clothed_visualizer
-                    )
-                    self._save_sample(
-                        dataset_dir=dataset_dirs[data_split], 
-                        sample_idx=pose_idx, 
-                        rgb_img=rgb_img, 
-                        seg_maps=seg_maps, 
-                        sample_values=sample_values,
-                        values_array=values_splits[data_split],
-                        clothed_visualizer=clothed_visualizer
-                    )
-                except RuntimeError:
-                    print('Got runtime error! Probably CUDA out of memory for the sample.')
+                rgb_img, seg_maps, sample_values = self.generate_sample(
+                    parameters=parameters,
+                    data_split=data_split,
+                    idx=pose_idx, 
+                    clothed_visualizer=clothed_visualizer
+                )
+                self._save_sample(
+                    dataset_dir=dataset_dirs[data_split], 
+                    sample_idx=pose_idx, 
+                    rgb_img=rgb_img, 
+                    seg_maps=seg_maps, 
+                    sample_values=sample_values,
+                    values_array=values_splits[data_split],
+                    clothed_visualizer=clothed_visualizer
+                )
                 torch.cuda.empty_cache()
 
 
@@ -750,11 +812,11 @@ def generate_dn(args):
     )
     param_cfg = {
         'pose': {
-            'strategy': 'zero',
+            'strategy': 'mocap',
             'interval': 'intra'
         },
         'global_orient': {
-            'strategy': 'zero',
+            'strategy': 'diverse',
             'interval': 'extra'
         },
         'shape': {

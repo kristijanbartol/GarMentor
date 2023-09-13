@@ -68,9 +68,12 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false,
+            "env": {
+                "CUDA_LAUNCH_BLOCKING": "1"
+            },
             "args": [
                 "-G", "female", 
-                "-N", "5800",
+                "-N", "4300",
                 "--preextract"
             ]
         },

@@ -231,6 +231,10 @@ class DNClothedRenderer(ClothedRenderer):
                 mesh, 
                 cameras=self.cameras
             )
+            try:
+                mesh.verts_list()
+            except RuntimeError as cuda_err:
+                return None, None
             rgb_image = self.rgb_shader(
                 fragments, 
                 mesh, 

@@ -78,7 +78,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
         load_logs = False
 
     # Instantiate metrics tracker
-    metrics_tracker = TrainingLossesAndMetricsTracker(metrics_to_track=metrics,
+    metrics_tracker = TrainingLossesAndMetricsTracker(garment_model=pose_shape_cfg.MODEL.GARMENT_MODEL,
+                                                      metrics_to_track=metrics,
                                                       img_wh=pose_shape_cfg.DATA.PROXY_REP_SIZE,
                                                       log_save_path=logs_save_path,
                                                       load_logs=load_logs,
