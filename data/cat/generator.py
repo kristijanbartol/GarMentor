@@ -570,22 +570,22 @@ class DNDataGenerator(DataGenerator):
             bbox=np.empty(0,)       # TODO: Remove as it is unrealiable at this stage.
         )
     
-    @staticmethod
-    def _check_style_blacklist(style):
+    def _check_style_blacklist(
+            self,
+            style
+        ):
         if not os.path.exists('invalid_styles.npy'):
             invalid_styles = []
         else:
             invalid_styles = np.load('invalid_styles.npy')
-        is_invalid = False
+        is_blacklisted = False
         for invalid_style in invalid_styles:
             if np.array_equal(style[0], invalid_style[0]) and np.array_equal(style[1], invalid_style[1]):
-                print('WARNING: Loaded blacklisted style! Setting the baseline value.')
-                is_invalid = True
+                self.skip_counter += 1
+                print(f'WARNING: Loaded blacklisted style! Increasing the skip counter ({self.skip_counter})...')
+                is_blacklisted = True
                 break
-        if is_invalid:
-            style[0] = np.load('top_baseline.npy')
-            style[1] = np.load('bottom_baseline.npy')
-        return style
+        return is_blacklisted
     
     @staticmethod
     def _verify_cuda(
@@ -608,6 +608,8 @@ class DNDataGenerator(DataGenerator):
         ) -> bool:
         print(torch.any(rgb_img, dim=-1).sum())
         if torch.any(rgb_img, dim=-1).sum() > 0.125 * rgb_img.shape[0] * rgb_img.shape[1]:
+            self.skip_counter += 1
+            print(f'WARNING: Appearance wrong! DrapeNet example broken. Increasing skip counter ({self.skip_counter})...')
             return False
         else:
             return True
@@ -617,7 +619,8 @@ class DNDataGenerator(DataGenerator):
             clothed_visualizer,
             params_dict
         ):
-        params_dict['style'] = self._check_style_blacklist(params_dict['style'])
+        if self._check_style_blacklist(params_dict['style']):
+            return None, None, None, False
         rgb_img, seg_maps, joints_3d = clothed_visualizer.vis_from_params(
             pose=params_dict['pose'],
             shape=params_dict['shape'],
@@ -628,8 +631,6 @@ class DNDataGenerator(DataGenerator):
             current_style=params_dict['style']
         )
         rgb_ok = self._verify_appearance(rgb_img)
-        if not rgb_ok:
-            self.skip_counter += 1
         return rgb_img, seg_maps, joints_3d, rgb_ok
 
     def generate_sample(

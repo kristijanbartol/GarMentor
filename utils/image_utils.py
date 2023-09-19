@@ -1,8 +1,9 @@
-from typing import Union, Tuple
+from typing import cast, Union, Tuple
 import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
+import torchvision.transforms.functional as F
 from kornia.geometry.transform import resize, translate
 
 
@@ -88,10 +89,10 @@ def _np_get_new_wh(
     return int(img_wh * scaling_factor)
 
 
-def _np_get_center_offset(
-        img_dims: np.ndarray,
-        scaling_factor: float
-    ) -> np.ndarray:
+def _get_center_offset(
+        img_dims,
+        scaling_factor
+    ):
     return (img_dims / 2) * (scaling_factor - 1)
 
 
@@ -131,7 +132,6 @@ def _np_rescale_retaining_center(
     )
     return final_img
 
-
 def _np_rescale_segmaps(
         seg_maps: np.ndarray,
         new_wh: int,
@@ -161,7 +161,7 @@ def normalize_features(
         img_wh=rgb_img.shape[0],
         scaling_factor=scaling_factor
     )
-    center_offset = _np_get_center_offset(
+    center_offset = _get_center_offset(
         img_dims=np.array(rgb_img.shape[:2]),
         scaling_factor=scaling_factor
     )
@@ -179,8 +179,53 @@ def normalize_features(
     return rgb_img, seg_maps, joints_2d
 
 
-def random_translate(img):
-    pass
+def augment_features(
+        rgb_img: torch.Tensor, 
+        seg_maps: torch.Tensor,
+        joints_2d: torch.Tensor,
+        h_range: Tuple[float, float] = (-0.1, 0.25), 
+        w_range: Tuple[float, float] = (-0.1, 0.1), 
+        scale_range: Tuple[float, float] = (-0.95, 1.3)
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    batch_size, _, height, width = rgb_img.shape
+    h_offset = torch.randint(
+        low=int(height * h_range[0]), 
+        high=int(height * h_range[1]), 
+        size=(batch_size,)
+    )
+    w_offset = torch.randint(
+        low=int(width * w_range[0]),
+        high=int(width * w_range[1]),
+        size=(batch_size,)
+    )
+    scale = torch.FloatTensor(batch_size).uniform_(
+        from_=scale_range[0], 
+        to=scale_range[1]
+    )
+
+    center_h = height // 2
+    center_w = width // 2
+    new_center_h = center_h * scale + h_offset
+    new_center_w = center_w * scale + w_offset
+    w_offset -= (new_center_w - new_center_w)
+    h_offset -= (new_center_h - new_center_h)
+
+    rgb_img = F.affine(
+        img=rgb_img,
+        angle=0,
+        translate=[int(h_offset), int(w_offset)],
+        scale=1.,
+        shear=[0, 0]
+    )
+    seg_maps = F.affine(
+        img=seg_maps,
+        angle=0,
+        translate=[int(h_offset), int(w_offset)],
+        scale=1.,
+        shear=[0, 0]
+    )
+    joints_2d = joints_2d * scale - torch.Tensor([h_offset, w_offset])
+    return rgb_img, seg_maps, joints_2d
 
 
 def convert_bbox_corners_to_centre_hw(bbox_corners):

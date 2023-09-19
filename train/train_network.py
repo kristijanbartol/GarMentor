@@ -13,6 +13,7 @@ from utils.cam_utils import (
     perspective_project_torch, 
     orthographic_project_torch
 )
+from utils.image_utils import augment_features
 from utils.rigid_transform_utils import rot6d_to_rotmat
 from utils.label_conversions import (
     ALL_JOINTS_TO_H36M_MAP, 
@@ -153,7 +154,15 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
 
                     seg_maps = sample_batch['seg_maps'].to(device)
                     rgb_in = sample_batch['rgb_img'].to(device)
-                    # Add background rgb
+
+                    if pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.APPLY_FLAG:
+                        rgb_in, seg_maps, target_joints2d_visib = augment_features(
+                            rgb_img=rgb_in,
+                            seg_maps=seg_maps,
+                            joints_2d=target_joints2d_visib
+                        )
+                        
+                    # Add background to the RGB.
                     # NOTE: The last seg map (-1) is the whole body seg map.
                     if rgb_in is not None:
                         rgb_in = add_rgb_background(backgrounds=background,
@@ -199,10 +208,10 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                         proxy_rep_input = torch.cat([heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
                     elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 18:
                         proxy_rep_input = torch.cat([edge_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
-                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 20:
-                        proxy_rep_input = torch.cat([rgb_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
                     elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 22 - seg_channels_diff:
                         proxy_rep_input = torch.cat([seg_maps, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
+                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 20:
+                        proxy_rep_input = torch.cat([rgb_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
                     elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 3:
                         proxy_rep_input = torch.cat([rgb_in], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
                     elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 1:
