@@ -90,13 +90,25 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
     mean_cam_t = torch.Tensor(pose_shape_cfg.TRAIN.SYNTH_DATA.MEAN_CAM_T).float().to(device)
     mean_cam_t = mean_cam_t[None, :].expand(pose_shape_cfg.TRAIN.BATCH_SIZE, -1)
 
+    if pose_shape_cfg.TRAIN.STORE_PRED:
+        npz_dict = {
+            'pose_gt': [],
+            'shape_gt': [],
+            'style_gt': [],
+            'style_mean': [],
+            'style_scale': []
+        }
     # Starting training loop
     for epoch in range(current_epoch, pose_shape_cfg.TRAIN.NUM_EPOCHS):
         print('\nEpoch {}/{}'.format(epoch, pose_shape_cfg.TRAIN.NUM_EPOCHS - 1))
         print('-' * 10)
         metrics_tracker.initialise_loss_metric_sums(pose_shape_cfg.MODEL)
 
-        for split in ['train', 'val']:
+        data_splits = ['train', 'val']
+        if pose_shape_cfg.TRAIN.STORE_PRED:
+            data_splits = ['val']
+
+        for split in data_splits:
             if split == 'train':
                 print('Training.')
                 pose_shape_model.train()
@@ -156,10 +168,11 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     rgb_in = sample_batch['rgb_img'].to(device)
 
                     if pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.APPLY_FLAG:
-                        rgb_in, seg_maps, target_joints2d_visib = augment_features(
+                        rgb_in, seg_maps, target_joints2d = augment_features(
                             rgb_img=rgb_in,
                             seg_maps=seg_maps,
-                            joints_2d=target_joints2d_visib
+                            joints_2d=target_joints2d,
+                            device=device
                         )
                         
                     # Add background to the RGB.
@@ -308,6 +321,13 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     if split == 'train':
                         loss.backward()
                         optimiser.step()
+                    else:
+                        if pose_shape_cfg.TRAIN.STORE_PRED:
+                            npz_dict['pose_gt'].append(target_pose.detach().cpu().numpy())
+                            npz_dict['shape_gt'].append(target_shape.detach().cpu().numpy())
+                            npz_dict['style_gt'].append(target_style_vector.detach().cpu().numpy())
+                            npz_dict['style_mean'].append(pred_style_mean.detach().cpu().numpy())
+                            npz_dict['style_scale'].append(pred_style_params.scale.detach().cpu().numpy())
 
                 #############################################################
                 # --------------------- TRACK METRICS ----------------------
@@ -357,6 +377,13 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                         std=pose_shape_cfg.DATA.HEATMAP_GAUSSIAN_STD
                     )
                     vis_logger.vis_heatmaps(pred_joints2d_coco_heatmaps, label='pred_coco')
+
+        if pose_shape_cfg.TRAIN.STORE_PRED:
+            for key in npz_dict:
+                npz_dict[key] = np.concatenate(npz_dict[key], axis=0)
+            np.savez(f'output/pred_{epoch-1}.npz', **npz_dict)
+            print(f'Saved predictions for model in epoch {epoch-1}... Exiting...')
+            exit()
 
         #############################################################
         # ------------- UPDATE METRICS HISTORY and SAVE -------------

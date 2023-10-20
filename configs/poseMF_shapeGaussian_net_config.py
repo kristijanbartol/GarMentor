@@ -58,6 +58,7 @@ _C.TRAIN.PIN_MEMORY = True
 _C.TRAIN.NUM_WORKERS = 2
 _C.TRAIN.GARMENT_PAIRS = ['t-shirt+pant']
 _C.TRAIN.PARAM_CFG_LABEL = 7
+_C.TRAIN.STORE_PRED = False
 
 # Train - Synthetic Data
 _C.TRAIN.SYNTH_DATA = CfgNode()

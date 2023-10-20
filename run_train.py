@@ -56,6 +56,9 @@ def run_train(device,
         pose_shape_cfg.merge_from_file(config_save_path)
         print('\nResuming from:', checkpoint_path)
 
+    if pose_shape_cfg.TRAIN.STORE_PRED:
+        assert(resume_from_epoch)
+
     print('\n', pose_shape_cfg)
     # ------------------------- Datasets -------------------------
     dataset_class = TNCATDataset if pose_shape_cfg.MODEL.GARMENT_MODEL == 'tn' else DNCATDataset

@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
-import torchvision.transforms.functional as F
+from torchvision.transforms.functional import affine
 from kornia.geometry.transform import resize, translate
 
 
@@ -183,48 +183,50 @@ def augment_features(
         rgb_img: torch.Tensor, 
         seg_maps: torch.Tensor,
         joints_2d: torch.Tensor,
+        device: str,
         h_range: Tuple[float, float] = (-0.1, 0.25), 
         w_range: Tuple[float, float] = (-0.1, 0.1), 
-        scale_range: Tuple[float, float] = (-0.95, 1.3)
+        #scale_range: Tuple[float, float] = (-0.95, 1.3),    #### Maybe -0.95 is a reason this didn't work!!!
+        scale_range: Tuple[float, float] = (0.95, 1.3),    #### Maybe -0.95 is a reason this didn't work!!!
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     batch_size, _, height, width = rgb_img.shape
     h_offset = torch.randint(
         low=int(height * h_range[0]), 
         high=int(height * h_range[1]), 
-        size=(batch_size,)
+        size=(batch_size,),
+        device=device
     )
     w_offset = torch.randint(
         low=int(width * w_range[0]),
         high=int(width * w_range[1]),
-        size=(batch_size,)
+        size=(batch_size,),
+        device=device
     )
-    scale = torch.FloatTensor(batch_size).uniform_(
-        from_=scale_range[0], 
-        to=scale_range[1]
-    )
+    scale = torch.rand(batch_size, device=device) * (scale_range[1] - scale_range[0]) + scale_range[0]
 
     center_h = height // 2
     center_w = width // 2
     new_center_h = center_h * scale + h_offset
     new_center_w = center_w * scale + w_offset
-    w_offset -= (new_center_w - new_center_w)
-    h_offset -= (new_center_h - new_center_h)
+    w_offset -= (new_center_w - center_w).long()
+    h_offset -= (new_center_h - center_h).long()
 
-    rgb_img = F.affine(
+    # NOTE: For now, using a single translate/scale for the whole batch.
+    rgb_img = affine(
         img=rgb_img,
         angle=0,
-        translate=[int(h_offset), int(w_offset)],
-        scale=1.,
+        translate=[int(h_offset[0]), int(w_offset[0])],
+        scale=float(scale[0]),
         shear=[0, 0]
     )
-    seg_maps = F.affine(
+    seg_maps = affine(
         img=seg_maps,
         angle=0,
-        translate=[int(h_offset), int(w_offset)],
-        scale=1.,
+        translate=[int(h_offset[0]), int(w_offset[0])],
+        scale=float(scale[0]),
         shear=[0, 0]
     )
-    joints_2d = joints_2d * scale - torch.Tensor([h_offset, w_offset])
+    joints_2d = joints_2d * scale[0] - torch.stack([h_offset[0], w_offset[0]], dim=0)
     return rgb_img, seg_maps, joints_2d
 
 

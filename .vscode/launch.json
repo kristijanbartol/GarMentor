@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--gpu", "1"
+                //"--gpu", "1"
             ]
         },
 
@@ -41,6 +41,21 @@
                 "-E", "experiments/tmp", 
                 "--gpu", "0",
                 "-G", "female"
+            ]
+        },
+
+        {
+            "name": "Resume Train (Eval)",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "-E", "experiments/drapenet-50k", 
+                "--gpu", "0",
+                "-G", "female",
+                "-R", "10"
             ]
         },
 
@@ -74,7 +89,8 @@
             "args": [
                 "-G", "female", 
                 "-N", "50000",
-                "--preextract"
+                "--preextract",
+                "--img_wh", "1024"
             ]
         },
 
@@ -133,6 +149,20 @@
                 //"--dataset", "3dpw"
             ]
         },
+
+        {
+            "name": "Predict (BEDLAM-Cherry)",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--pose_shape_weights", "experiments/drapenet-50k/saved_models/epoch_013.tar",
+                "--cropped_images"
+            ]
+        },
+
 
         {
             "name": "(Pre-Process) Evaluate",
