@@ -15,7 +15,7 @@ from models.fully_parametric_net import FullyParametricNet
 from models.smpl_official import SMPL
 from models.poseMF_shapeGaussian_net import PoseMFShapeGaussianNet
 from models.canny_edge_detector import CannyEdgeDetector
-from models.parametric_model import ParametricModel
+from models.parametric.tn import ParametricModel
 #from evaluate.evaluate_poseMF_shapeGaussian_net import evaluate_pose_MF_shapeGaussian_net
 from evaluate.evaluate_poseMF_shapeGaussian_net import evaluate_pose_MF_shapeGaussian_net
 from rendering.body import BodyRenderer

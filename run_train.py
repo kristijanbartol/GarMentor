@@ -1,5 +1,8 @@
 import os
-from data.datasets.cat import CATDataset
+from data.datasets.cat import (
+    DNCATDataset,
+    TNCATDataset
+)
 import torch
 import torch.cuda
 import torch.optim as optim
@@ -53,16 +56,22 @@ def run_train(device,
         pose_shape_cfg.merge_from_file(config_save_path)
         print('\nResuming from:', checkpoint_path)
 
+    if pose_shape_cfg.TRAIN.STORE_PRED:
+        assert(resume_from_epoch)
+
     print('\n', pose_shape_cfg)
     # ------------------------- Datasets -------------------------
-    train_dataset = CATDataset(
+    dataset_class = TNCATDataset if pose_shape_cfg.MODEL.GARMENT_MODEL == 'tn' else DNCATDataset
+    train_dataset = dataset_class(
+        garment_model=pose_shape_cfg.MODEL.GARMENT_MODEL,
         gender=gender,
         data_split='train',
         train_val_ratio=0.8,
         backgrounds_dir_path=paths.TRAIN_BACKGROUNDS_PATH,
         img_wh=pose_shape_cfg.DATA.PROXY_REP_SIZE
     )
-    val_dataset = CATDataset(
+    val_dataset = dataset_class(
+        garment_model=pose_shape_cfg.MODEL.GARMENT_MODEL,
         gender=gender,
         data_split='valid',
         train_val_ratio=0.8,

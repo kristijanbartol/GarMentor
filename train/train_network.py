@@ -13,6 +13,7 @@ from utils.cam_utils import (
     perspective_project_torch, 
     orthographic_project_torch
 )
+from utils.image_utils import augment_features
 from utils.rigid_transform_utils import rot6d_to_rotmat
 from utils.label_conversions import (
     ALL_JOINTS_TO_H36M_MAP, 
@@ -78,7 +79,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
         load_logs = False
 
     # Instantiate metrics tracker
-    metrics_tracker = TrainingLossesAndMetricsTracker(metrics_to_track=metrics,
+    metrics_tracker = TrainingLossesAndMetricsTracker(garment_model=pose_shape_cfg.MODEL.GARMENT_MODEL,
+                                                      metrics_to_track=metrics,
                                                       img_wh=pose_shape_cfg.DATA.PROXY_REP_SIZE,
                                                       log_save_path=logs_save_path,
                                                       load_logs=load_logs,
@@ -88,13 +90,25 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
     mean_cam_t = torch.Tensor(pose_shape_cfg.TRAIN.SYNTH_DATA.MEAN_CAM_T).float().to(device)
     mean_cam_t = mean_cam_t[None, :].expand(pose_shape_cfg.TRAIN.BATCH_SIZE, -1)
 
+    if pose_shape_cfg.TRAIN.STORE_PRED:
+        npz_dict = {
+            'pose_gt': [],
+            'shape_gt': [],
+            'style_gt': [],
+            'style_mean': [],
+            'style_scale': []
+        }
     # Starting training loop
     for epoch in range(current_epoch, pose_shape_cfg.TRAIN.NUM_EPOCHS):
         print('\nEpoch {}/{}'.format(epoch, pose_shape_cfg.TRAIN.NUM_EPOCHS - 1))
         print('-' * 10)
-        metrics_tracker.initialise_loss_metric_sums()
+        metrics_tracker.initialise_loss_metric_sums(pose_shape_cfg.MODEL)
 
-        for split in ['train', 'val']:
+        data_splits = ['train', 'val']
+        if pose_shape_cfg.TRAIN.STORE_PRED:
+            data_splits = ['val']
+
+        for split in data_splits:
             if split == 'train':
                 print('Training.')
                 pose_shape_model.train()
@@ -152,7 +166,16 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
 
                     seg_maps = sample_batch['seg_maps'].to(device)
                     rgb_in = sample_batch['rgb_img'].to(device)
-                    # Add background rgb
+
+                    if pose_shape_cfg.TRAIN.SYNTH_DATA.AUGMENT.APPLY_FLAG:
+                        rgb_in, seg_maps, target_joints2d = augment_features(
+                            rgb_img=rgb_in,
+                            seg_maps=seg_maps,
+                            joints_2d=target_joints2d,
+                            device=device
+                        )
+                        
+                    # Add background to the RGB.
                     # NOTE: The last seg map (-1) is the whole body seg map.
                     if rgb_in is not None:
                         rgb_in = add_rgb_background(backgrounds=background,
@@ -190,24 +213,25 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                         heatmaps = heatmaps * target_joints2d_visib[:, :, None, None]
 
                     # Concatenate edge-image and 2D joint heatmaps to create input proxy representation
-                    if pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 23:
+                    seg_channels_diff = 2 if pose_shape_cfg.MODEL.GARMENT_MODEL == 'dn' else 0
+                    if pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 23 - seg_channels_diff:
                         #np.repeat((seg_maps[:, -1][None, 0] * 255).detach().cpu().numpy(), 3, axis=0)
                         proxy_rep_input = torch.cat([edge_in, seg_maps, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh)
                     elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 17:
                         proxy_rep_input = torch.cat([heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
                     elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 18:
                         proxy_rep_input = torch.cat([edge_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
+                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 22 - seg_channels_diff:
+                        proxy_rep_input = torch.cat([seg_maps, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
                     elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 20:
                         proxy_rep_input = torch.cat([rgb_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
-                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 22:
-                        proxy_rep_input = torch.cat([seg_maps, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
                     elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 3:
                         proxy_rep_input = torch.cat([rgb_in], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
                     elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 1:
                         proxy_rep_input = torch.cat([edge_in], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
-                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 5:
+                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 5 - seg_channels_diff:
                         proxy_rep_input = torch.cat([seg_maps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
-                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 6:
+                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 6 - seg_channels_diff:
                         proxy_rep_input = torch.cat([edge_in, seg_maps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
 
                 with torch.set_grad_enabled(split == 'train'): #type:ignore
@@ -297,6 +321,13 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                     if split == 'train':
                         loss.backward()
                         optimiser.step()
+                    else:
+                        if pose_shape_cfg.TRAIN.STORE_PRED:
+                            npz_dict['pose_gt'].append(target_pose.detach().cpu().numpy())
+                            npz_dict['shape_gt'].append(target_shape.detach().cpu().numpy())
+                            npz_dict['style_gt'].append(target_style_vector.detach().cpu().numpy())
+                            npz_dict['style_mean'].append(pred_style_mean.detach().cpu().numpy())
+                            npz_dict['style_scale'].append(pred_style_params.scale.detach().cpu().numpy())
 
                 #############################################################
                 # --------------------- TRACK METRICS ----------------------
@@ -346,6 +377,13 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                         std=pose_shape_cfg.DATA.HEATMAP_GAUSSIAN_STD
                     )
                     vis_logger.vis_heatmaps(pred_joints2d_coco_heatmaps, label='pred_coco')
+
+        if pose_shape_cfg.TRAIN.STORE_PRED:
+            for key in npz_dict:
+                npz_dict[key] = np.concatenate(npz_dict[key], axis=0)
+            np.savez(f'output/pred_{epoch-1}.npz', **npz_dict)
+            print(f'Saved predictions for model in epoch {epoch-1}... Exiting...')
+            exit()
 
         #############################################################
         # ------------- UPDATE METRICS HISTORY and SAVE -------------

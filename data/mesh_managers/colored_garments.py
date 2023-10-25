@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import Dict, List, Union
 import torch
 import numpy as np
 from pytorch3d.structures import Meshes
@@ -12,6 +12,7 @@ from data.mesh_managers.common import (
     default_body_color,
     random_pallete_color
 )
+from utils.drapenet_structure import DrapeNetStructure
 from utils.mesh_utils import concatenate_meshes
 from vis.colors import GarmentColors, BodyColors
 
@@ -33,7 +34,7 @@ class ColoredGarmentsMeshManager(MeshManager):
 
     def create_meshes(
             self,
-            smpl_output_dict: Dict[str, SMPL4GarmentOutput],
+            garment_output_dict: Dict[str, Union[SMPL4GarmentOutput, DrapeNetStructure]],
             device: str = 'cpu'
     ) -> List[Meshes]:
         ''' Extract trimesh Meshes from SMPL4Garment output (verts and faces).
@@ -49,14 +50,14 @@ class ColoredGarmentsMeshManager(MeshManager):
             three meshes are returnned as a result of this method.
         '''
         verts_list = [
-            smpl_output_dict['upper'].body_verts,
-            smpl_output_dict['upper'].garment_verts,
-            smpl_output_dict['lower'].garment_verts
+            garment_output_dict['upper'].body_verts,
+            garment_output_dict['upper'].garment_verts,
+            garment_output_dict['lower'].garment_verts
         ]
         faces_list = [
-            smpl_output_dict['upper'].body_faces,
-            smpl_output_dict['upper'].garment_faces,
-            smpl_output_dict['lower'].garment_faces
+            garment_output_dict['upper'].body_faces,
+            garment_output_dict['upper'].garment_faces,
+            garment_output_dict['lower'].garment_faces
         ]
         
         if self.config.VISUALIZATION.DEFAULT_MESH_COLORS:

@@ -282,10 +282,10 @@ class PoseMFShapeGaussianLoss(nn.Module):
                 if self.model_config.DETERMINISTIC:
                     style_loss = self.determ_style_loss(pred_dict['style_params'], target_dict['style_params'])
                 else:
-                    #style_loss_per_class = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=4)
-                    style_loss = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=4)
+                    #style_loss_per_class = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=2)
+                    style_loss = -(pred_dict['style_params'].log_prob(target_dict['style_params']).sum(dim=2)) # (batch_size, num_classes=2)
                     # NOTE: Only 2/4 (if num_classes=4) NLL losses are non-zero, others are masked.
-                    #style_loss = target_dict['garment_labels'] * style_loss_per_class                                    # (batch_size, num_classes=4)
+                    #style_loss = target_dict['garment_labels'] * style_loss_per_class                                    # (batch_size, num_classes=2)
                     if self.loss_config.REDUCTION == 'mean':
                         style_loss = torch.mean(style_loss)
                     elif self.loss_config.REDUCTION == 'sum':

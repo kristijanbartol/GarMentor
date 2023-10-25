@@ -11,6 +11,7 @@ class TrainingLossesAndMetricsTracker:
     training. Updates loss and metrics history at end of each epoch.
     """
     def __init__(self,
+                 garment_model,
                  metrics_to_track,
                  img_wh,
                  log_save_path,
@@ -37,10 +38,12 @@ class TrainingLossesAndMetricsTracker:
             self.metrics_to_track.remove('shape')
             self.metrics_to_track.append('shape_method')
             self.metrics_to_track.append('shape_baseline')
+            self.shape_baseline = np.zeros(10,)
         if 'style' in self.metrics_to_track:
             self.metrics_to_track.remove('style')
             self.metrics_to_track.append('style_method')
             self.metrics_to_track.append('style_baseline')
+            self.style_baseline = self._load_style_baseline(garment_model)
         self.img_wh = img_wh
         self.log_save_path = log_save_path
 
@@ -52,6 +55,18 @@ class TrainingLossesAndMetricsTracker:
                 self.epochs_history[metric_type] = []
 
         self.loss_metric_sums = None
+
+    @staticmethod
+    def _load_style_baseline(garment_model):
+        if garment_model == 'tn':
+            return np.zeros((2, 4))
+        else:
+            top_baseline = np.load('top_baseline.npy')
+            bottom_baseline = np.load('bottom_baseline.npy')
+            return np.stack([
+                top_baseline,
+                bottom_baseline
+            ], axis=0)
 
     def load_history(self, load_log_path, current_epoch):
         """
@@ -83,7 +98,7 @@ class TrainingLossesAndMetricsTracker:
 
         return history
 
-    def initialise_loss_metric_sums(self):
+    def initialise_loss_metric_sums(self, train_cfg):
         self.loss_metric_sums = {'train_losses': 0., 'val_losses': 0.,
                                  'train_num_samples': 0, 'val_num_samples': 0}
 
@@ -95,9 +110,9 @@ class TrainingLossesAndMetricsTracker:
                 self.loss_metric_sums['val_num_visib_joints2Dsamples'] = 0.
                 self.loss_metric_sums[metric_type] = 0.
             elif 'shape_method' in metric_type:
-                self.loss_metric_sums[metric_type] = np.zeros(11,)
+                self.loss_metric_sums[metric_type] = np.zeros(1 + train_cfg.NUM_SMPL_BETAS,)
             elif 'style_method' in metric_type:
-                self.loss_metric_sums[metric_type] = np.zeros(11,)
+                self.loss_metric_sums[metric_type] = np.zeros(1 + 2 + train_cfg.NUM_STYLE_PARAMS * 2,)
             else:
                 self.loss_metric_sums[metric_type] = 0.
 
@@ -169,7 +184,8 @@ class TrainingLossesAndMetricsTracker:
             shape_params_method_batch = np.mean(np.abs(pred_dict['shape_params'] - target_dict['shape_params']), axis=-1)
             shape_params_method_components = np.abs(pred_dict['shape_params'] - target_dict['shape_params'])
             shape_params_method_sum = np.hstack((np.sum(shape_params_method_batch), np.sum(shape_params_method_components, axis=0)))
-            shape_params_baseline_batch = np.mean(np.abs(np.zeros_like(pred_dict['shape_params']) - target_dict['shape_params']), axis=-1)
+            #shape_params_baseline_batch = np.mean(np.abs(np.zeros_like(pred_dict['shape_params']) - target_dict['shape_params']), axis=-1)
+            shape_params_baseline_batch = np.mean(np.abs(np.repeat(self.shape_baseline[np.newaxis], batch_size, axis=0) - target_dict['shape_params']), axis=-1)
             self.loss_metric_sums[split + '_shape_method'] += shape_params_method_sum
             self.loss_metric_sums[split + '_shape_baseline'] += np.sum(shape_params_baseline_batch)
 
@@ -180,7 +196,8 @@ class TrainingLossesAndMetricsTracker:
                 np.sum(np.mean(abs_diff, -1), 0),               # sum of (B, M) -> (N,) -> (2,)
                 np.ravel(np.sum(abs_diff, 0))                   # sum B -> (N, M), i.e., (2, 4) -> 8
             ))
-            style_params_baseline_batch = np.mean(np.mean(np.abs(np.zeros_like(pred_dict['style_params']) - target_dict['style_params']), axis=-1), axis=-1)
+            #style_params_baseline_batch = np.mean(np.mean(np.abs(np.zeros_like(pred_dict['style_params']) - target_dict['style_params']), axis=-1), axis=-1)
+            style_params_baseline_batch = np.mean(np.mean(np.abs(np.repeat(self.style_baseline[np.newaxis], batch_size, axis=0) - target_dict['style_params']), axis=-1), axis=-1)
             self.loss_metric_sums[split + '_style_method'] += method_sums
             self.loss_metric_sums[split + '_style_baseline'] += np.sum(style_params_baseline_batch)
 
