@@ -574,10 +574,10 @@ class DNDataGenerator(DataGenerator):
             self,
             style
         ):
-        if not os.path.exists('invalid_styles.npy'):
+        if not os.path.exists('model_files/invalid_styles.npy'):
             invalid_styles = []
         else:
-            invalid_styles = np.load('invalid_styles.npy')
+            invalid_styles = np.load('model_files/invalid_styles.npy')
         is_blacklisted = False
         for invalid_style in invalid_styles:
             if np.array_equal(style[0], invalid_style[0]) and np.array_equal(style[1], invalid_style[1]):
@@ -593,12 +593,12 @@ class DNDataGenerator(DataGenerator):
             current_style
         ) -> None:
         if rgb_img is None:
-            if not os.path.exists('invalid_styles.npy'):
+            if not os.path.exists('model_files/invalid_styles.npy'):
                 invalid_styles = []
             else:
-                invalid_styles = list(np.load('invalid_styles.npy'))
+                invalid_styles = list(np.load('model_files/invalid_styles.npy'))
             invalid_styles.append(current_style)
-            np.save('invalid_styles.npy', np.array(invalid_styles))
+            np.save('model_files/invalid_styles.npy', np.array(invalid_styles))
             print(f'Runtime error! Logged this sample to the invalid ones ({len(invalid_styles)}). Now exiting...')
             exit()
     
@@ -740,7 +740,8 @@ class DNDataGenerator(DataGenerator):
         parameters = DNParameters(param_cfg=param_cfg)
         clothed_visualizer = DNClothedVisualizer(
             device=self.device,
-            gender=gender
+            gender=gender,
+            img_wh=img_wh
         )
         dataset_dirs = get_dataset_dirs(
             param_cfg=param_cfg,

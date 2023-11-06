@@ -61,8 +61,8 @@ class TrainingLossesAndMetricsTracker:
         if garment_model == 'tn':
             return np.zeros((2, 4))
         else:
-            top_baseline = np.load('top_baseline.npy')
-            bottom_baseline = np.load('bottom_baseline.npy')
+            top_baseline = np.load('model_files/top_baseline.npy')
+            bottom_baseline = np.load('model_files/bottom_baseline.npy')
             return np.stack([
                 top_baseline,
                 bottom_baseline

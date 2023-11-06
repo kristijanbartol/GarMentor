@@ -225,7 +225,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                         proxy_rep_input = torch.cat([seg_maps, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
                     elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 20:
                         proxy_rep_input = torch.cat([rgb_in, heatmaps], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
-                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 3:
+                    elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 3 and seg_channels_diff != 2:
                         proxy_rep_input = torch.cat([rgb_in], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
                     elif pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 1:
                         proxy_rep_input = torch.cat([edge_in], dim=1).float()  # (batch_size, C, img_wh, img_wh) #type:ignore
