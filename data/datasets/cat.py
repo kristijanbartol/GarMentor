@@ -223,7 +223,7 @@ class CATDataset(Dataset):
         Get the sample based on index, which can be a list of indices.
         """
         seg_maps = np.load(self.seg_maps_paths[idx])['seg_maps']
-        seg_maps = np.flip(seg_maps, axis=1)
+        #seg_maps = np.flip(seg_maps, axis=1)
         rgb_img = imageio.imread(self.rgb_img_paths[idx]).transpose(2, 0, 1)[::-1] / 255
         style_vector = self.getitem_style(idx)
 

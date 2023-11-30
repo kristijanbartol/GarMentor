@@ -470,7 +470,7 @@ class TNDataGenerator(DataGenerator):
             img_wh: int,
             num_samples_to_reach: int,
             upper_class: str,
-            lower_class: str,
+            lower_class: str
         ) -> None:
         """
         (Pre-)generate the dataset for particular upper+lower garment class.
@@ -804,7 +804,7 @@ def generate_tn(args):
         img_wh=args.img_wh,
         num_samples_to_reach=args.num_samples,
         upper_class=args.upper_class,
-        lower_class=args.lower_class,
+        lower_class=args.lower_class
     )
 
 

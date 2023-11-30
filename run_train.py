@@ -28,6 +28,7 @@ def run_train(device,
               experiment_dir,
               pose_shape_cfg_opts=None,
               resume_from_epoch=None,
+              store_pred=False,
               visdom=None):
 
     pose_shape_cfg = get_cfg_defaults()
@@ -56,7 +57,7 @@ def run_train(device,
         pose_shape_cfg.merge_from_file(config_save_path)
         print('\nResuming from:', checkpoint_path)
 
-    if pose_shape_cfg.TRAIN.STORE_PRED:
+    if store_pred:
         assert(resume_from_epoch)
 
     print('\n', pose_shape_cfg)
@@ -107,7 +108,8 @@ def run_train(device,
         vis_logger = VisLogger(
             device=device,
             visdom=visdom, 
-            smpl_model=smpl_model
+            smpl_model=smpl_model,
+            img_wh=pose_shape_cfg.DATA.PROXY_REP_SIZE
         )
 
     # ------------------------- Loss Function + Optimiser -------------------------
@@ -139,7 +141,8 @@ def run_train(device,
                                    model_save_dir=model_save_dir,
                                    logs_save_path=logs_save_path,
                                    checkpoint=checkpoint,
-                                   vis_logger=vis_logger)
+                                   vis_logger=vis_logger,
+                                   store_pred=store_pred)
 
 
 if __name__ == '__main__':
@@ -153,6 +156,8 @@ if __name__ == '__main__':
     parser.add_argument('--resume_from_epoch', '-R', type=int, default=None,
                         help='Epoch to resume experiment from. If resuming, experiment_dir must already exist, with saved model checkpoints and config yaml file.')
     parser.add_argument('--vis', dest='vis', action='store_true', 
+                        help='(optional) whether or not to visualize training progress details over time using Visdom')
+    parser.add_argument('--store_pred', dest='store_pred', action='store_true', 
                         help='(optional) whether or not to visualize training progress details over time using Visdom')
     parser.add_argument('--vport', type=int, default=8888,
                         help='Epoch to resume experiment from. If resuming, experiment_dir must already exist, with saved model checkpoints and config yaml file.')
@@ -175,4 +180,5 @@ if __name__ == '__main__':
               experiment_dir=args.experiment_dir,
               pose_shape_cfg_opts=args.pose_shape_cfg_opts,
               resume_from_epoch=args.resume_from_epoch,
+              store_pred=args.store_pred,
               visdom=visdom)

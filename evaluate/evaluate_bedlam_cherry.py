@@ -140,6 +140,7 @@ def generate_pred_sample(
         pred_dict,
         clothed_visualizer
     ):
+    #pred_dict['style_mean'] = np.flip(pred_dict['style_mean'], axis=0).copy()
     pred_rgb, pred_segmaps = generate_sample(
         pred_dict=pred_dict,
         clothed_visualizer=clothed_visualizer

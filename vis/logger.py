@@ -23,7 +23,8 @@ class VisLogger():
             self, 
             device: str, 
             visdom: Visdom, 
-            smpl_model: SMPL
+            smpl_model: SMPL,
+            img_wh: int
         ) -> None:
         """
         A visualization logger constructor.
@@ -37,7 +38,8 @@ class VisLogger():
         self.visdom = visdom
         self.kpts_vis = KeypointsVisualizer(
             device=self.device,
-            smpl_model=smpl_model
+            smpl_model=smpl_model,
+            img_wh=img_wh
         )
         self.body_vis = BodyVisualizer(
             device=self.device,
@@ -64,7 +66,22 @@ class VisLogger():
         Visualize a batch of edge maps.
         """
         edge_in_rgb = torch.cat((edge_in,) * 3, dim=1).squeeze(dim=2) * 255
-        self.visdom.images(edge_in_rgb[:self._nrow], nrow=self._nrow, win=label)
+        self.visdom.images(edge_in_rgb[:self._nrow], nrow=self._nrow, win=label, opts={'title': label})
+
+    def vis_segmaps(
+            self, 
+            segmaps: torch.Tensor,
+            label: Optional[str] = 'segmaps'
+        ) -> None:
+        """
+        Visualize a batch of edge maps.
+        """
+        upper_map_rgb = segmaps[:, 0][:, None].repeat(1, 3, 1, 1)
+        lower_map_rgb = segmaps[:, 1][:, None].repeat(1, 3, 1, 1)
+        whole_map_rgb = segmaps[:, 2][:, None].repeat(1, 3, 1, 1)
+        self.visdom.images(upper_map_rgb[:self._nrow], nrow=self._nrow, win=f'{label}_upper', opts={'title': f'{label}_upper'})
+        self.visdom.images(lower_map_rgb[:self._nrow], nrow=self._nrow, win=f'{label}_lower', opts={'title': f'{label}_lower'})
+        self.visdom.images(whole_map_rgb[:self._nrow], nrow=self._nrow, win=f'{label}_whole', opts={'title': f'{label}_whole'})
 
     def vis_heatmaps(
             self, 

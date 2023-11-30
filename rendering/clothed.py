@@ -199,15 +199,15 @@ class DNClothedRenderer(ClothedRenderer):
         ) -> np.ndarray:
         ''' Organize segmentation maps in the form network will expect them.
 
-            In particular, there will always be five maps: the first two for
-            the lower garment (depending on the lower label), the second two
-            for the upper garment (depending on the upper label), and the
-            final for the whole clothed body.
+            In particular, the maps are created in reverse order (whole body,
+            lower cloth, upper cloth), because of the way the maps are extracted
+            from RGB images. Therefore, the order of the maps have to be
+            inversed.
         '''
         feature_maps = np.zeros((3, seg_maps.shape[1], seg_maps.shape[2]))
-        feature_maps[-1] = seg_maps[0]
-        feature_maps[0] = seg_maps[1]
-        feature_maps[1] = seg_maps[2]
+        feature_maps[2] = seg_maps[0]
+        feature_maps[1] = seg_maps[1]
+        feature_maps[0] = seg_maps[2]
         return feature_maps
 
     def forward(
@@ -225,6 +225,7 @@ class DNClothedRenderer(ClothedRenderer):
             device=device
         )
         rgbs = []
+        # NOTE: Need this particular order because of the way I produce segmaps.
         for mesh_part, mesh in zip(['body', 'upper', 'lower'], meshes):
             print(f'Rendering {mesh_part} mesh...')
             fragments = self.rasterizer(

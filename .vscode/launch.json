@@ -26,7 +26,8 @@
             "args": [
                 "-E", "experiments/tmp", 
                 "--gpu", "0", 
-                "--vport", "8889"
+                "--vport", "8889",
+                "--gender", "female"
             ]
         },
 
@@ -52,10 +53,11 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "-E", "experiments/drapenet-50k", 
+                "-E", "experiments/drapenet-20k-512x512-noheat", 
                 "--gpu", "0",
                 "-G", "female",
-                "-R", "10"
+                "-R", "10",
+                "--store_pred"
             ]
         },
 
@@ -88,9 +90,9 @@
             },
             "args": [
                 "-G", "female", 
-                "-N", "20000",
+                "-N", "100000",
                 "--preextract",
-                "--img_wh", "1024"
+                "--img_wh", "256"
             ]
         },
 
@@ -158,7 +160,7 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--pose_shape_weights", "experiments/drapenet-50k/saved_models/epoch_013.tar",
+                "--pose_shape_weights", "experiments/drapenet-20k-1024x1024-noheat/saved_models/epoch_026.tar",
                 "--cropped_images"
             ]
         },

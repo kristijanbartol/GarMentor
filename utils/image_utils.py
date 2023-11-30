@@ -70,7 +70,7 @@ def np_determine_bbox(img):
 def _np_get_scaling_factor(
         img_wh: int, 
         bbox: np.ndarray, 
-        var: float = 0.0, 
+        var: float = 0.0,   # NOTE: At the moment, no random scaling is applied by default. 
         fraction: float = 0.92
     ) -> float:
     # TODO: Later, either take the max between the height/weight of the bbox OR

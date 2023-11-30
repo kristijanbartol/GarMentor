@@ -153,7 +153,7 @@ def evaluate(
         pred_dict,
         clothed_visualizer
     ):
-    save_dir = 'output/eval/'
+    save_dir = 'output/preds/qualitative/valid/'
     for sample_idx in range(pred_dict['pose_gt'].shape[0]):
         save_path = os.path.join(save_dir, f'{sample_idx}.png')
         if os.path.exists(save_path):
@@ -181,7 +181,7 @@ if __name__ == '__main__':
         device='cuda:0',
         gender='female'
     )
-    pred_dict = np.load('output/pred_10.npz')
+    pred_dict = np.load('output/preds/npz/valid/pred_10.npz')
     evaluate(
         pred_dict=pred_dict,
         clothed_visualizer=clothed_visualizer

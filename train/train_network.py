@@ -44,7 +44,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                                    logs_save_path,
                                    save_val_metrics=['PVE-SC', 'MPJPE-PA'],
                                    checkpoint=None,
-                                   vis_logger=None):
+                                   vis_logger=None,
+                                   store_pred=False):
     # Set up dataloaders
     train_dataloader = DataLoader(train_dataset,
                                   batch_size=pose_shape_cfg.TRAIN.BATCH_SIZE,
@@ -90,7 +91,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
     mean_cam_t = torch.Tensor(pose_shape_cfg.TRAIN.SYNTH_DATA.MEAN_CAM_T).float().to(device)
     mean_cam_t = mean_cam_t[None, :].expand(pose_shape_cfg.TRAIN.BATCH_SIZE, -1)
 
-    if pose_shape_cfg.TRAIN.STORE_PRED:
+    if store_pred:
         npz_dict = {
             'pose_gt': [],
             'shape_gt': [],
@@ -105,7 +106,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
         metrics_tracker.initialise_loss_metric_sums(pose_shape_cfg.MODEL)
 
         data_splits = ['train', 'val']
-        if pose_shape_cfg.TRAIN.STORE_PRED:
+        if store_pred:
             data_splits = ['val']
 
         for split in data_splits:
@@ -322,7 +323,7 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                         loss.backward()
                         optimiser.step()
                     else:
-                        if pose_shape_cfg.TRAIN.STORE_PRED:
+                        if store_pred:
                             npz_dict['pose_gt'].append(target_pose.detach().cpu().numpy())
                             npz_dict['shape_gt'].append(target_shape.detach().cpu().numpy())
                             npz_dict['style_gt'].append(target_style_vector.detach().cpu().numpy())
@@ -365,7 +366,8 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                 if vis_logger is not None:
                     vis_logger.vis_rgb(rgb_in)
                     vis_logger.vis_edge(edge_in)
-                    vis_logger.vis_heatmaps(heatmaps, label='gt_coco')
+                    vis_logger.vis_segmaps(seg_maps)
+                    #vis_logger.vis_heatmaps(heatmaps, label='gt_coco')
 
                     pred_joints2d_normalized = undo_keypoint_normalisation(
                         pred_joints2d_samples[:, 0],
@@ -376,12 +378,12 @@ def train_poseMF_shapeGaussian_net(pose_shape_model,
                         pose_shape_cfg.DATA.PROXY_REP_SIZE,
                         std=pose_shape_cfg.DATA.HEATMAP_GAUSSIAN_STD
                     )
-                    vis_logger.vis_heatmaps(pred_joints2d_coco_heatmaps, label='pred_coco')
+                    #vis_logger.vis_heatmaps(pred_joints2d_coco_heatmaps, label='pred_coco')
 
-        if pose_shape_cfg.TRAIN.STORE_PRED:
+        if store_pred:
             for key in npz_dict:
                 npz_dict[key] = np.concatenate(npz_dict[key], axis=0)
-            np.savez(f'output/pred_{epoch-1}.npz', **npz_dict)
+            np.savez(f'output/preds/npz/valid/pred_{epoch-1}.npz', **npz_dict)
             print(f'Saved predictions for model in epoch {epoch-1}... Exiting...')
             exit()
 
