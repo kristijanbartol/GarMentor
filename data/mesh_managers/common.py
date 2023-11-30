@@ -4,6 +4,7 @@ from psbody.mesh import Mesh
 from pytorch3d.structures import Meshes
 import numpy as np
 from random import randint
+import torch
 
 from vis.colors import norm_color
 
@@ -24,6 +25,14 @@ def default_upper_color(pallete):
 
 def default_lower_color(pallete):
     return np.array(norm_color(list(pallete)[7].value))
+
+
+def torch_default_body_color(pallete, device):
+    return torch.Tensor(norm_color(list(pallete)[0].value)).unsqueeze(0).unsqueeze(0).to(device=device)
+
+
+def torch_default_garment_color(pallete, device):
+    return torch.Tensor(norm_color(list(pallete)[4].value)).unsqueeze(0).unsqueeze(0).to(device=device)
 
 
 def create_psbody_meshes(smpl_output_dict: SMPL4GarmentOutput

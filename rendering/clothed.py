@@ -248,3 +248,54 @@ class DNClothedRenderer(ClothedRenderer):
         feature_maps = self._organize_seg_maps(seg_maps)
 
         return final_rgb, feature_maps
+    
+
+class TorchClothedRenderer(ClothedRenderer):
+
+    def __init__(
+            self,
+            *args,
+            **kwargs
+        ) -> None:
+        ''' The clothed renderer constructor.'''
+        super().__init__(*args, **kwargs)
+
+    @staticmethod
+    def _get_img_diff(
+        rgb1,
+        rgb2
+    ):
+        return torch.logical_not(torch.all(torch.isclose(rgb1, rgb2, atol=1e-3), dim=-1))
+
+    def forward(
+            self, 
+            meshes: List[Meshes],
+            device: str,
+            *args,
+            **kwargs
+        ) -> torch.Tensor:
+        '''Render RGB images of clothed meshes, single-colored piece-wise.'''
+        self._process_optional_arguments(*args, **kwargs)
+        rgbs = []
+        # NOTE: Need this particular order because of the way I produce segmaps.
+        for mesh_part, mesh in zip(['body', 'garment'], meshes):
+            print(f'Rendering {mesh_part} mesh...')
+            fragments = self.rasterizer(
+                mesh, 
+                cameras=self.cameras
+            )
+            try:
+                mesh.verts_list()
+            except RuntimeError as cuda_err:
+                return None, None
+            rgb_image = self.rgb_shader(
+                fragments, 
+                mesh, 
+                lights=self.lights_rgb_render
+            )[:, :, :, :3]
+            rgbs.append(rgb_image)
+
+        return torch.Tensor([
+            self._get_img_diff(rgbs[-1], rgbs[-2]),
+            self._get_img_diff(rgbs[-2], rgbs[-3])
+        ])[:, [1, 0]]    # TODO: Verify whether the order is ['<garment>', 'whole']

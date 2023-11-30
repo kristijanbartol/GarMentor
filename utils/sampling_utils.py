@@ -323,6 +323,14 @@ def sample_uniform_style(
     #return style
 
 
+def sample_random_style(garment_part: str) -> np.ndarray:
+    styles_array = torch.load(os.path.join(
+        paths.DRAPENET_CHECKPOINTS,
+        paths.TOP_CODES_FNAME if garment_part == 'upper' else paths.BOTTOM_CODES_FNAME)
+    ).detach()
+    return styles_array[torch.randint(low=0, high=styles_array.shape[0], size=(1,))][0]
+
+
 def sample_predefined_style(
         _: str,
         garment_part: str

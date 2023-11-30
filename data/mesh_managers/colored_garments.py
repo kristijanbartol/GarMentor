@@ -10,6 +10,8 @@ from data.mesh_managers.common import (
     default_upper_color,
     default_lower_color,
     default_body_color,
+    torch_default_body_color,
+    torch_default_garment_color
     random_pallete_color
 )
 from utils.drapenet_structure import DrapeNetStructure
@@ -109,3 +111,36 @@ class ColoredGarmentsMeshManager(MeshManager):
             ))
         
         return meshes 
+
+
+def create_meshes_torch(
+        verts_list: List[torch.Tensor],     # already on device, 2[1, V, 3]
+        faces_list: List[torch.Tensor]      # already on device, 2[1, F, 3]
+) -> List[Meshes]:
+    textures_list = [
+        torch.ones_like(verts_list[0]) * torch_default_body_color(BodyColors, device=verts_list[0].device),
+        torch.ones_like(verts_list[1]) * torch_default_garment_color(GarmentColors, device=verts_list[0].device)
+    ]
+
+    cat_verts_list = [
+        verts_list[0],
+        torch.cat([
+            verts_list[0],
+            verts_list[1]
+        ], dim=1)
+    ]
+    cat_faces_list = [
+        faces_list[0],
+        faces_list[1] + faces_list[0].shape[1]
+    ]
+    cat_textures_list = [
+        textures_list[0],
+        torch.cat([textures_list[0], textures_list[1]], dim=1)
+    ]
+
+    meshes = [
+        Meshes(verts=vs, faces=fs, textures=Textures(verts_rgb=ts)) for (vs, fs, ts) in zip(
+            cat_verts_list, cat_faces_list, cat_textures_list
+        )
+    ]
+    return meshes

@@ -279,3 +279,98 @@ class DNParametricModel(ParametricModel):
             joints=joints
         )
         return drapenet_dict
+
+
+class TorchParametricModel(DNParametricModel):
+
+    def __init__(
+            self,
+            device: str,
+            gender: str
+        ) -> None:
+        super().__init__(
+            device=device,
+            gender=gender
+        )
+
+    def _draping(
+            self, 
+            vertices_T, 
+            faces_garments, 
+            latent_codes, 
+            pose, 
+            beta, 
+            models, 
+            smpl_server, 
+            tfs_c_inv
+        ):
+        faces_top, faces_bottom = faces_garments
+        latent_code_top, latent_code_bottom = latent_codes
+        embedder, _lbs, _lbs_shape, _lbs_deform_top, _lbs_deform_bottom, _lbs_deform_layer = models
+        with torch.no_grad():
+            output_smpl = smpl_server(betas=beta, body_pose=pose[:, 3:], global_orient=pose[:, :3], return_verts=True)
+            tfs = output_smpl.T
+            smpl_verts = output_smpl.vertices
+            joints = output_smpl.joints
+
+            _, top_mesh = deforming(vertices_top_T, faces_top, pose, beta, latent_code_top, embedder, _lbs, _lbs_shape, _lbs_deform_top, tfs, tfs_c_inv)
+
+            _, _, bottom_mesh, bottom_mesh_layer = deforming_layer(vertices_bottom_T, faces_bottom, pose, beta, latent_code_bottom, latent_code_top, embedder, _lbs, _lbs_shape, _lbs_deform_bottom, _lbs_deform_layer, tfs, tfs_c_inv)
+
+        body_mesh = trimesh.Trimesh(smpl_verts.squeeze().cpu().numpy(), smpl_server.faces)
+
+        colors_f_body = np.ones((len(body_mesh.faces), 4))*np.array([255, 255, 255, 200])[np.newaxis,:]
+        colors_f_top = np.ones((len(top_mesh.faces), 4))*np.array([160, 160, 255, 200])[np.newaxis,:]
+        colors_f_bottom = np.ones((len(bottom_mesh.faces), 4))*np.array([100, 100, 100, 200])[np.newaxis,:]
+        body_mesh.visual.face_colors = colors_f_body
+        top_mesh.visual.face_colors = colors_f_top
+        bottom_mesh.visual.face_colors = colors_f_bottom
+        bottom_mesh_layer.visual.face_colors = colors_f_bottom
+            
+        return top_mesh, bottom_mesh, bottom_mesh_layer, body_mesh, joints
+    
+    def run(self,
+            pose: torch.Tensor, 
+            shape: torch.Tensor, 
+            style_vector: torch.Tensor,
+            garment_part: str
+            ) -> Dict[str, DrapeNetStructure]:
+        drapenet_dict = {}
+        decoder = self.decoder_top if garment_part == 'upper' else self.decoder_bottom
+        _, vertices_T, faces = reconstruct(
+            coords_encoder=self.coords_encoder, 
+            decoder=decoder, 
+            lat=style_vector, 
+            udf_max_dist=0.1, 
+            resolution=256, 
+            differentiable=False
+        )
+        #vertices_Ts = [vertices_T, vertices_bottom_T]
+        #faces_garments = [faces_top.cpu().numpy(), faces_bottom.cpu().numpy()]
+
+        top_mesh, bottom_mesh, _, body_mesh, joints = draping(
+            vertices_Ts=vertices_Ts, 
+            faces_garments=faces_garments, 
+            latent_codes=[style_tensor[[0]], style_tensor[[1]]], 
+            pose=torch.from_numpy(pose).unsqueeze(0).float().to(self.device), 
+            beta=torch.from_numpy(shape).unsqueeze(0).float().to(self.device), 
+            models=self.models, 
+            smpl_server=self.smpl_server, 
+            tfs_c_inv=self.tfs_c_inv
+        )
+
+        drapenet_dict['upper'] = DrapeNetStructure(
+            garment_verts=top_mesh.vertices,
+            garment_faces=faces_garments[0],
+            body_verts=body_mesh.vertices,
+            body_faces=body_mesh.faces,
+            joints=joints
+        )
+        drapenet_dict['lower'] = DrapeNetStructure(
+            garment_verts=bottom_mesh.vertices,
+            garment_faces=faces_garments[1],
+            body_verts=body_mesh.vertices,
+            body_faces=body_mesh.faces,
+            joints=joints
+        )
+        return drapenet_dict
