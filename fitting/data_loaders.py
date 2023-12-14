@@ -3,8 +3,8 @@ import numpy as np
 import os
 import cv2
 
-MASKS_DIR = 'demo/masks/'
-PARAMS_DIR = 'demo/npz/'
+MASKS_DIR = '/data/tailornet/fitting/masks/'
+PARAMS_DIR = '/data/tailornet/fitting/npz/'
 
 
 def prepare_gar():
@@ -39,6 +39,7 @@ def prepare_gar():
     mask_subdir = os.path.join(MASKS_DIR, DATASET)
     params_subdir = os.path.join(PARAMS_DIR, DATASET)
     # Prepare masks
+    # NOTE: Will use .npz files directly, not .png, but good for debugging.
     for masks_npz in [x for x in os.listdir(mask_subdir) if '.npz' in x]:
         masks_files.append(masks_npz)
         masks = np.load(
@@ -48,7 +49,7 @@ def prepare_gar():
         # NOTE: Lower and upper are accidentantaly swapped during data generation.
         for mask_idx, mask_part in enumerate(['lower', 'upper', 'whole']):
             mask_name = f'{masks_npz[:-4]}_{mask_part}.png'
-            mask_png = np.tile(masks[mask_idx][:, :, np.newaxis], (1, 1, 3)).astype(np.float32)
+            mask_png = np.tile(masks[mask_idx][:, :, np.newaxis], (1, 1, 3)).astype(np.float32) * 255
             cv2.imwrite(
                 os.path.join(mask_subdir, mask_name), 
                 mask_png
@@ -75,15 +76,24 @@ def prepare_gar():
 
 def load_gt(
         img_name: str,
-        dataset: str
+        dataset: str,
+        img_size: int
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
     masks_dict = {}
-    for part_label in ['lower', 'upper', 'whole']:
-        masks_dict[part_label] = cv2.imread(os.path.join(
+    for part_label in ['upper', 'lower']:
+        mask = cv2.imread(os.path.join(
             MASKS_DIR,
             dataset,
             f'{img_name.split(".")[0]}_{part_label}.png'
         ))
+        # NOTE: When upscaled, the silhouette quality is very bad.
+        #mask = cv2.resize(
+        #    mask, 
+        #    (img_size, img_size),
+        #    interpolation=cv2.INTER_LINEAR
+        #)
+        mask = np.swapaxes(mask, 0, 2) / 255
+        masks_dict[part_label] = (mask[0] + mask[1] + mask[2]) / 3
     params_dict = np.load(
         os.path.join(PARAMS_DIR, dataset, f'{img_name[:-4]}.npz'), 
         allow_pickle=True

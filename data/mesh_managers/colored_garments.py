@@ -11,7 +11,7 @@ from data.mesh_managers.common import (
     default_lower_color,
     default_body_color,
     torch_default_body_color,
-    torch_default_garment_color
+    torch_default_garment_color,
     random_pallete_color
 )
 from utils.drapenet_structure import DrapeNetStructure
@@ -131,11 +131,17 @@ def create_meshes_torch(
     ]
     cat_faces_list = [
         faces_list[0],
-        faces_list[1] + faces_list[0].shape[1]
+        torch.cat([
+            faces_list[0],
+            faces_list[1] + verts_list[0].shape[1],
+        ], dim=1)
     ]
     cat_textures_list = [
         textures_list[0],
-        torch.cat([textures_list[0], textures_list[1]], dim=1)
+        torch.cat([
+            textures_list[0], 
+            textures_list[1]
+        ], dim=1)
     ]
 
     meshes = [

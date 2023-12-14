@@ -46,6 +46,22 @@
         },
 
         {
+            "name": "Fitting",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "CUDA_LAUNCH_BLOCKING": "1"
+            },
+            "args": [
+                "--device", "cuda:0", 
+                "--dataset", "gar"
+            ]
+        },
+
+        {
             "name": "Resume Train (Eval)",
             "type": "python",
             "request": "launch",

@@ -1,7 +1,8 @@
 from abc import abstractmethod
-from typing import Dict
+from typing import Dict, Tuple
 from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
 import torch
+import torch.nn.functional as F
 import numpy as np
 from utils.garment_classes import GarmentClasses
 import time
@@ -17,7 +18,8 @@ from drapenet_for_garmentor.utils_drape import (
     load_udf,
     reconstruct
 )
-from drapenet_for_garmentor.smpl_pytorch.body_models import SMPL
+from drapenet_for_garmentor.smpl_pytorch.body_models import SMPL, ModelOutput
+from drapenet_for_garmentor.meshudf.meshudf import get_mesh_from_udf
 
 from tailornet_for_garmentor.models.smpl4garment import SMPL4Garment
 from tailornet_for_garmentor.models.tailornet_model import get_best_runner as get_tn_runner
@@ -293,84 +295,160 @@ class TorchParametricModel(DNParametricModel):
             gender=gender
         )
 
+    @staticmethod
+    def _skinning(x, w, tfs, tfs_c_inv):
+        """Linear blend skinning
+        Args:
+            x (tensor): deformed points. shape: [B, N, D]
+            w (tensor): conditional input. [B, N, J]
+            tfs (tensor): bone transformation matrices. shape: [B, J, D+1, D+1]
+            tfs_c_inv (tensor): bone transformation matrices. shape: [J, D+1, D+1]
+        Returns:
+            x (tensor): skinned points. shape: [B, N, D]
+        """
+        tfs = torch.einsum('bnij,njk->bnik', tfs, tfs_c_inv)
+
+        x_h = F.pad(x, (0, 1), value=1.0)
+        x_h = torch.einsum("bpn,bnij,bpj->bpi", w, tfs, x_h)
+
+        return x_h[:, :, :3]
+
+    def _deforming(
+            self, 
+            verts_T, 
+            pose, 
+            beta, 
+            latent_code, 
+            embedder, 
+            model_lbs, 
+            model_lbs_shape, 
+            model_lbs_deform, 
+            tfs, 
+            tfs_c_inv
+        ):
+        # vertices_garment_T - (#P, 3) 
+        # tfs - (1, 24, 4, 4) 
+        # tfs_c_inv - (24, 4, 4) 
+        # pose - (1, 72) 
+        # beta - (1, 10) 
+        # latent_code - (1, 32) 
+
+        num_v = verts_T.shape[0]
+        points = verts_T.unsqueeze(0)
+        points_embed = embedder(points*5)
+            
+        latent_code = latent_code.unsqueeze(1).repeat(1, num_v, 1)
+        points_embed = torch.cat((points_embed, latent_code), dim=-1)
+            
+        pose_input = pose.unsqueeze(1).repeat(1, num_v, 1)
+        beta_input = beta.unsqueeze(1).repeat(1, num_v, 1)
+
+        input_lbs_deform = torch.cat((pose_input, beta_input), dim=-1)
+        
+        x_deform = model_lbs_deform(input_lbs_deform, points_embed)/100
+        garment_deform = points + x_deform
+
+        input_lbs_shape = torch.cat((points, beta_input), dim=-1)
+        delta_shape_pred = model_lbs_shape(input_lbs_shape)
+        garment_deform += delta_shape_pred
+
+        lbs_weight = model_lbs(points)
+        lbs_weight = lbs_weight.softmax(dim=-1)
+        garment_skinning = self._skinning(garment_deform, lbs_weight, tfs, tfs_c_inv)
+
+        verts_deformed = garment_skinning.squeeze() # (#P, 3) 
+        return verts_deformed
+
     def _draping(
             self, 
-            vertices_T, 
-            faces_garments, 
+            verts_T, 
             latent_codes, 
             pose, 
             beta, 
-            models, 
-            smpl_server, 
-            tfs_c_inv
+            tfs,
+            tfs_c_inv,
+            garment_part
         ):
-        faces_top, faces_bottom = faces_garments
-        latent_code_top, latent_code_bottom = latent_codes
-        embedder, _lbs, _lbs_shape, _lbs_deform_top, _lbs_deform_bottom, _lbs_deform_layer = models
-        with torch.no_grad():
-            output_smpl = smpl_server(betas=beta, body_pose=pose[:, 3:], global_orient=pose[:, :3], return_verts=True)
-            tfs = output_smpl.T
-            smpl_verts = output_smpl.vertices
-            joints = output_smpl.joints
+        latent_code = latent_codes
+        embedder, lbs, lbs_shape, lbs_deform_top, lbs_deform_bottom, _ = self.models
+        lbs_deform = lbs_deform_top if garment_part == 'upper' else lbs_deform_bottom
+        verts_deformed = self._deforming(
+            verts_T, 
+            pose, 
+            beta, 
+            latent_code, 
+            embedder, 
+            lbs, 
+            lbs_shape, 
+            lbs_deform, 
+            tfs, 
+            tfs_c_inv
+        )
+        return verts_deformed
+    
+    def get_body_output(
+            self,
+            pose: torch.Tensor,
+            shape: torch.Tensor,
+            global_orient: torch.Tensor,
+            return_verts: bool
+        ) -> ModelOutput:
+        return self.smpl_server(
+            betas=shape,
+            body_pose=pose,
+            global_orient=global_orient,
+            return_verts=return_verts
+        )
+    
+    def _reconstruct(
+            self,
+            coords_encoder, 
+            decoder, 
+            lat, 
+            udf_max_dist=0.1, 
+            resolution=256, 
+            differentiable=False
+        ):
+        def udf_func(c):
+            c = coords_encoder.encode(c.unsqueeze(0))
+            p = decoder(c, lat).squeeze(0)
+            p = torch.sigmoid(p)
+            p = (1 - p) * udf_max_dist
+            return p
 
-            _, top_mesh = deforming(vertices_top_T, faces_top, pose, beta, latent_code_top, embedder, _lbs, _lbs_shape, _lbs_deform_top, tfs, tfs_c_inv)
-
-            _, _, bottom_mesh, bottom_mesh_layer = deforming_layer(vertices_bottom_T, faces_bottom, pose, beta, latent_code_bottom, latent_code_top, embedder, _lbs, _lbs_shape, _lbs_deform_bottom, _lbs_deform_layer, tfs, tfs_c_inv)
-
-        body_mesh = trimesh.Trimesh(smpl_verts.squeeze().cpu().numpy(), smpl_server.faces)
-
-        colors_f_body = np.ones((len(body_mesh.faces), 4))*np.array([255, 255, 255, 200])[np.newaxis,:]
-        colors_f_top = np.ones((len(top_mesh.faces), 4))*np.array([160, 160, 255, 200])[np.newaxis,:]
-        colors_f_bottom = np.ones((len(bottom_mesh.faces), 4))*np.array([100, 100, 100, 200])[np.newaxis,:]
-        body_mesh.visual.face_colors = colors_f_body
-        top_mesh.visual.face_colors = colors_f_top
-        bottom_mesh.visual.face_colors = colors_f_bottom
-        bottom_mesh_layer.visual.face_colors = colors_f_bottom
-            
-        return top_mesh, bottom_mesh, bottom_mesh_layer, body_mesh, joints
+        return get_mesh_from_udf(
+            udf_func,
+            coords_range=(-1, 1),
+            max_dist=udf_max_dist,
+            N=resolution,
+            max_batch=2**16,
+            differentiable=differentiable,
+            use_fast_grid_filler=True
+        )
     
     def run(self,
             pose: torch.Tensor, 
             shape: torch.Tensor, 
             style_vector: torch.Tensor,
+            smpl_output: ModelOutput,
             garment_part: str
-            ) -> Dict[str, DrapeNetStructure]:
-        drapenet_dict = {}
+        ) -> Tuple[torch.Tensor, torch.Tensor]:
         decoder = self.decoder_top if garment_part == 'upper' else self.decoder_bottom
-        _, vertices_T, faces = reconstruct(
+        verts_T, cloth_faces = self._reconstruct(
             coords_encoder=self.coords_encoder, 
             decoder=decoder, 
             lat=style_vector, 
             udf_max_dist=0.1, 
             resolution=256, 
-            differentiable=False
+            differentiable=True     # crucial! (originally False)
         )
-        #vertices_Ts = [vertices_T, vertices_bottom_T]
-        #faces_garments = [faces_top.cpu().numpy(), faces_bottom.cpu().numpy()]
-
-        top_mesh, bottom_mesh, _, body_mesh, joints = draping(
-            vertices_Ts=vertices_Ts, 
-            faces_garments=faces_garments, 
-            latent_codes=[style_tensor[[0]], style_tensor[[1]]], 
-            pose=torch.from_numpy(pose).unsqueeze(0).float().to(self.device), 
-            beta=torch.from_numpy(shape).unsqueeze(0).float().to(self.device), 
-            models=self.models, 
-            smpl_server=self.smpl_server, 
-            tfs_c_inv=self.tfs_c_inv
+        cloth_verts = self._draping(
+            verts_T=verts_T, 
+            latent_codes=style_vector, 
+            pose=pose, 
+            beta=shape, 
+            tfs=smpl_output.T,
+            tfs_c_inv=self.tfs_c_inv,
+            garment_part=garment_part
         )
-
-        drapenet_dict['upper'] = DrapeNetStructure(
-            garment_verts=top_mesh.vertices,
-            garment_faces=faces_garments[0],
-            body_verts=body_mesh.vertices,
-            body_faces=body_mesh.faces,
-            joints=joints
-        )
-        drapenet_dict['lower'] = DrapeNetStructure(
-            garment_verts=bottom_mesh.vertices,
-            garment_faces=faces_garments[1],
-            body_verts=body_mesh.vertices,
-            body_faces=body_mesh.faces,
-            joints=joints
-        )
-        return drapenet_dict
+        return cloth_verts, cloth_faces

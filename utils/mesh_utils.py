@@ -16,6 +16,9 @@ def concatenate_meshes(vertices_list: List[np.ndarray],     # N[(V, 3)]
     faces_list_with_offsets = [faces_list[0]]
     num_vertices = 0
     for idx in range(len(faces_list)):
+        # TODO: This might be incorrect, because the final dimensions are
+        #       F1 + F1 + F2, instead of just F1 + F2, where FN is the 
+        #       number of faces for the Nth mesh.
         faces_list_with_offsets.append(faces_list[idx] + num_vertices)
         num_vertices += vertices_list[idx].shape[0]
     concat_faces = np.concatenate(faces_list_with_offsets, axis=0)

@@ -270,7 +270,6 @@ class TorchClothedRenderer(ClothedRenderer):
     def forward(
             self, 
             meshes: List[Meshes],
-            device: str,
             *args,
             **kwargs
         ) -> torch.Tensor:
@@ -284,10 +283,10 @@ class TorchClothedRenderer(ClothedRenderer):
                 mesh, 
                 cameras=self.cameras
             )
-            try:
-                mesh.verts_list()
-            except RuntimeError as cuda_err:
-                return None, None
+            #try:
+            #    mesh.verts_list()
+            #except RuntimeError as cuda_err:
+            #    return None, None
             rgb_image = self.rgb_shader(
                 fragments, 
                 mesh, 
@@ -295,7 +294,9 @@ class TorchClothedRenderer(ClothedRenderer):
             )[:, :, :, :3]
             rgbs.append(rgb_image)
 
-        return torch.Tensor([
-            self._get_img_diff(rgbs[-1], rgbs[-2]),
-            self._get_img_diff(rgbs[-2], rgbs[-3])
-        ])[:, [1, 0]]    # TODO: Verify whether the order is ['<garment>', 'whole']
+        return self._get_img_diff(rgbs[-2], rgbs[-1]).swapaxes(1, 2)
+        # NOTE: You need the bottom part when fitting pose and shape params also.
+        #return torch.cat([
+        #    self._get_img_diff(rgbs[-1], torch.zeros_like(rgbs[-1])),
+        #    self._get_img_diff(rgbs[-2], rgbs[-1])
+        #], dim=0).swapaxes(1, 2)    # TODO: Verify whether the order is ['<garment>', 'whole']
