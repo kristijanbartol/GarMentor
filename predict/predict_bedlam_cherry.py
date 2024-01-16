@@ -44,53 +44,55 @@ def predict_bedlam(pose_shape_model,
     for scene_name in os.listdir('output/crop/bedlam-cherry'):
         scene_dir = os.path.join(crop_dir, scene_name)
         for seq_name in os.listdir(scene_dir):
-            seq_dir = os.path.join(scene_dir, seq_name)
-            for img_name in os.listdir(seq_dir):
-                img_path = os.path.join(seq_dir, img_name)
-                mask_paths = [f'{os.path.join(img_path.replace("crop", "masks")).split(".")[0]}_{x}.png' for x in ['upper-cloth', 'lower-cloth', 'whole-body']]
+            if scene_name == '20221019_3-8_250_highbmihand_orbit_stadium_6fps' or True: # use for sanity check
+                seq_dir = os.path.join(scene_dir, seq_name)
+                for img_name in os.listdir(seq_dir):
+                    img_path = os.path.join(seq_dir, img_name)
+                    print(f'Predicting {img_path}...')
+                    mask_paths = [f'{os.path.join(img_path.replace("crop", "masks")).split(".")[0]}_{x}.png' for x in ['upper-cloth', 'lower-cloth', 'whole-body']]
 
-                with torch.no_grad():
-                    # ------------------------- INPUT LOADING AND PROXY REPRESENTATION GENERATION -------------------------
-                    #image = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
-                    image = cv2.imread(img_path)
-                    image = torch.from_numpy(image.transpose(2, 1, 0)).float().to(device) / 255.0
-                    masks = np.stack([cv2.resize(cv2.imread(x), (img_wh, img_wh)) for x in mask_paths])
-                    masks = torch.from_numpy(masks).float().to(device) / 255.
-                    proxy_rep_segmaps = ((masks[:, :, :, 0] + masks[:, :, :, 1] + masks[:, :, :, 2]) / 3).unsqueeze(0)
-                    # NOTE: The models used currently have two issues with their training data:
-                    #       1. The segmaps are flipped;
-                    #       2. The upper and lower garments are swapped (the order was (lower, upper, whole)).
-                    proxy_rep_segmaps = torch.flip(proxy_rep_segmaps, dims=[2,])
-                    proxy_rep_segmaps[:, [0, 1]] = proxy_rep_segmaps[:, [1, 0]]
-                    # Predict Person Bounding Box + 2D Joints
-                    hrnet_output = predict_hrnet(hrnet_model=hrnet_model,
-                                                hrnet_config=hrnet_cfg,
-                                                object_detect_model=object_detect_model,
-                                                image=image,
-                                                object_detect_threshold=pose_shape_cfg.DATA.BBOX_THRESHOLD,
-                                                bbox_scale_factor=pose_shape_cfg.DATA.BBOX_SCALE_FACTOR)
+                    with torch.no_grad():
+                        # ------------------------- INPUT LOADING AND PROXY REPRESENTATION GENERATION -------------------------
+                        #image = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
+                        image = cv2.imread(img_path)
+                        image = torch.from_numpy(image.transpose(2, 1, 0)).float().to(device) / 255.0
+                        masks = np.stack([cv2.resize(cv2.imread(x), (img_wh, img_wh)) for x in mask_paths])
+                        masks = torch.from_numpy(masks).float().to(device) / 255.
+                        proxy_rep_segmaps = ((masks[:, :, :, 0] + masks[:, :, :, 1] + masks[:, :, :, 2]) / 3).unsqueeze(0)
+                        # NOTE: The models used currently have two issues with their training data:
+                        #       1. The segmaps are flipped;
+                        #       2. The upper and lower garments are swapped (the order was (lower, upper, whole)).
+                        proxy_rep_segmaps = torch.flip(proxy_rep_segmaps, dims=[2,])
+                        proxy_rep_segmaps[:, [0, 1]] = proxy_rep_segmaps[:, [1, 0]]
+                        # Predict Person Bounding Box + 2D Joints
+                        hrnet_output = predict_hrnet(hrnet_model=hrnet_model,
+                                                    hrnet_config=hrnet_cfg,
+                                                    object_detect_model=object_detect_model,
+                                                    image=image,
+                                                    object_detect_threshold=pose_shape_cfg.DATA.BBOX_THRESHOLD,
+                                                    bbox_scale_factor=pose_shape_cfg.DATA.BBOX_SCALE_FACTOR)
 
-                    # Create proxy representation with 1) Edge detection and 2) 2D joints heatmaps generation
-                    proxy_rep_heatmaps = convert_2Djoints_to_gaussian_heatmaps_torch(joints2D=hrnet_output['joints2D'].unsqueeze(0),
-                                                                                    img_wh=img_wh,
-                                                                                    std=pose_shape_cfg.DATA.HEATMAP_GAUSSIAN_STD)
-                    hrnet_joints2Dvisib = hrnet_output['joints2Dconfs'] > joints2Dvisib_threshold
-                    hrnet_joints2Dvisib[[0, 1, 2, 3, 4, 5, 6, 11, 12]] = True  # Only removing joints [7, 8, 9, 10, 13, 14, 15, 16] if occluded
-                    proxy_rep_heatmaps = proxy_rep_heatmaps * hrnet_joints2Dvisib[None, :, None, None]
-                    if pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 3:
-                        # Verify:
-                        #cv2.imwrite('rgb.png', proxy_rep_segmaps[0, 0].repeat(3, 1, 1).permute(1, 2, 0).cpu().detach().numpy() * 255)
-                        proxy_rep_input = torch.cat([proxy_rep_segmaps], dim=1).float()  # (1, 3, img_wh, img_wh)
-                    else:
-                        proxy_rep_input = torch.cat([proxy_rep_segmaps, proxy_rep_heatmaps], dim=1).float()  # (1, 20, img_wh, img_wh)
+                        # Create proxy representation with 1) Edge detection and 2) 2D joints heatmaps generation
+                        proxy_rep_heatmaps = convert_2Djoints_to_gaussian_heatmaps_torch(joints2D=hrnet_output['joints2D'].unsqueeze(0),
+                                                                                        img_wh=img_wh,
+                                                                                        std=pose_shape_cfg.DATA.HEATMAP_GAUSSIAN_STD)
+                        hrnet_joints2Dvisib = hrnet_output['joints2Dconfs'] > joints2Dvisib_threshold
+                        hrnet_joints2Dvisib[[0, 1, 2, 3, 4, 5, 6, 11, 12]] = True  # Only removing joints [7, 8, 9, 10, 13, 14, 15, 16] if occluded
+                        proxy_rep_heatmaps = proxy_rep_heatmaps * hrnet_joints2Dvisib[None, :, None, None]
+                        if pose_shape_cfg.MODEL.NUM_IN_CHANNELS == 3:
+                            # Verify:
+                            #cv2.imwrite('rgb.png', proxy_rep_segmaps[0, 0].repeat(3, 1, 1).permute(1, 2, 0).cpu().detach().numpy() * 255)
+                            proxy_rep_input = torch.cat([proxy_rep_segmaps], dim=1).float()  # (1, 3, img_wh, img_wh)
+                        else:
+                            proxy_rep_input = torch.cat([proxy_rep_segmaps, proxy_rep_heatmaps], dim=1).float()  # (1, 20, img_wh, img_wh)
 
-                    # ------------------------------- POSE AND SHAPE DISTRIBUTION PREDICTION -------------------------------
-                    pred_pose_F, pred_pose_U, pred_pose_S, pred_pose_V, pred_pose_rotmats_mode, \
-                        pred_shape_dist, pred_style_dist, pred_glob, pred_cam_wp = pose_shape_model(proxy_rep_input)
-                    # Pose F, U, V and rotmats_mode are (bsize, 23, 3, 3) and Pose S is (bsize, 23, 3)
-                        
-                    # TODO: Store style predictions
-                    preds_dict[img_path] = pred_style_dist.loc.cpu().detach().numpy()[0]              
+                        # ------------------------------- POSE AND SHAPE DISTRIBUTION PREDICTION -------------------------------
+                        pred_pose_F, pred_pose_U, pred_pose_S, pred_pose_V, pred_pose_rotmats_mode, \
+                            pred_shape_dist, pred_style_dist, pred_glob, pred_cam_wp = pose_shape_model(proxy_rep_input)
+                        # Pose F, U, V and rotmats_mode are (bsize, 23, 3, 3) and Pose S is (bsize, 23, 3)
+                            
+                        # TODO: Store style predictions
+                        preds_dict[img_path] = pred_style_dist.loc.cpu().detach().numpy()[0]
     np.savez('output/preds/npz/bedlam-cherry/preds.npz', **preds_dict)
 
 

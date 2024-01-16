@@ -106,50 +106,6 @@ def pa_mpjpe(predicted, target):
     return a, R, t
 
 
-# From Sergey Prokudin:
-# https://gist.github.com/sergeyprokudin/c4bf4059230da8db8256e36524993367
-def calc_chamfer_distance(x, y, metric='l2', direction='bi'):
-    """Chamfer distance between two point clouds
-    Parameters
-    ----------
-    x: numpy array [n_points_x, n_dims]
-        first point cloud
-    y: numpy array [n_points_y, n_dims]
-        second point cloud
-    metric: string or callable, default ‘l2’
-        metric to use for distance computation. Any metric from scikit-learn or scipy.spatial.distance can be used.
-    direction: str
-        direction of Chamfer distance.
-            'y_to_x':  computes average minimal distance from every point in y to x
-            'x_to_y':  computes average minimal distance from every point in x to y
-            'bi': compute both
-    Returns
-    -------
-    chamfer_dist: float
-        computed bidirectional Chamfer distance:
-            sum_{x_i \in x}{\min_{y_j \in y}{||x_i-y_j||**2}} + sum_{y_j \in y}{\min_{x_i \in x}{||x_i-y_j||**2}}
-    """
-    
-    if direction=='y_to_x':
-        x_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(x)
-        min_y_to_x = x_nn.kneighbors(y)[0]
-        chamfer_dist = np.mean(min_y_to_x)
-    elif direction=='x_to_y':
-        y_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(y)
-        min_x_to_y = y_nn.kneighbors(x)[0]
-        chamfer_dist = np.mean(min_x_to_y)
-    elif direction=='bi':
-        x_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(x)
-        min_y_to_x = x_nn.kneighbors(y)[0]
-        y_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(y)
-        min_x_to_y = y_nn.kneighbors(x)[0]
-        chamfer_dist = np.mean(min_y_to_x) + np.mean(min_x_to_y)
-    else:
-        raise ValueError("Invalid direction type. Supported types: \'y_x\', \'x_y\', \'bi\'")
-        
-    return chamfer_dist
-
-
 def scale_and_translation_transform_batch(P, T):
     """
     First Normalises batch of input 3D meshes P such that each mesh has mean (0, 0, 0) and
@@ -222,4 +178,138 @@ def make_xz_ground_plane(vertices):
     lowest_y = vertices[:, :, 1].min(axis=-1, keepdims=True)
     vertices[:, :, 1] = vertices[:, :, 1] - lowest_y
     return vertices
+
+
+# From Sergey Prokudin:
+# https://gist.github.com/sergeyprokudin/c4bf4059230da8db8256e36524993367
+def calc_chamfer_distance(x, y, metric='l2', direction='bi'):
+    """Chamfer distance between two point clouds
+    Parameters
+    ----------
+    x: numpy array [n_points_x, n_dims]
+        first point cloud
+    y: numpy array [n_points_y, n_dims]
+        second point cloud
+    metric: string or callable, default ‘l2’
+        metric to use for distance computation. Any metric from scikit-learn or scipy.spatial.distance can be used.
+    direction: str
+        direction of Chamfer distance.
+            'y_to_x':  computes average minimal distance from every point in y to x
+            'x_to_y':  computes average minimal distance from every point in x to y
+            'bi': compute both
+    Returns
+    -------
+    chamfer_dist: float
+        computed bidirectional Chamfer distance:
+            sum_{x_i \in x}{\min_{y_j \in y}{||x_i-y_j||**2}} + sum_{y_j \in y}{\min_{x_i \in x}{||x_i-y_j||**2}}
+    """
+    
+    if direction=='y_to_x':
+        x_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(x)
+        min_y_to_x = x_nn.kneighbors(y)[0]
+        chamfer_dist = np.mean(min_y_to_x)
+    elif direction=='x_to_y':
+        y_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(y)
+        min_x_to_y = y_nn.kneighbors(x)[0]
+        chamfer_dist = np.mean(min_x_to_y)
+    elif direction=='bi':
+        x_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(x)
+        min_y_to_x = x_nn.kneighbors(y)[0]
+        y_nn = NearestNeighbors(n_neighbors=1, leaf_size=1, algorithm='kd_tree', metric=metric).fit(y)
+        min_x_to_y = y_nn.kneighbors(x)[0]
+        chamfer_dist = np.mean(min_y_to_x) + np.mean(min_x_to_y)
+    else:
+        raise ValueError("Invalid direction type. Supported types: \'y_x\', \'x_y\', \'bi\'")
+        
+    return chamfer_dist
+
+
+# TODO: Implement more robust BCC (see STEPS).
+def bcc(body_verts,
+        pred_cloth_verts,
+        gt_cloth_verts,
+        threshold=0.01
+    ):
+    ''' BCC metric (ClothWild), implemented with known 3D GT.
+    
+        Takes predicted and GT vertices and determines the masks individually
+        w.r.t. SMPL body. For both predicted and GT vertices, the corresponding
+        SMPL vertices are first found and are set as masks. The corresponding
+        vertices are simply the closest vertices found by the same NN algorithm 
+        that CD uses. Then, the BCC metric is calculated as a ratio between the
+        correctly classified vertices and the sum of correctly and incorrectly
+        classified points:
+
+        BCC = (# correct) / (# correct + # incorrect)
+
+        Note that there are two types of incorrect classification. One is when
+        the vertex is classified as covered while it is not. The other is when
+        the vertex should be classified as covered but is not. The sum of these
+        two types is the total number of incorrect classifications.
+
+        Other names:
+        - BCC-3D
+        - (NOTE: naming it BCC would still be correct if properly explained)
+
+        STEPS:
+        1. Segment the body into parts.
+        2. Assign the corresponding labels for clothing mesh by finding the
+           closest body vertex and assign its label.
+        3. For each body vertex, determine whether it is covered by cloth.
+           It is considered covered if there is at least one vertex that
+           satisfies the two conditions:
+           3.1 The clothing vertex is within the specified distance.
+           3.2 The clothing vertex belongs to the corresponding body part.
+        4. Determine covered vertices for both meshes and calculate IoU.
+
+        Simplified function:
+        For now, only find the corresponding clothing vertices by proximity.
+    '''
+    def find_closest_vertex(body_vertex, clothing_verts):
+        distances = np.linalg.norm(clothing_verts - body_vertex, axis=1)
+        closest_index = np.argmin(distances)
+        proximity = np.min(distances)
+        return clothing_verts[closest_index], proximity
+
+    pred_body_mask_idxs = set()
+    gt_body_mask_idxs = set()
+    for bidx, bv in enumerate(body_verts):
+        _, dist = find_closest_vertex(bv, pred_cloth_verts)
+        if dist < threshold:
+            pred_body_mask_idxs.add(bidx)
+        _, dist = find_closest_vertex(bv, gt_cloth_verts)
+        if dist < threshold:
+            gt_body_mask_idxs.add(bidx)
+
+    intersection_idxs = pred_body_mask_idxs & gt_body_mask_idxs
+    union_idxs = pred_body_mask_idxs | gt_body_mask_idxs
+    iou = float(len(intersection_idxs)) / float(len(union_idxs))
+
+    return iou, intersection_idxs
+
+
+# TODO: Implement masked CD.
+def masked_chamfer_distance(
+        body_verts,
+        intersection_body_idxs,
+        pred_cloth_verts,
+        gt_cloth_verts
+    ):
+    ''' A novel metric.
+    
+        Takes predicted and GT vertices. First, calculates the Chamfer distance
+        between the (masked) predicted vertices and GT vertices. Then, it
+        calculates the Chamfer distance between the (masked) GT vertices and
+        the predicted vertices. The final distance is an average.
+
+        (???) What is the mask?
+
+        Does it make sense to come up with a new metric? It seems that, if both
+        meshes are provided along with the SMPL bodies, then the original CD 
+        should work nicely.
+
+        Other possible names:
+        - average corresponding Chamfer distance
+    '''
+    pass
 

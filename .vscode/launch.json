@@ -176,7 +176,8 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--pose_shape_weights", "experiments/drapenet-20k-1024x1024-noheat/saved_models/epoch_026.tar",
+                //"--pose_shape_weights", "experiments/drapenet-50k-significant_augment/saved_models/epoch_023.tar",
+                "--pose_shape_weights", "experiments/drapenet-50k/saved_models/epoch_023.tar",
                 "--cropped_images"
             ]
         },

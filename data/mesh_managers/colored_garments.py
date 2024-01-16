@@ -15,7 +15,7 @@ from data.mesh_managers.common import (
     random_pallete_color
 )
 from utils.drapenet_structure import DrapeNetStructure
-from utils.mesh_utils import concatenate_meshes
+from utils.mesh_utils import concatenate_mesh_list
 from vis.colors import GarmentColors, BodyColors
 
 from tailornet_for_garmentor.models.smpl4garment_utils import SMPL4GarmentOutput
@@ -79,7 +79,7 @@ class ColoredGarmentsMeshManager(MeshManager):
         concat_faces_list = [faces_list[0]]
         concat_color_list = [body_colors]
         for idx in range(len(verts_list)-1):
-            concat_verts, concat_faces = concatenate_meshes(
+            concat_verts, concat_faces = concatenate_mesh_list(
                 vertices_list=[concat_verts_list[idx], verts_list[idx+1]],
                 faces_list=[concat_faces_list[idx], faces_list[idx+1]]
             )

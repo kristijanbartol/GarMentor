@@ -10,7 +10,7 @@ import os
 
 from configs import paths
 from utils.drapenet_structure import DrapeNetStructure
-from utils.mesh_utils import concatenate_meshes
+from utils.mesh_utils import concatenate_mesh_list
 
 from drapenet_for_garmentor.utils_drape import (
     draping,
@@ -139,7 +139,7 @@ class TNParametricModel(ParametricModel):
             )
         
         if lower is not None and upper is not None:
-            body_lower_verts, body_lower_faces = concatenate_meshes(
+            body_lower_verts, body_lower_faces = concatenate_mesh_list(
                 [lower.body_verts, lower.garment_verts],
                 [lower.body_faces, lower.garment_faces]
             )

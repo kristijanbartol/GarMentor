@@ -15,7 +15,7 @@ from rendering.clothed import ClothedRenderer
 
 from utils.image_utils import batch_add_rgb_background, batch_crop_pytorch_affine, batch_crop_opencv_affine
 from utils.label_conversions import convert_2Djoints_to_gaussian_heatmaps_torch
-from utils.mesh_utils import concatenate_meshes
+from utils.mesh_utils import concatenate_mesh_list
 from utils.rigid_transform_utils import rot6d_to_rotmat, aa_rotate_translate_points_pytorch3d
 from utils.sampling_utils import compute_vertex_uncertainties_by_poseMF_shapeGaussian_sampling, joints2D_error_sorted_verts_sampling
 
@@ -132,7 +132,7 @@ def predict_poseMF_shapeGaussian_net(pose_shape_model,
                 style_vector=pred_style_dist.loc[0].cpu().numpy()
             )
             
-            pred_vertices_merged_trimesh, pred_faces_merged_trimesh = concatenate_meshes(
+            pred_vertices_merged_trimesh, pred_faces_merged_trimesh = concatenate_mesh_list(
                 vertices_list = [
                     smpl_output_dict['upper'].body_verts,
                     smpl_output_dict['upper'].garment_verts,

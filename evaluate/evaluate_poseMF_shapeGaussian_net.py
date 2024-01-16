@@ -14,7 +14,7 @@ sys.path.append('/garmentor/')
 from metrics.eval_metrics_tracker import EvalMetricsTracker
 from rendering.body import BodyRenderer
 from utils.cam_utils import orthographic_project_torch
-from utils.mesh_utils import concatenate_meshes
+from utils.mesh_utils import concatenate_mesh_list
 from utils.rigid_transform_utils import rot6d_to_rotmat, aa_rotate_translate_points_pytorch3d, aa_rotate_rotmats
 from utils.joints2d_utils import undo_keypoint_normalisation
 from utils.label_conversions import (
@@ -363,7 +363,7 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
             #       they anyways the state-of-the-art pose&shape estimation model and we can't compete then.
             print(f'Measurements error: {np.mean(np.array(measurements_errors), axis=0) * 1000.}')
             
-            pred_vertices_merged_trimesh, pred_faces_merged_trimesh = concatenate_meshes(
+            pred_vertices_merged_trimesh, pred_faces_merged_trimesh = concatenate_mesh_list(
                 vertices_list = [
                     smpl_output_dict['upper'].body_verts,
                     smpl_output_dict['upper'].garment_verts,
@@ -375,7 +375,7 @@ def evaluate_pose_MF_shapeGaussian_net(pose_shape_model,
                     smpl_output_dict['lower'].garment_verts
                 ]
             )
-            pred_reposed_vertices_merged_trimesh, pred_reposed_faces_merged_trimesh = concatenate_meshes(
+            pred_reposed_vertices_merged_trimesh, pred_reposed_faces_merged_trimesh = concatenate_mesh_list(
                 vertices_list=[
                     smpl_reposed_output_dict['upper'].body_verts,
                     smpl_reposed_output_dict['upper'].garment_verts,

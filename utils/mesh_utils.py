@@ -1,10 +1,12 @@
 from typing import List, Tuple
 import numpy as np
+import trimesh
 
 
-def concatenate_meshes(vertices_list: List[np.ndarray],     # N[(V, 3)]
-                       faces_list: List[np.ndarray]         # N[(F, 3)]
-                       ) -> Tuple[np.ndarray, np.ndarray]:  # (N*V, 3), (N*F, 3)
+def concatenate_mesh_list(
+        vertices_list: List[np.ndarray],     # N[(V, 3)]
+        faces_list: List[np.ndarray]         # N[(F, 3)]
+    ) -> Tuple[np.ndarray, np.ndarray]:  # (N*V, 3), (N*F, 3)
     '''Concatenate a list of vertices arrays and a list of faces arrays.'''
 
     concat_vertices = np.concatenate(vertices_list, axis=0)
