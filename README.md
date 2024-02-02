@@ -1,4 +1,4 @@
-# GarMentor: Synthetic Training for Clothed Avatars
+# GarMentor: Revisiting Synthetic Features for Learning Garment Estimation In the Wild
 
 <img src="https://github.com/kristijanbartol/garmentor/blob/main/assets/Garmentor_Pipeline_Overview.png" width="400">
 
