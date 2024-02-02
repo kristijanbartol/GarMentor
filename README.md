@@ -146,6 +146,14 @@ python run_train.py -E experiments/exp_001 --port 8888
 
 and track the progress in your browser on `localhost:<port>`, for example, `localhost:888`.
 
+## Generated Dataset
+
+<img src="https://github.com/kristijanbartol/GarMentor/blob/main/assets/cat-examples.png" width="400">
+
+## Current Results
+
+<img src="https://github.com/kristijanbartol/GarMentor/blob/main/assets/qualitative.png" width="400">
+
 ## Weaknesses and Future Research
 The current results are not yet competitive with the state-of-the-art. We are working on further improvements.
 
