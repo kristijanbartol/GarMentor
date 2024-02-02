@@ -147,14 +147,11 @@ python run_train.py -E experiments/exp_001 --port 8888
 and track the progress in your browser on `localhost:<port>`, for example, `localhost:888`.
 
 ## Weaknesses and Future Research
-The following aspects of our method may be the subject of future research:
-- Mesh interpenetrations: this occurs occasionally amongst 3D mesh samples drawn from shape and pose distribution predictions. A sample inter-penetratation penalty may be useful.
-- Sample diversity / distribution expressiviness: since the predicted distributions are uni-modal, sample diversity may be limited.
-- Sampling speed: rejection sampling from a matrix-Fisher distribution is currently slow.
-- Non-tight clothing: body shape prediction accuracy suffers when subjects are wearing non-tight clothing, since the synthetic training data does not model clothing in 3D (only uses clothing textures). Perhaps better synthetic data (e.g. [AGORA](https://agora.is.tue.mpg.de)) will alleviate this issue.
+The current results are not yet competitive with the state-of-the-art. We are working on further improvements.
+
 
 ## Acknowledgments
-Code was adapted from/influenced by the following repos - thanks to the authors!
+The code was adapted from/influenced by the following repos - thanks to the authors! Mostly, it was based on Akash Sengupta's repository: [Hierarchical Probabilistic 3D Humans](https://github.com/akashsengupta1997/HierarchicalProbabilistic3DHuman).
 
 - [HMR](https://github.com/akanazawa/hmr)
 - [SPIN](https://github.com/nkolot/SPIN)
